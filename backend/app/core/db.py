@@ -1,35 +1,29 @@
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import SQLModel, create_engine
 
-from app import crud
 from app.core.config import settings
-from app.models import User, UserCreate
+from app.domains.users.domain import UserCreate
+from app.domains.users.service import provide as provide_user_service
+from app.domains.users.usecases.create_user import provide as provide_create_user
 
 # Convert MultiHostUrl to string properly
 database_url = settings.SQLALCHEMY_DATABASE_URI
 engine = create_engine(database_url.unicode_string())
 
 
-# make sure all SQLModel models are imported (app.models) before initializing DB
-# otherwise, SQLModel might fail to initialize relationships properly
-# for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
-
-
-def init_db(session: Session) -> None:
-    # Tables should be created with Alembic migrations
-    # But if you don't want to use migrations, create
-    # the tables un-commenting the next lines
-    # from sqlmodel import SQLModel
-
-    # This works because the models are already imported and registered from app.models
+def init_db() -> None:
+    """Initialize database with tables and first superuser."""
     SQLModel.metadata.create_all(engine)
 
-    user = session.exec(
-        select(User).where(User.email == settings.FIRST_SUPERUSER)
-    ).first()
-    if not user:
+    user_service = provide_user_service()
+    existing_user = user_service.get_user_by_email(settings.FIRST_SUPERUSER)
+
+    if not existing_user:
+        create_user_usecase = provide_create_user()
+
         user_in = UserCreate(
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD,
             is_superuser=True,
         )
-        user = crud.create_user(session=session, user_create=user_in)
+
+        create_user_usecase.execute(user_in, send_welcome_email=False)
