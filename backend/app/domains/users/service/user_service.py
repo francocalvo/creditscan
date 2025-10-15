@@ -10,6 +10,7 @@ from app.domains.users.domain.models import (
     UsersPublic,
     UserUpdate,
 )
+from app.domains.users.domain.options import SearchOptions
 from app.domains.users.repository import provide as provide_repository
 from app.domains.users.repository.user_repository import UserRepository
 
@@ -109,6 +110,37 @@ class UserService:
             UserNotFoundError: If user is not found
         """
         self.user_repository.delete(user_id)
+
+    def search(self, search_options: SearchOptions) -> UsersPublic:
+        """Search users with advanced filtering options.
+
+        This method provides comprehensive search capabilities:
+        - Partial email matching (e.g., "john" matches "john@example.com")
+        - Partial full name matching (e.g., "Smith" matches "John Smith")
+        - Active/inactive status filtering
+        - Superuser status filtering
+        - Sorting by any field (email, full_name, etc.)
+        - Pagination with skip and limit
+
+        Args:
+            search_options: Search options including filters, pagination, and sorting
+
+        Returns:
+            UsersPublic: Paginated search results with total count
+
+        Example:
+            >>> from app.domains.users.domain.options import SearchOptions, SearchFilters
+            >>> options = SearchOptions()
+            >>> options.with_filters(SearchFilters(email="john", is_active=True))
+            >>> results = service.search(options)
+        """
+        users = self.user_repository.search(search_options)
+        count = self.user_repository.count_by_search_options(search_options)
+
+        return UsersPublic(
+            data=[UserPublic.model_validate(user) for user in users],
+            count=count,
+        )
 
     def authenticate(self, email: str, password: str) -> UserPublic | None:
         """Authenticate a user by email and password.

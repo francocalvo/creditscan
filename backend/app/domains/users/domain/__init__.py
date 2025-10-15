@@ -13,6 +13,13 @@ from .models import (
     UserUpdate,
     UserUpdateMe,
 )
+from .options import (
+    SearchFilters,
+    SearchOptions,
+    SearchPagination,
+    SearchSorting,
+    SortOrder,
+)
 
 __all__ = [
     "NewPassword",
@@ -27,4 +34,9 @@ __all__ = [
     "UsersPublic",
     "UserUpdate",
     "UserUpdateMe",
+    "SearchFilters",
+    "SearchOptions",
+    "SearchPagination",
+    "SearchSorting",
+    "SortOrder",
 ]

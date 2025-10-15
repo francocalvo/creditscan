@@ -10,6 +10,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from app.core.security import get_password_hash, verify_password
 from app.domains.users.domain.errors import UserNotFoundError
 from app.domains.users.domain.models import User, UserCreate, UserUpdate
+from app.domains.users.domain.options import SearchOptions, SortOrder
 from app.pkgs.database import get_db_session
 
 
@@ -157,6 +158,105 @@ class UserRepository:
         user = self.get_by_id(user_id)
         self.db_session.delete(user)
         self.db_session.commit()
+
+    def search(self, search_options: SearchOptions) -> list[User]:
+        """Search users using advanced filtering options.
+
+        This is a DAO-style method that supports searching and filtering
+        users by multiple criteria with sorting and pagination.
+
+        Supports:
+        - Partial email matching (LIKE query)
+        - Partial full name matching (LIKE query)
+        - Active/inactive status filtering
+        - Superuser status filtering
+        - Sorting by any field
+        - Pagination
+
+        Args:
+            search_options: Search options including filters, pagination, and sorting
+
+        Returns:
+            list[User]: List of users matching the search criteria
+        """
+        query = select(User)
+
+        # Apply email filter (partial match using LIKE)
+        if search_options.filters.email:
+            email_pattern = f"%{search_options.filters.email}%"
+            query = query.where(User.email.like(email_pattern))  # type: ignore
+
+        # Apply full_name filter (partial match using LIKE)
+        if search_options.filters.full_name:
+            name_pattern = f"%{search_options.filters.full_name}%"
+            query = query.where(User.full_name.like(name_pattern))  # type: ignore
+
+        # Apply is_active filter
+        if search_options.filters.is_active is not None:
+            query = query.where(User.is_active == search_options.filters.is_active)
+
+        # Apply is_superuser filter
+        if search_options.filters.is_superuser is not None:
+            query = query.where(
+                User.is_superuser == search_options.filters.is_superuser
+            )
+
+        # Apply sorting
+        sort_column = getattr(User, search_options.sorting.field, User.email)
+        if search_options.sorting.order == SortOrder.DESC:
+            query = query.order_by(sort_column.desc())  # type: ignore
+        else:
+            query = query.order_by(sort_column.asc())  # type: ignore
+
+        # Apply pagination
+        query = query.offset(search_options.pagination.skip).limit(
+            search_options.pagination.limit
+        )
+
+        result = self.db_session.exec(query)
+        return list(result)
+
+    def count_by_search_options(self, search_options: SearchOptions) -> int:
+        """Count users matching the search criteria.
+
+        Args:
+            search_options: Search options including filters
+
+        Returns:
+            int: Number of users matching the search criteria
+        """
+        query: SelectOfScalar[User] = select(User)
+
+        # Apply email filter (partial match using LIKE)
+        if search_options.filters.email:
+            email_pattern = f"%{search_options.filters.email}%"
+            query = query.where(User.email.like(email_pattern))  # type: ignore
+
+        # Apply full_name filter (partial match using LIKE)
+        if search_options.filters.full_name:
+            name_pattern = f"%{search_options.filters.full_name}%"
+            query = query.where(User.full_name.like(name_pattern))  # type: ignore
+
+        # Apply is_active filter
+        if search_options.filters.is_active is not None:
+            query = query.where(User.is_active == search_options.filters.is_active)
+
+        # Apply is_superuser filter
+        if search_options.filters.is_superuser is not None:
+            query = query.where(
+                User.is_superuser == search_options.filters.is_superuser
+            )
+
+        count_q = (
+            query.with_only_columns(func.count())
+            .order_by(None)
+            .select_from(query.get_final_froms()[0])
+        )
+
+        result = self.db_session.exec(count_q)
+        for count in result:
+            return count  # type: ignore
+        return 0
 
     def authenticate(self, email: str, password: str) -> User | None:
         """Authenticate a user by email and password.
