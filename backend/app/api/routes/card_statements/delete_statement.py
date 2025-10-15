@@ -1,0 +1,45 @@
+"""Delete card statement endpoint."""
+
+import uuid
+
+from fastapi import APIRouter, HTTPException
+
+from app.api.deps import CurrentUser
+from app.domains.card_statements.domain.errors import CardStatementNotFoundError
+from app.domains.card_statements.usecases import (
+    provide_delete_statement,
+    provide_get_statement,
+)
+
+router = APIRouter()
+
+
+@router.delete("/{statement_id}", status_code=204)
+def delete_card_statement(
+    statement_id: uuid.UUID,
+    current_user: CurrentUser,
+) -> None:
+    """Delete a card statement.
+
+    Users can only delete their own statements.
+    Superusers can delete any statement.
+    """
+    try:
+        # First, check if the statement exists and belongs to the user
+        get_usecase = provide_get_statement()
+        existing_statement = get_usecase.execute(statement_id)
+
+        if (
+            existing_statement.user_id != current_user.id
+            and not current_user.is_superuser
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to delete this statement",
+            )
+
+        # Delete the statement
+        delete_usecase = provide_delete_statement()
+        delete_usecase.execute(statement_id)
+    except CardStatementNotFoundError:
+        raise HTTPException(status_code=404, detail="Card statement not found")
