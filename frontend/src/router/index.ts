@@ -78,6 +78,12 @@ const router = createRouter({
           component: LoginView,
           meta: { guest: true },
         },
+        {
+          path: 'signup',
+          name: 'signup',
+          component: () => import('../views/SignUpView.vue'),
+          meta: { guest: true },
+        },
       ]
     },
   ],

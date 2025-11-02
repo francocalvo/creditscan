@@ -99,6 +99,13 @@ const handleSubmit = async () => {
                 class="p-button-primary login-button"
               />
             </div>
+
+            <div class="signup-link">
+              <p>
+                Don't have an account? 
+                <router-link to="/auth/signup" class="link">Sign Up</router-link>
+              </p>
+            </div>
           </form>
         </template>
   </Card>
@@ -107,7 +114,7 @@ const handleSubmit = async () => {
 <style scoped>
 /* Card styles only - layout is handled by AuthLayout */
 .login-card {
-  max-width: 500px;
+  max-width: 420px;
   width: 100%;
   margin: 0 auto;
 }
@@ -118,11 +125,14 @@ const handleSubmit = async () => {
   background-color: var(--surface-card);
   border-radius: var(--border-radius);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  padding: 4rem;
+}
+
+.login-card :deep(.p-card-body) {
+  padding: 0;
 }
 
 .login-card :deep(.p-card-content) {
-  padding: 1.5rem 2rem 2.5rem;
+  padding: 1rem 1.5rem 1.5rem;
   display: flex;
   justify-content: center;
 }
@@ -135,9 +145,9 @@ const handleSubmit = async () => {
 }
 
 .form-field {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   width: 100%;
-  max-width: 450px;
+  max-width: 320px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -156,7 +166,7 @@ const handleSubmit = async () => {
 }
 
 .card-header {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   text-align: center;
   background-color: var(--surface-section);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
@@ -166,7 +176,7 @@ const handleSubmit = async () => {
   margin: 0;
   color: var(--primary-color);
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
 }
 
 .form-field label {
@@ -188,15 +198,15 @@ const handleSubmit = async () => {
 }
 
 .error-message {
-  margin: 1.5rem auto;
+  margin: 1rem auto;
   width: 100%;
-  max-width: 450px;
+  max-width: 320px;
 }
 
 .button-container {
-  margin: 2.5rem auto 0;
+  margin: 1.75rem auto 0;
   width: 100%;
-  max-width: 450px;
+  max-width: 320px;
   display: flex;
   justify-content: center;
 }
@@ -204,5 +214,29 @@ const handleSubmit = async () => {
 .login-button {
   width: 100%;
   min-height: 2.5rem;
+}
+
+.signup-link {
+  margin-top: 1.25rem;
+  text-align: center;
+  width: 100%;
+  max-width: 320px;
+}
+
+.signup-link p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.link:hover {
+  color: var(--primary-color-emphasis);
+  text-decoration: underline;
 }
 </style>

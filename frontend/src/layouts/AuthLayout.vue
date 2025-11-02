@@ -31,13 +31,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
-  max-width: 500px;
+  gap: 1rem;
+  max-width: 420px;
   width: 100%;
+  padding: 1rem;
 }
 
 .auth-logo img {
-  height: 80px;
+  height: 60px;
   width: auto;
 }
 

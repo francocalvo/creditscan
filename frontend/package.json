@@ -1,5 +1,5 @@
 {
-  "name": "findash",
+  "name": "creditscan",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@primeuix/themes": "^1.0.3",
     "@tanstack/vue-query": "^5.74.6",
+    "axios": "^1.13.1",
     "pinia": "^3.0.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.3",
@@ -34,7 +35,7 @@
     "npm-run-all2": "^7.0.2",
     "prettier": "3.5.3",
     "typescript": "~5.8.0",
-    "vite": "^6.2.4",
+    "vite": "^6.4.1",
     "vite-plugin-vue-devtools": "^7.7.2",
     "vue-tsc": "^2.2.8"
   }

@@ -86,14 +86,13 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.removeItem('access_token')
   }
 
-  async function register(userData: any) {
+  async function register(userData: { email: string; password: string; full_name?: string | null }) {
     loading.value = true
     error.value = null
 
     try {
-      await UsersService.registerUser({ requestBody: userData })
-      // Login after registration if your API supports it
-      // or redirect to login
+      const newUser = await UsersService.registerUser({ requestBody: userData })
+      return newUser
     } catch (err) {
       error.value = err instanceof Error ? err : new Error('Registration failed')
       throw error.value
