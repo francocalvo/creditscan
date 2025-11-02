@@ -1,6 +1,55 @@
-# User models have been moved to the users domain module
-# Import them here for backward compatibility
-from app.domains.users.domain.models import (
+"""
+Central model registry.
+
+All SQLModel table models must be imported here to ensure they're registered
+with SQLModel.metadata. This ensures:
+- Tables are created when init_db() is called
+- Alembic can discover models for migrations
+- All models are available in one place
+"""
+
+from sqlmodel import SQLModel
+
+# Card statement models (table=True: CardStatement)
+from app.domains.card_statements.domain.models import (  # noqa
+    CardStatement,
+    CardStatementBase,
+    CardStatementCreate,
+    CardStatementPublic,
+    CardStatementsPublic,
+    CardStatementUpdate,
+)
+
+# Tag models (table=True: Tag)
+from app.domains.tags.domain.models import (  # noqa
+    Tag,
+    TagBase,
+    TagCreate,
+    TagPublic,
+    TagsPublic,
+    TagUpdate,
+)
+
+# Transaction tag models (table=True: TransactionTag)
+from app.domains.transaction_tags.domain.models import (  # noqa
+    TransactionTag,
+    TransactionTagCreate,
+    TransactionTagPublic,
+)
+
+# Transaction models (table=True: Transaction)
+from app.domains.transactions.domain.models import (  # noqa
+    Transaction,
+    TransactionBase,
+    TransactionCreate,
+    TransactionPublic,
+    TransactionsPublic,
+    TransactionUpdate,
+)
+
+# Import all domain table models here to register them with SQLModel metadata
+# User models (table=True: User)
+from app.domains.users.domain.models import (  # noqa
     NewPassword,
     UpdatePassword,
     User,
@@ -25,52 +74,28 @@ __all__ = [
     "UsersPublic",
     "UserUpdate",
     "UserUpdateMe",
+    "CardStatement",
+    "CardStatementBase",
+    "CardStatementCreate",
+    "CardStatementPublic",
+    "CardStatementsPublic",
+    "CardStatementUpdate",
+    "Transaction",
+    "TransactionBase",
+    "TransactionCreate",
+    "TransactionPublic",
+    "TransactionsPublic",
+    "TransactionUpdate",
+    "Tag",
+    "TagBase",
+    "TagCreate",
+    "TagPublic",
+    "TagsPublic",
+    "TagUpdate",
+    "TransactionTag",
+    "TransactionTagCreate",
+    "TransactionTagPublic",
 ]
-
-import uuid
-
-from sqlmodel import Field, Relationship, SQLModel
-
-
-# Shared properties
-class ItemBase(SQLModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=255)
-
-
-# Properties to receive on item creation
-class ItemCreate(ItemBase):
-    pass
-
-
-# Properties to receive on item update
-class ItemUpdate(ItemBase):
-    title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-
-
-# Database model, database table inferred from class name
-class Item(ItemBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, ondelete="CASCADE"
-    )
-    owner: User | None = Relationship(back_populates="items")
-
-
-# Properties to return via API, id is always required
-class ItemPublic(ItemBase):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-
-
-class ItemsPublic(SQLModel):
-    data: list[ItemPublic]
-    count: int
-
-
-# Note: CardStatement models have been moved to the card_statements domain module
-# See:
-# - app.domains.card_statements.domain.models
 
 
 # Generic message
