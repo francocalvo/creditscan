@@ -10,9 +10,13 @@ from app.domains.card_statements.usecases import provide_get_statement
 from app.domains.transaction_tags.domain.errors import (
     TransactionTagNotFoundError,
 )
-from app.domains.transaction_tags.usecases import provide_remove_tag
+from app.domains.transaction_tags.usecases.remove_tag import (
+    provide as provide_remove_tag,
+)
 from app.domains.transactions.domain.errors import TransactionNotFoundError
-from app.domains.transactions.usecases import provide_get_transaction
+from app.domains.transactions.usecases.get_transaction import (
+    provide as provide_get_transaction,
+)
 
 router = APIRouter()
 

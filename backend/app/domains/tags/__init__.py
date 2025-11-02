@@ -10,8 +10,8 @@ from .domain import (
     TagsPublic,
     TagUpdate,
 )
-from .repository import TagRepository, provide_tag_repository
-from .service import TagService, provide_tag_service
+from .repository import TagRepository
+from .service import TagService
 
 __all__ = [
     "Tag",
@@ -24,6 +24,4 @@ __all__ = [
     "InvalidTagDataError",
     "TagRepository",
     "TagService",
-    "provide_tag_repository",
-    "provide_tag_service",
 ]

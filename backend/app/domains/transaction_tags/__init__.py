@@ -8,14 +8,8 @@ from .domain import (
     TransactionTagNotFoundError,
     TransactionTagPublic,
 )
-from .repository import (
-    TransactionTagRepository,
-    provide_transaction_tag_repository,
-)
-from .service import (
-    TransactionTagService,
-    provide_transaction_tag_service,
-)
+from .repository import TransactionTagRepository
+from .service import TransactionTagService
 
 __all__ = [
     "TransactionTag",
@@ -26,6 +20,4 @@ __all__ = [
     "InvalidTransactionTagDataError",
     "TransactionTagRepository",
     "TransactionTagService",
-    "provide_transaction_tag_repository",
-    "provide_transaction_tag_service",
 ]

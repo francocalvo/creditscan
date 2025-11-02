@@ -7,7 +7,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUser
 from app.domains.tags.domain.models import TagsPublic
-from app.domains.tags.usecases import provide_list_tags
+from app.domains.tags.usecases.list_tags import provide as provide_list_tags
 
 router = APIRouter()
 

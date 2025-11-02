@@ -2,7 +2,7 @@
 
 from app.domains.tags.domain.models import TagCreate, TagPublic
 from app.domains.tags.service import TagService
-from app.domains.tags.service import provide as provide_service
+from app.domains.tags.service.tag_service import provide as provide_service
 
 
 class CreateTagUseCase:

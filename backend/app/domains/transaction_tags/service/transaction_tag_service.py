@@ -7,9 +7,11 @@ from app.domains.transaction_tags.domain.models import (
     TransactionTagCreate,
     TransactionTagPublic,
 )
-from app.domains.transaction_tags.repository import provide as provide_repository
 from app.domains.transaction_tags.repository.transaction_tag_repository import (
     TransactionTagRepository,
+)
+from app.domains.transaction_tags.repository.transaction_tag_repository import (
+    provide as provide_repository,
 )
 
 

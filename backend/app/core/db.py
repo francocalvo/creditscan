@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, create_engine
 
+# Import app.models to register all table models with SQLModel.metadata
+# This ensures all tables are created when init_db() is called
 from app.core.config import settings
 from app.domains.users.domain import UserCreate
 from app.domains.users.service import provide as provide_user_service

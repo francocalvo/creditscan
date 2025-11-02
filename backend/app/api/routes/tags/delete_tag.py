@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.deps import CurrentUser
 from app.domains.tags.domain.errors import TagNotFoundError
-from app.domains.tags.usecases import provide_delete_tag, provide_get_tag
+from app.domains.tags.usecases.delete_tag import provide as provide_delete_tag
+from app.domains.tags.usecases.get_tag import provide as provide_get_tag
 
 router = APIRouter()
 

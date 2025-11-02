@@ -10,14 +10,8 @@ from .domain import (
     TransactionsPublic,
     TransactionUpdate,
 )
-from .repository import (
-    TransactionRepository,
-    provide_transaction_repository,
-)
-from .service import (
-    TransactionService,
-    provide_transaction_service,
-)
+from .repository import TransactionRepository
+from .service import TransactionService
 
 __all__ = [
     "Transaction",
@@ -30,6 +24,4 @@ __all__ = [
     "InvalidTransactionDataError",
     "TransactionRepository",
     "TransactionService",
-    "provide_transaction_repository",
-    "provide_transaction_service",
 ]

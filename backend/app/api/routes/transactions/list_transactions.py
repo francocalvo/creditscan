@@ -9,7 +9,9 @@ from app.api.deps import CurrentUser
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases import provide_get_statement
 from app.domains.transactions.domain.models import TransactionsPublic
-from app.domains.transactions.usecases import provide_list_transactions
+from app.domains.transactions.usecases.list_transactions import (
+    provide as provide_list_transactions,
+)
 
 router = APIRouter()
 

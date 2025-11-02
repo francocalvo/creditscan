@@ -16,9 +16,11 @@ from app.domains.transactions.domain.models import (
     TransactionPublic,
     TransactionUpdate,
 )
-from app.domains.transactions.usecases import (
-    provide_get_transaction,
-    provide_update_transaction,
+from app.domains.transactions.usecases.get_transaction import (
+    provide as provide_get_transaction,
+)
+from app.domains.transactions.usecases.update_transaction import (
+    provide as provide_update_transaction,
 )
 
 router = APIRouter()

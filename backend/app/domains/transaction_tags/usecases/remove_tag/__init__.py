@@ -1,5 +1,5 @@
 """Remove tag from transaction usecase."""
 
-from .usecase import RemoveTagFromTransactionUseCase, provide
+from .usecase import RemoveTagFromTransactionUseCase
 
-__all__ = ["RemoveTagFromTransactionUseCase", "provide"]
+__all__ = ["RemoveTagFromTransactionUseCase"]

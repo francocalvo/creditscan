@@ -12,7 +12,9 @@ from app.domains.transactions.domain.models import (
     TransactionCreate,
     TransactionPublic,
 )
-from app.domains.transactions.usecases import provide_create_transaction
+from app.domains.transactions.usecases.create_transaction import (
+    provide as provide_create_transaction,
+)
 
 router = APIRouter()
 

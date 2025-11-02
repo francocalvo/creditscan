@@ -10,9 +10,11 @@ from app.domains.transactions.domain.models import (
     TransactionsPublic,
     TransactionUpdate,
 )
-from app.domains.transactions.repository import provide as provide_repository
 from app.domains.transactions.repository.transaction_repository import (
     TransactionRepository,
+)
+from app.domains.transactions.repository.transaction_repository import (
+    provide as provide_repository,
 )
 
 

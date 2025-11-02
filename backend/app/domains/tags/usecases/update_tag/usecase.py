@@ -4,7 +4,7 @@ import uuid
 
 from app.domains.tags.domain.models import TagPublic, TagUpdate
 from app.domains.tags.service import TagService
-from app.domains.tags.service import provide as provide_service
+from app.domains.tags.service.tag_service import provide as provide_service
 
 
 class UpdateTagUseCase:

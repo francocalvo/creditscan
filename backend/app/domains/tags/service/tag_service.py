@@ -10,8 +10,12 @@ from app.domains.tags.domain.models import (
     TagsPublic,
     TagUpdate,
 )
-from app.domains.tags.repository import provide as provide_repository
-from app.domains.tags.repository.tag_repository import TagRepository
+from app.domains.tags.repository.tag_repository import (
+    TagRepository,
+)
+from app.domains.tags.repository.tag_repository import (
+    provide as provide_repository,
+)
 
 
 class TagService:

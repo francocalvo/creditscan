@@ -1,5 +1,5 @@
 """Add tag to transaction usecase."""
 
-from .usecase import AddTagToTransactionUseCase, provide
+from .usecase import AddTagToTransactionUseCase
 
-__all__ = ["AddTagToTransactionUseCase", "provide"]
+__all__ = ["AddTagToTransactionUseCase"]

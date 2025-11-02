@@ -7,7 +7,9 @@ from app.domains.transactions.domain.models import (
     TransactionUpdate,
 )
 from app.domains.transactions.service import TransactionService
-from app.domains.transactions.service import provide as provide_service
+from app.domains.transactions.service.transaction_service import (
+    provide as provide_service,
+)
 
 
 class UpdateTransactionUseCase:

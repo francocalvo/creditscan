@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException
 from app.api.deps import CurrentUser
 from app.domains.tags.domain.errors import InvalidTagDataError, TagNotFoundError
 from app.domains.tags.domain.models import TagPublic, TagUpdate
-from app.domains.tags.usecases import provide_get_tag, provide_update_tag
+from app.domains.tags.usecases.get_tag import provide as provide_get_tag
+from app.domains.tags.usecases.update_tag import provide as provide_update_tag
 
 router = APIRouter()
 
