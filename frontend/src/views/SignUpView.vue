@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 // Import PrimeVue components
-import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
@@ -87,15 +86,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <Card class="signup-card">
-    <template #header>
-      <div class="card-header">
-        <h2 class="title">Sign Up</h2>
-      </div>
-    </template>
-
-    <template #content>
-      <form @submit.prevent="handleSubmit" class="form-container">
+  <form @submit.prevent="handleSubmit" class="form-container">
         <div class="form-field">
           <label for="fullName">Full Name</label>
           <div class="input-wrapper">
@@ -196,50 +187,25 @@ const handleSubmit = async () => {
             <router-link to="/auth/login" class="link">Log In</router-link>
           </p>
         </div>
-      </form>
-    </template>
-  </Card>
+  </form>
 </template>
 
 <style scoped>
-/* Card styles only - layout is handled by AuthLayout */
-.signup-card {
-  max-width: 420px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-/* Styles specific to the signup card and its contents */
-.signup-card {
-  width: 100%;
-  background-color: var(--surface-card);
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.signup-card :deep(.p-card-body) {
-  padding: 0;
-}
-
-.signup-card :deep(.p-card-content) {
-  padding: 1rem 1.5rem 1.5rem;
-  display: flex;
-  justify-content: center;
-}
-
 .form-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  transition: all 0.4s ease;
 }
 
 .form-field {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
   width: 100%;
   max-width: 320px;
   margin-left: auto;
   margin-right: auto;
+  transition: all 0.4s ease;
 }
 
 .input-wrapper {
@@ -251,22 +217,8 @@ const handleSubmit = async () => {
   width: 100%;
 }
 
-.signup-card :deep(.p-password-input) {
+.input-wrapper :deep(.p-password-input) {
   width: 100%;
-}
-
-.card-header {
-  padding: 1.25rem 1.5rem;
-  text-align: center;
-  background-color: var(--surface-section);
-  border-radius: var(--border-radius) var(--border-radius) 0 0;
-}
-
-.title {
-  margin: 0;
-  color: var(--primary-color);
-  font-weight: 600;
-  font-size: 1.35rem;
 }
 
 .form-field label {
@@ -294,11 +246,12 @@ const handleSubmit = async () => {
 }
 
 .button-container {
-  margin: 1.75rem auto 0;
+  margin: 2rem auto 0;
   width: 100%;
   max-width: 320px;
   display: flex;
   justify-content: center;
+  transition: all 0.4s ease;
 }
 
 .signup-button {
@@ -307,7 +260,7 @@ const handleSubmit = async () => {
 }
 
 .login-link {
-  margin-top: 1.25rem;
+  margin-top: 1.5rem;
   text-align: center;
   width: 100%;
   max-width: 320px;
