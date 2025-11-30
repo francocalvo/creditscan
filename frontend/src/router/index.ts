@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import StatementsView from '../views/StatementsView.vue'
 import { useAuthStore } from '../stores/auth'
 
 // Import layouts
@@ -17,7 +17,17 @@ const router = createRouter({
         {
           path: '', // Default child route for '/'
           name: 'home',
-          component: HomeView,
+          component: StatementsView,
+        },
+        {
+          path: 'analytics',
+          name: 'analytics',
+          component: () => import('../views/AnalyticsView.vue'),
+        },
+        {
+          path: 'transactions',
+          name: 'transactions',
+          component: () => import('../views/TransactionsView.vue'),
         },
         {
           path: 'about',
@@ -28,42 +38,42 @@ const router = createRouter({
         {
           path: 'balance-sheet',
           name: 'balance-sheet',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'monthly-overview',
           name: 'monthly-overview',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'reports',
           name: 'reports',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'queries',
           name: 'queries',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'investment-performance',
           name: 'investment-performance',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'fire-simulations',
           name: 'fire-simulations',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'data-sync',
           name: 'data-sync',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
         {
           path: 'preferences',
           name: 'preferences',
-          component: HomeView,
+          component: () => import('../views/AboutView.vue'),
         },
       ],
     },

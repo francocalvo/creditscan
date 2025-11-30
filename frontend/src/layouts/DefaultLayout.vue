@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import type { MenuItem } from 'primevue/menuitem'
@@ -7,9 +7,38 @@ import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
 import Menu from 'primevue/menu'
 
+import logoLight from '@/assets/logo.svg'
+import logoDark from '@/assets/logo-dark.svg'
+
 // Default layout for authenticated users
 const router = useRouter()
 const authStore = useAuthStore()
+
+// Dark mode detection
+const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
+const logoSrc = computed(() => isDarkMode.value ? logoDark : logoLight)
+
+const updateDarkMode = () => {
+  isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
+}
+
+onMounted(() => {
+  // Create a MutationObserver to watch for class changes on the document element
+  const observer = new MutationObserver(updateDarkMode)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  
+  // Store observer for cleanup
+  ;(window as any).__darkModeObserver = observer
+})
+
+onUnmounted(() => {
+  // Clean up observer
+  const observer = (window as any).__darkModeObserver
+  if (observer) {
+    observer.disconnect()
+    delete (window as any).__darkModeObserver
+  }
+})
 
 // User menu toggle
 const userMenu = ref()
@@ -58,6 +87,7 @@ const handleUploadStatement = () => {
 const toggleDarkMode = () => {
   document.documentElement.classList.toggle('my-app-dark')
 }
+
 </script>
 
 <template>
@@ -66,7 +96,8 @@ const toggleDarkMode = () => {
       <div class="header-content">
         <div class="logo">
           <router-link to="/" class="logo-link">
-            FinDash
+            <img :src="logoSrc" alt="FinDash Logo" class="logo-image" />
+            <span class="logo-text">CreditScan</span>
           </router-link>
         </div>
         
@@ -129,19 +160,32 @@ const toggleDarkMode = () => {
 }
 
 .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary-color);
+  display: flex;
+  align-items: center;
 }
 
 .logo-link {
-  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   text-decoration: none;
   transition: opacity 0.2s;
 }
 
 .logo-link:hover {
   opacity: 0.8;
+}
+
+.logo-image {
+  height: 40px;
+  width: auto;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  letter-spacing: -0.02em;
 }
 
 .header-actions {
@@ -183,6 +227,10 @@ const toggleDarkMode = () => {
     padding: 1rem;
   }
   
+  .logo-text {
+    font-size: 1.25rem;
+  }
+  
   .upload-button {
     padding: 0.5rem 1rem;
   }
@@ -190,9 +238,19 @@ const toggleDarkMode = () => {
   .upload-button :deep(.p-button-label) {
     display: none;
   }
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    font-size: 1rem;
+  }
   
-  .content {
-    padding: 1rem;
+  .logo-image {
+    height: 32px;
+  }
+  
+  .header-actions {
+    gap: 0.5rem;
   }
 }
 </style>

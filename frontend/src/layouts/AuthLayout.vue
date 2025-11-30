@@ -5,8 +5,11 @@ import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { useRoute, useRouter } from 'vue-router'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+
+import logoLight from '@/assets/logo.svg'
+import logoDark from '@/assets/logo-dark.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +17,32 @@ const authStore = useAuthStore()
 
 const isSignup = computed(() => route.name === 'signup')
 const pageTitle = computed(() => isSignup.value ? 'Sign Up' : 'Login')
+
+// Dark mode detection
+const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
+const logoSrc = computed(() => isDarkMode.value ? logoDark : logoLight)
+
+const updateDarkMode = () => {
+  isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
+}
+
+onMounted(() => {
+  // Create a MutationObserver to watch for class changes on the document element
+  const observer = new MutationObserver(updateDarkMode)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  
+  // Store observer for cleanup
+  ;(window as any).__darkModeObserver = observer
+})
+
+onUnmounted(() => {
+  // Clean up observer
+  const observer = (window as any).__darkModeObserver
+  if (observer) {
+    observer.disconnect()
+    delete (window as any).__darkModeObserver
+  }
+})
 
 // Form state
 const email = ref('')
@@ -114,7 +143,7 @@ watch(() => route.name, () => {
   <div class="auth-layout">
     <div class="auth-container">
       <div class="auth-logo">
-        <img src="@/assets/logo.svg" alt="FindDash Logo" />
+        <img :src="logoSrc" alt="FindDash Logo" />
       </div>
       
       <Card class="auth-card">
@@ -272,7 +301,7 @@ watch(() => route.name, () => {
 }
 
 .auth-logo img {
-  height: 60px;
+  height: 100px;
   width: auto;
 }
 
