@@ -64,3 +64,31 @@ General development docs: [development.md](./development.md).
 
 This includes using Docker Compose, custom local domains, `.env` configurations,
 etc.
+
+### Windows + WSL
+
+Startup commands
+
+1. Open Docker Desktop.
+2. Open Ubuntu and:
+3. Run:
+
+```bash
+# Change into correct directory
+cd creditscan
+
+# Open editor
+antigravity .
+
+# Start containers
+docker compose watch
+```
+
+4. (Optional) If we are doing frontend, we could do this:
+
+```bash
+docker compose stop frontend
+cd frontend
+npm install
+npm run dev
+```

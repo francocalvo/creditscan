@@ -6,6 +6,7 @@ import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
+import { useTransactions } from '@/composables/useTransactions'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -22,6 +23,25 @@ const {
   formatDate, 
   formatPeriod 
 } = useStatements()
+
+const {
+  transactions,
+  isLoading: isTransactionsLoading,
+  fetchTransactions,
+  formatCurrency: formatTransactionCurrency,
+  formatDate: formatTransactionDate
+} = useTransactions()
+
+const enrichedTransactions = computed(() => {
+  return transactions.value.map(txn => {
+    const statement = statementsWithCard.value.find(s => s.id === txn.statement_id)
+    return {
+      ...txn,
+      card: statement?.card,
+      status: statement?.status || 'pending'
+    }
+  })
+})
 
 const toast = useToast()
 
@@ -89,6 +109,7 @@ const filteredStatements = computed(() => {
 onMounted(() => {
   fetchStatements()
   fetchBalance()
+  fetchTransactions()
 })
 
 const getStatementCardDisplay = (statement: typeof statementsWithCard.value[0]) => {
@@ -362,12 +383,63 @@ const handlePaymentSubmit = async (paymentData: {
       </div>
     </div>
 
-    <!-- Transactions Section (Placeholder) -->
-    <div v-else-if="activeTab === 'transactions'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-list placeholder-icon"></i>
-        <h3>Transactions</h3>
-        <p>Transaction history coming soon</p>
+    <!-- Transactions Section -->
+    <div v-else-if="activeTab === 'transactions'" class="transactions-section">
+      <div class="section-header">
+        <div class="header-left">
+          <h2 class="section-title">Transactions</h2>
+          <p class="section-subtitle">View all your transactions ordered by date</p>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div v-if="isTransactionsLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading transactions...</p>
+        </div>
+
+        <table v-else-if="enrichedTransactions.length > 0" class="statements-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Card</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="transaction in enrichedTransactions" :key="transaction.id">
+              <td class="date-cell">
+                <i class="pi pi-calendar calendar-icon"></i>
+                {{ formatTransactionDate(transaction.txn_date) }}
+              </td>
+              <td>
+                <div v-if="transaction.card" class="card-info">
+                  <span class="bank-name">{{ transaction.card.bank }}</span>
+                  <span class="card-brand">{{ transaction.card.brand }}</span>
+                </div>
+                <span v-else>-</span>
+              </td>
+              <td>{{ transaction.description }}</td>
+              <td>
+                <span v-if="transaction.category" class="category-badge">
+                  {{ transaction.category }}
+                </span>
+                <span v-else>-</span>
+              </td>
+              <td class="balance-cell">{{ formatTransactionCurrency(transaction.amount, transaction.currency) }}</td>
+              <td>
+                <StatusBadge :status="transaction.status" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div v-else class="empty-state">
+          <p>No transactions found</p>
+        </div>
       </div>
     </div>
 
@@ -820,6 +892,23 @@ const handlePaymentSubmit = async (paymentData: {
   .cards-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.bank-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.card-brand {
+  color: #6b7280;
+  font-size: 12px;
+  text-transform: uppercase;
 }
 </style>
 
