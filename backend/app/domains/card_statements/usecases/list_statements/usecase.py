@@ -19,15 +19,15 @@ class ListCardStatementsUseCase:
         skip: int = 0,
         limit: int = 100,
         user_id: uuid.UUID | None = None,
-        card_last4: str | None = None,
+        card_id: uuid.UUID | None = None,
     ) -> CardStatementsPublic:
         """Execute the usecase to list card statements.
 
         Args:
             skip: Number of records to skip
             limit: Number of records to return
-            user_id: Optional filter by user ID
-            card_last4: Optional filter by card last 4 digits
+            user_id: Optional filter by user ID (via credit card relationship)
+            card_id: Optional filter by card ID
 
         Returns:
             CardStatementsPublic: Paginated statements data
@@ -35,8 +35,8 @@ class ListCardStatementsUseCase:
         filters = {}
         if user_id:
             filters["user_id"] = user_id
-        if card_last4:
-            filters["card_last4"] = card_last4
+        if card_id:
+            filters["card_id"] = card_id
 
         return self.service.list_statements(skip=skip, limit=limit, filters=filters)
 

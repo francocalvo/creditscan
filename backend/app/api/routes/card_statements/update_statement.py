@@ -14,9 +14,11 @@ from app.domains.card_statements.domain.models import (
     CardStatementPublic,
     CardStatementUpdate,
 )
-from app.domains.card_statements.usecases import (
-    provide_get_statement,
-    provide_update_statement,
+from app.domains.card_statements.usecases.get_statement import (
+    provide as provide_get_statement,
+)
+from app.domains.card_statements.usecases.update_statement import (
+    provide as provide_update_statement,
 )
 
 router = APIRouter()

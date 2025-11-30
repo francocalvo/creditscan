@@ -7,7 +7,9 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUser
 from app.domains.card_statements.domain.models import CardStatementsPublic
-from app.domains.card_statements.usecases import provide_list_statements
+from app.domains.card_statements.usecases.list_statements import (
+    provide as provide_list_statements,
+)
 
 router = APIRouter()
 
@@ -18,11 +20,12 @@ def list_card_statements(
     skip: int = 0,
     limit: int = 100,
     user_id: uuid.UUID | None = None,
-    card_last4: str | None = None,
+    card_id: uuid.UUID | None = None,
 ) -> Any:
     """Retrieve card statements.
 
     By default, returns the current user's statements. Superusers can filter by user_id.
+    Can also filter by card_id.
     """
     usecase = provide_list_statements()
 
@@ -36,5 +39,5 @@ def list_card_statements(
         skip=skip,
         limit=limit,
         user_id=filter_user_id,
-        card_last4=card_last4,
+        card_id=card_id,
     )

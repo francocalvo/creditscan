@@ -12,6 +12,7 @@ from app.domains.card_statements.domain.models import (
     CardStatementCreate,
     CardStatementUpdate,
 )
+from app.domains.credit_cards.domain.models import CreditCard
 from app.pkgs.database import get_db_session
 
 
@@ -42,36 +43,58 @@ class CardStatementRepository:
     def list(
         self, skip: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
     ) -> list[CardStatement]:
-        """List card statements with pagination and filtering."""
+        """List card statements with pagination and filtering.
+
+        Supports filtering by user_id through the credit_card relationship.
+        """
         query = select(CardStatement)
+
+        # Check if we need to join with credit_card for user_id filtering
+        needs_join = filters and "user_id" in filters
+
+        if needs_join:
+            query = query.join(CreditCard, CardStatement.card_id == CreditCard.id)
 
         if filters:
             for field, value in filters.items():
-                if hasattr(CardStatement, field):
+                if field == "user_id":
+                    # Filter by user_id through the credit_card join
+                    query = query.where(CreditCard.user_id == value)
+                elif hasattr(CardStatement, field):
                     query = query.where(getattr(CardStatement, field) == value)
 
         result = self.db_session.exec(query.offset(skip).limit(limit))
         return list(result)
 
     def count(self, filters: dict[str, Any] | None = None) -> int:
-        """Count card statements with optional filtering."""
-        query = select(CardStatement)
+        """Count card statements with optional filtering.
+
+        Supports filtering by user_id through the credit_card relationship.
+        """
+        # Check if we need to join with credit_card for user_id filtering
+        needs_join = filters and "user_id" in filters
+
+        if needs_join:
+            # Use select with join for user_id filtering
+            query = (
+                select(func.count(CardStatement.id))
+                .select_from(CardStatement)
+                .join(CreditCard, CardStatement.card_id == CreditCard.id)
+            )
+        else:
+            # Simple count without join
+            query = select(func.count(CardStatement.id)).select_from(CardStatement)
 
         if filters:
             for field, value in filters.items():
-                if hasattr(CardStatement, field):
+                if field == "user_id":
+                    # Filter by user_id through the credit_card join
+                    query = query.where(CreditCard.user_id == value)
+                elif hasattr(CardStatement, field):
                     query = query.where(getattr(CardStatement, field) == value)
 
-        count_q = (
-            query.with_only_columns(func.count())
-            .order_by(None)
-            .select_from(query.get_final_froms()[0])
-        )
-
-        result = self.db_session.exec(count_q)
-        for count in result:
-            return count  # type: ignore
-        return 0
+        result = self.db_session.exec(query)
+        return result.one()
 
     def update(
         self, statement_id: uuid.UUID, statement_data: CardStatementUpdate

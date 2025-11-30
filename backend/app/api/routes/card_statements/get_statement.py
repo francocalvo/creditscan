@@ -8,7 +8,9 @@ from fastapi import APIRouter, HTTPException
 from app.api.deps import CurrentUser
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.domain.models import CardStatementPublic
-from app.domains.card_statements.usecases import provide_get_statement
+from app.domains.card_statements.usecases.get_statement import (
+    provide as provide_get_statement,
+)
 
 router = APIRouter()
 

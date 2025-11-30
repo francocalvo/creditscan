@@ -20,6 +20,27 @@ from app.domains.card_statements.domain.models import (  # noqa
     CardStatementUpdate,
 )
 
+# Credit card models (table=True: CreditCard)
+from app.domains.credit_cards.domain.models import (  # noqa
+    CardBrand,
+    CreditCard,
+    CreditCardBase,
+    CreditCardCreate,
+    CreditCardPublic,
+    CreditCardsPublic,
+    CreditCardUpdate,
+)
+
+# Payment models (table=True: Payment)
+from app.domains.payments.domain.models import (  # noqa
+    Payment,
+    PaymentBase,
+    PaymentCreate,
+    PaymentPublic,
+    PaymentsPublic,
+    PaymentUpdate,
+)
+
 # Tag models (table=True: Tag)
 from app.domains.tags.domain.models import (  # noqa
     Tag,
@@ -53,6 +74,7 @@ from app.domains.users.domain.models import (  # noqa
     NewPassword,
     UpdatePassword,
     User,
+    UserBalancePublic,
     UserBase,
     UserCreate,
     UserPublic,
@@ -67,6 +89,7 @@ __all__ = [
     "NewPassword",
     "UpdatePassword",
     "User",
+    "UserBalancePublic",
     "UserBase",
     "UserCreate",
     "UserPublic",
@@ -80,6 +103,13 @@ __all__ = [
     "CardStatementPublic",
     "CardStatementsPublic",
     "CardStatementUpdate",
+    "CreditCard",
+    "CreditCardBase",
+    "CreditCardCreate",
+    "CreditCardPublic",
+    "CreditCardsPublic",
+    "CreditCardUpdate",
+    "CardBrand",
     "Transaction",
     "TransactionBase",
     "TransactionCreate",
@@ -95,6 +125,12 @@ __all__ = [
     "TransactionTag",
     "TransactionTagCreate",
     "TransactionTagPublic",
+    "Payment",
+    "PaymentBase",
+    "PaymentCreate",
+    "PaymentPublic",
+    "PaymentsPublic",
+    "PaymentUpdate",
 ]
 
 

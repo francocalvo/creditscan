@@ -6,7 +6,9 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.deps import CurrentUser
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
-from app.domains.card_statements.usecases import provide_get_statement
+from app.domains.card_statements.usecases.get_statement import (
+    provide as provide_get_statement,
+)
 from app.domains.tags.domain.errors import TagNotFoundError
 from app.domains.tags.usecases.get_tag import provide as provide_get_tag
 from app.domains.transaction_tags.domain.errors import (

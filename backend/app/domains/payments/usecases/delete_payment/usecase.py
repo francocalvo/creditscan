@@ -1,0 +1,30 @@
+"""Usecase for deleting a payment."""
+
+from __future__ import annotations
+
+import uuid
+
+from app.domains.payments.service import PaymentService
+
+
+class DeletePaymentUseCase:
+    """Usecase for deleting a payment."""
+
+    def __init__(self, service: PaymentService) -> None:
+        """Initialize the usecase with a service."""
+        self.service = service
+
+    def execute(self, payment_id: uuid.UUID) -> None:
+        """Execute the usecase to delete a payment.
+
+        Args:
+            payment_id: Payment ID to delete
+        """
+        self.service.delete_payment(payment_id)
+
+
+def provide() -> DeletePaymentUseCase:
+    """Provide an instance of DeletePaymentUseCase."""
+    from app.domains.payments.service import provide as provide_service
+
+    return DeletePaymentUseCase(provide_service())

@@ -12,9 +12,7 @@ from sqlmodel import Field, SQLModel
 class CardStatementBase(SQLModel):
     """Base model for card statements."""
 
-    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
-    card_last4: str = Field(max_length=4)
-    card_brand: str | None = None
+    card_id: uuid.UUID = Field(foreign_key="credit_card.id", index=True)
     period_start: date | None = None
     period_end: date | None = None
     close_date: date | None = None
@@ -28,6 +26,7 @@ class CardStatementBase(SQLModel):
     minimum_payment: Decimal | None = Field(
         default=None, sa_column=Column(DECIMAL(32, 2))
     )
+    is_fully_paid: bool = Field(default=False)
 
 
 # For creating new records
@@ -59,8 +58,7 @@ class CardStatementPublic(CardStatementBase):
 class CardStatementUpdate(SQLModel):
     """Model for updating card statement."""
 
-    card_last4: str | None = Field(default=None, max_length=4)
-    card_brand: str | None = None
+    card_id: uuid.UUID | None = None
     period_start: date | None = None
     period_end: date | None = None
     close_date: date | None = None
@@ -74,6 +72,7 @@ class CardStatementUpdate(SQLModel):
     minimum_payment: Decimal | None = Field(
         default=None, sa_column=Column(DECIMAL(32, 2))
     )
+    is_fully_paid: bool | None = None
 
 
 # For paginated lists

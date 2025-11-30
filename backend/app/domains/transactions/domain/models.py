@@ -12,9 +12,7 @@ from sqlmodel import Field, SQLModel  # type: ignore
 class TransactionBase(SQLModel):
     """Base model for transactions."""
 
-    statement_id: uuid.UUID = Field(
-        foreign_key="card_statement.statement_id", index=True
-    )
+    statement_id: uuid.UUID = Field(foreign_key="card_statement.id", index=True)
     txn_date: date
     payee: str = Field(max_length=200)
     description: str = Field(max_length=500)

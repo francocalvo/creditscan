@@ -12,7 +12,7 @@ class TransactionTag(SQLModel, table=True):
     __tablename__ = "transaction_tags"
 
     transaction_id: uuid.UUID = Field(
-        foreign_key="transaction.transaction_id",
+        foreign_key="transaction.id",
         primary_key=True,
     )
     tag_id: uuid.UUID = Field(
