@@ -1,5 +1,5 @@
 import type { ApiError } from './api'
-import useCustomToast from './hooks/useCustomToast'
+import { useCustomToast } from './composables/useToast'
 
 export const emailPattern = {
   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,

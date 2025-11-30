@@ -36,7 +36,7 @@ export function useCreditCards() {
     error.value = null
     
     try {
-      const token = await OpenAPI.TOKEN?.()
+      const token = typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
       const queryParams = new URLSearchParams()
       
       if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString())
