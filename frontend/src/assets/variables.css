@@ -17,17 +17,65 @@
     --focus-ring-color: var(--p-focus-ring-color);
     --focus-ring-offset: var(--p-focus-ring-offset);
     --focus-ring-shadow: var(--p-focus-ring-shadow);
+
+    /* Semantic Colors - Light Mode Default */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
+
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+
+    --border-color: #e5e7eb;
+
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --card-shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
+    --accent-success-bg: #ecfdf5;
+    --accent-success-text: #059669;
+    --accent-danger-bg: #fef2f2;
+    --accent-danger-text: #dc2626;
+    --accent-info-bg: #eff6ff;
+    --accent-info-text: #2563eb;
+
+    /* Legacy PrimeVue Mappings */
+    --surface-ground: var(--bg-secondary);
+    --code-background: var(--bg-tertiary);
+    --code-color: var(--text-secondary);
 }
 
-:root[class*='app-dark'] {
-    --surface-ground: var(--p-surface-950);
-    --code-background: var(--p-surface-800);
-    --code-color: var(--p-surface-100);
-}
+:root.dark {
+    /* Semantic Colors - Dark Mode Override */
+    --bg-primary: #1f2937;
+    /* Gray 800 */
+    --bg-secondary: #111827;
+    /* Gray 900 */
+    --bg-tertiary: #374151;
+    /* Gray 700 */
 
-:root {
-    --surface-ground: var(--p-surface-100);
-    --code-background: var(--p-surface-900);
-    --code-color: var(--p-surface-200);
+    --text-primary: #f9fafb;
+    /* Gray 50 */
+    --text-secondary: #d1d5db;
+    /* Gray 300 */
+    --text-muted: #9ca3af;
+    /* Gray 400 */
 
+    --border-color: #374151;
+    /* Gray 700 */
+
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --card-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+
+    --accent-success-bg: rgba(5, 150, 105, 0.2);
+    --accent-success-text: #34d399;
+    --accent-danger-bg: rgba(220, 38, 38, 0.2);
+    --accent-danger-text: #f87171;
+    --accent-info-bg: rgba(37, 99, 235, 0.2);
+    --accent-info-text: #60a5fa;
+
+    /* Legacy PrimeVue Mappings */
+    --surface-ground: var(--bg-secondary);
+    --code-background: var(--bg-tertiary);
+    --code-color: var(--text-secondary);
 }

@@ -33,8 +33,8 @@ const props = defineProps<Props>()
 
 <style scoped>
 .metric-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   transition: box-shadow 0.2s;
@@ -53,19 +53,19 @@ const props = defineProps<Props>()
 
 .metric-title {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .metric-icon {
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .metric-value {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
@@ -89,12 +89,12 @@ const props = defineProps<Props>()
 }
 
 .change-neutral {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .metric-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 </style>
 

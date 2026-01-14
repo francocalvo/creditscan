@@ -6,6 +6,8 @@ import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
+import TransactionList from '@/components/transactions/TransactionList.vue'
+import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard.vue'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -59,6 +61,9 @@ const pendingStatements = computed(() => {
 })
 
 const creditUtilization = computed(() => {
+  // Return N/A if no cards to avoid ghost numbers
+  if (cards.value.length === 0) return 'N/A'
+  
   // Mock calculation - in real app would use credit limits
   return '23%'
 })
@@ -224,7 +229,7 @@ const handlePaymentSubmit = async (paymentData: {
         </div>
         
         <div class="filter-controls">
-          <button class="filter-button">
+          <button class="filter-button" @click="$router.push('/settings')">
             <i class="pi pi-cog"></i>
           </button>
           <select v-model="filterStatus" class="filter-select">
@@ -354,21 +359,14 @@ const handlePaymentSubmit = async (paymentData: {
     </div>
 
     <!-- Analytics Section (Placeholder) -->
-    <div v-else-if="activeTab === 'analytics'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-chart-line placeholder-icon"></i>
-        <h3>Analytics</h3>
-        <p>Analytics dashboard coming soon</p>
-      </div>
+    <!-- Analytics Section -->
+    <div v-else-if="activeTab === 'analytics'" class="analytics-section">
+      <AnalyticsDashboard />
     </div>
 
-    <!-- Transactions Section (Placeholder) -->
-    <div v-else-if="activeTab === 'transactions'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-list placeholder-icon"></i>
-        <h3>Transactions</h3>
-        <p>Transaction history coming soon</p>
-      </div>
+    <!-- Transactions Section -->
+    <div v-else-if="activeTab === 'transactions'" class="transactions-section">
+      <TransactionList />
     </div>
 
     <!-- Payment Modal -->
@@ -417,13 +415,13 @@ const handlePaymentSubmit = async (paymentData: {
 .section-title {
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-subtitle {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -440,8 +438,8 @@ const handlePaymentSubmit = async (paymentData: {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 0 16px;
 }
@@ -466,8 +464,8 @@ const handlePaymentSubmit = async (paymentData: {
 
 .filter-button {
   padding: 12px 16px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
@@ -475,13 +473,13 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 .filter-button:hover {
-  background: #f9fafb;
+  background: var(--surface-hover);
 }
 
 .filter-select {
   padding: 12px 16px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -492,8 +490,8 @@ const handlePaymentSubmit = async (paymentData: {
 
 /* Table */
 .table-container {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -504,8 +502,8 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 .statements-table thead {
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .statements-table th {
@@ -513,13 +511,13 @@ const handlePaymentSubmit = async (paymentData: {
   text-align: left;
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .statements-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-tertiary);
   transition: background-color 0.2s;
 }
 
@@ -528,18 +526,18 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 .statements-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-hover);
 }
 
 .statements-table td {
   padding: 20px;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .card-cell {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .balance-cell {
@@ -567,18 +565,18 @@ const handlePaymentSubmit = async (paymentData: {
 .action-button {
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-button:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--bg-tertiary);
+  border-color: var(--text-muted);
 }
 
 .action-button:disabled {
@@ -604,7 +602,7 @@ const handlePaymentSubmit = async (paymentData: {
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .spinner {
@@ -625,7 +623,7 @@ const handlePaymentSubmit = async (paymentData: {
 .empty-state {
   padding: 80px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Cards Section */
@@ -771,13 +769,13 @@ const handlePaymentSubmit = async (paymentData: {
 .placeholder-content h3 {
   font-size: 24px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 12px 0;
 }
 
 .placeholder-content p {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 

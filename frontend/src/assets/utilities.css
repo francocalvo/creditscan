@@ -1,0 +1,101 @@
+/* Tailwind-like shim using semantic variables */
+
+/* Backgrounds */
+.bg-white {
+    background-color: var(--bg-primary) !important;
+}
+
+.bg-gray-50 {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.bg-gray-100 {
+    background-color: var(--bg-tertiary) !important;
+}
+
+/* Text Colors */
+.text-gray-900 {
+    color: var(--text-primary) !important;
+}
+
+.text-gray-800 {
+    color: var(--text-primary) !important;
+}
+
+.text-gray-700 {
+    color: var(--text-secondary) !important;
+}
+
+.text-gray-600 {
+    color: var(--text-secondary) !important;
+}
+
+.text-gray-500 {
+    color: var(--text-muted) !important;
+}
+
+.text-gray-400 {
+    color: var(--text-muted) !important;
+}
+
+/* Borders */
+.border-gray-200 {
+    border-color: var(--border-color) !important;
+}
+
+.border-gray-100 {
+    border-color: var(--border-color) !important;
+}
+
+/* Hover States */
+.hover\:bg-gray-50:hover {
+    background-color: var(--surface-hover) !important;
+}
+
+/* Semantic Accents */
+.text-green-600,
+.text-green-500 {
+    color: var(--accent-success-text) !important;
+}
+
+.bg-green-50 {
+    background-color: var(--accent-success-bg) !important;
+}
+
+.border-green-100 {
+    border-color: var(--accent-success-bg) !important;
+}
+
+.text-red-600,
+.text-red-500 {
+    color: var(--accent-danger-text) !important;
+}
+
+.bg-red-50 {
+    background-color: var(--accent-danger-bg) !important;
+}
+
+.border-red-100 {
+    border-color: var(--accent-danger-bg) !important;
+}
+
+.text-blue-600,
+.text-blue-500 {
+    color: var(--accent-info-text) !important;
+}
+
+.bg-blue-50 {
+    background-color: var(--accent-info-bg) !important;
+}
+
+.border-blue-100 {
+    border-color: var(--accent-info-bg) !important;
+}
+
+/* Layout & Spacing (These usually work fine without theme changes, but ensuring defaults) */
+.shadow-sm {
+    box-shadow: var(--card-shadow) !important;
+}
+
+/* Dark Mode Helper */
+/* Since we don't have true tailwind 'dark:', we rely on the variables changing underneath these classes. */

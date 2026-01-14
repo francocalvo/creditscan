@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { RouterView, useRoute } from 'vue-router'
 import Button from 'primevue/button'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useThemeStore } from '@/stores/theme'
+
+const themeStore = useThemeStore()
+const route = useRoute()
+
+onMounted(() => {
+  themeStore.initTheme()
+})
 
 function toggleDarkMode() {
-  document.documentElement.classList.toggle('my-app-dark');
+  themeStore.toggleTheme()
 }
 
-const route = useRoute()
 const isAuthPage = computed(() => {
   return route.path.startsWith('/auth')
 })

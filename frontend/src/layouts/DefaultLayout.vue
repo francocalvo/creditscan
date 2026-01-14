@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import type { MenuItem } from 'primevue/menuitem'
 import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
@@ -13,32 +14,10 @@ import logoDark from '@/assets/logo-dark.svg'
 // Default layout for authenticated users
 const router = useRouter()
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 
 // Dark mode detection
-const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
-const logoSrc = computed(() => isDarkMode.value ? logoDark : logoLight)
-
-const updateDarkMode = () => {
-  isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
-}
-
-onMounted(() => {
-  // Create a MutationObserver to watch for class changes on the document element
-  const observer = new MutationObserver(updateDarkMode)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  
-  // Store observer for cleanup
-  ;(window as any).__darkModeObserver = observer
-})
-
-onUnmounted(() => {
-  // Clean up observer
-  const observer = (window as any).__darkModeObserver
-  if (observer) {
-    observer.disconnect()
-    delete (window as any).__darkModeObserver
-  }
-})
+const logoSrc = computed(() => themeStore.isDark ? logoDark : logoLight)
 
 // User menu toggle
 const userMenu = ref()
@@ -85,7 +64,7 @@ const handleUploadStatement = () => {
 
 // Dark mode toggle
 const toggleDarkMode = () => {
-  document.documentElement.classList.toggle('my-app-dark')
+  themeStore.toggleTheme()
 }
 
 </script>

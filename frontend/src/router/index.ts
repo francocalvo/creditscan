@@ -34,6 +34,11 @@ const router = createRouter({
           name: 'about',
           component: () => import('../views/AboutView.vue'),
         },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/SettingsView.vue'),
+        },
         // Add other authenticated routes here as children of DefaultLayout
         {
           path: 'balance-sheet',
@@ -103,11 +108,11 @@ router.beforeEach((to, from, next) => {
   if (requiresAuth && !authStore.isAuthenticated) {
     // Redirect to login page if not authenticated
     next({ name: 'login', query: { redirect: to.fullPath } })
-  } 
+  }
   else if (guestOnly && authStore.isAuthenticated) {
     // Redirect to home if already authenticated and trying to access a guest route
     next({ name: 'home' })
-  } 
+  }
   else {
     next()
   }
