@@ -1,7 +1,6 @@
 """Card statement repository implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -13,7 +12,6 @@ from app.domains.card_statements.domain.models import (
     CardStatementUpdate,
 )
 from app.domains.credit_cards.domain.models import CreditCard
-from app.pkgs.database import get_db_session
 
 
 class CardStatementRepository:
@@ -118,7 +116,13 @@ class CardStatementRepository:
         self.db_session.commit()
 
 
-@lru_cache
-def provide() -> CardStatementRepository:
-    """Provide an instance of CardStatementRepository."""
-    return CardStatementRepository(get_db_session())
+def provide(session: Session) -> CardStatementRepository:
+    """Provide an instance of CardStatementRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        CardStatementRepository: An instance of CardStatementRepository with the given session.
+    """
+    return CardStatementRepository(session)

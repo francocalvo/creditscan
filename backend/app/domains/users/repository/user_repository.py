@@ -1,7 +1,6 @@
 """User repository implementation."""
 
 import uuid
-from functools import lru_cache
 
 from sqlmodel import Session, func, select
 from sqlmodel.sql.expression import SelectOfScalar
@@ -10,7 +9,6 @@ from app.core.security import get_password_hash
 from app.domains.users.domain.errors import UserNotFoundError
 from app.domains.users.domain.models import User, UserCreate, UserUpdate
 from app.domains.users.domain.options import SearchOptions, SortOrder
-from app.pkgs.database import get_db_session
 
 
 class UserRepository:
@@ -208,11 +206,13 @@ class UserRepository:
         return 0
 
 
-@lru_cache
-def provide() -> UserRepository:
+def provide(session: Session) -> UserRepository:
     """Provide an instance of UserRepository.
 
+    Args:
+        session: The database session to use.
+
     Returns:
-        UserRepository: An instance of UserRepository with a database session.
+        UserRepository: An instance of UserRepository with the given session.
     """
-    return UserRepository(get_db_session())
+    return UserRepository(session)

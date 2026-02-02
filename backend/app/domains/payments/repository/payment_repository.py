@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from functools import lru_cache
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -15,7 +14,6 @@ from app.domains.payments.domain.models import (
     PaymentCreate,
     PaymentUpdate,
 )
-from app.pkgs.database import get_db_session
 
 
 class PaymentRepository:
@@ -103,7 +101,13 @@ class PaymentRepository:
         return total if total is not None else Decimal("0")
 
 
-@lru_cache
-def provide() -> PaymentRepository:
-    """Provide an instance of PaymentRepository."""
-    return PaymentRepository(get_db_session())
+def provide(session: Session) -> PaymentRepository:
+    """Provide an instance of PaymentRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        PaymentRepository: An instance of PaymentRepository with the given session.
+    """
+    return PaymentRepository(session)
