@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.payments.service import PaymentService
 
 
@@ -23,8 +25,12 @@ class DeletePaymentUseCase:
         self.service.delete_payment(payment_id)
 
 
-def provide() -> DeletePaymentUseCase:
-    """Provide an instance of DeletePaymentUseCase."""
+def provide(session: Session) -> DeletePaymentUseCase:
+    """Provide an instance of DeletePaymentUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.payments.service import provide as provide_service
 
-    return DeletePaymentUseCase(provide_service())
+    return DeletePaymentUseCase(provide_service(session))

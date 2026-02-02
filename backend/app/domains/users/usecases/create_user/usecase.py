@@ -1,5 +1,7 @@
 """Usecase for creating a new user."""
 
+from sqlmodel import Session
+
 from app.core.config import settings
 from app.domains.users.domain.errors import DuplicateUserError
 from app.domains.users.domain.models import UserCreate, UserPublic
@@ -60,10 +62,13 @@ class CreateUserUseCase:
         return user
 
 
-def provide() -> CreateUserUseCase:
+def provide(session: Session) -> CreateUserUseCase:
     """Provide an instance of CreateUserUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         CreateUserUseCase: A new instance with the user service
     """
-    return CreateUserUseCase(provide_user_service())
+    return CreateUserUseCase(provide_user_service(session))

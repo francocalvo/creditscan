@@ -4,6 +4,8 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from sqlmodel import Session
+
 from app.domains.card_statements.repository import (
     provide as provide_card_statement_repository,
 )
@@ -110,10 +112,14 @@ class GetUserBalanceUseCase:
         )
 
 
-def provide() -> GetUserBalanceUseCase:
-    """Provide an instance of GetUserBalanceUseCase."""
+def provide(session: Session) -> GetUserBalanceUseCase:
+    """Provide an instance of GetUserBalanceUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     return GetUserBalanceUseCase(
-        provide_card_statement_repository(),
-        provide_transaction_repository(),
-        provide_payment_repository(),
+        provide_card_statement_repository(session),
+        provide_transaction_repository(session),
+        provide_payment_repository(session),
     )

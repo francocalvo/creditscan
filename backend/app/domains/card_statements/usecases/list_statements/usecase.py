@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.card_statements.domain.models import CardStatementsPublic
 from app.domains.card_statements.service import CardStatementService
 from app.domains.card_statements.service import provide as provide_service
@@ -41,6 +43,10 @@ class ListCardStatementsUseCase:
         return self.service.list_statements(skip=skip, limit=limit, filters=filters)
 
 
-def provide() -> ListCardStatementsUseCase:
-    """Provide an instance of ListCardStatementsUseCase."""
-    return ListCardStatementsUseCase(provide_service())
+def provide(session: Session) -> ListCardStatementsUseCase:
+    """Provide an instance of ListCardStatementsUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return ListCardStatementsUseCase(provide_service(session))

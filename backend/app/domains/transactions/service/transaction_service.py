@@ -1,8 +1,9 @@
 """Transaction service implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
+
+from sqlmodel import Session
 
 from app.domains.transactions.domain.models import (
     TransactionCreate,
@@ -59,7 +60,10 @@ class TransactionService:
         self.repository.delete(transaction_id)
 
 
-@lru_cache
-def provide() -> TransactionService:
-    """Provide an instance of TransactionService."""
-    return TransactionService(provide_repository())
+def provide(session: Session) -> TransactionService:
+    """Provide an instance of TransactionService.
+
+    Args:
+        session: The database session to use.
+    """
+    return TransactionService(provide_repository(session))

@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.core.security import verify_password
 from app.domains.users.domain.errors import (
     InvalidCredentialsError,
@@ -52,10 +54,13 @@ class UpdatePasswordUseCase:
         self.user_service.update_user(user_id, user_update)
 
 
-def provide() -> UpdatePasswordUseCase:
+def provide(session: Session) -> UpdatePasswordUseCase:
     """Provide an instance of UpdatePasswordUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         UpdatePasswordUseCase: A new instance with the user service
     """
-    return UpdatePasswordUseCase(provide_user_service())
+    return UpdatePasswordUseCase(provide_user_service(session))

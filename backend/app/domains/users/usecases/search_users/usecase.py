@@ -1,6 +1,6 @@
 """Use case for searching users by email."""
 
-from functools import lru_cache
+from sqlmodel import Session
 
 from app.domains.users.domain.models import UsersPublic
 from app.domains.users.domain.options import (
@@ -96,11 +96,13 @@ class SearchUsersUseCase:
         return self.service.search(search_options)
 
 
-@lru_cache
-def provide() -> SearchUsersUseCase:
+def provide(session: Session) -> SearchUsersUseCase:
     """Provide an instance of SearchUsersUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         SearchUsersUseCase: An instance of the use case with dependencies
     """
-    return SearchUsersUseCase(provide_service())
+    return SearchUsersUseCase(provide_service(session))

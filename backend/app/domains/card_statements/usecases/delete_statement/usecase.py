@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.card_statements.service import CardStatementService
 from app.domains.card_statements.service import provide as provide_service
 
@@ -22,6 +24,10 @@ class DeleteCardStatementUseCase:
         self.service.delete_statement(statement_id)
 
 
-def provide() -> DeleteCardStatementUseCase:
-    """Provide an instance of DeleteCardStatementUseCase."""
-    return DeleteCardStatementUseCase(provide_service())
+def provide(session: Session) -> DeleteCardStatementUseCase:
+    """Provide an instance of DeleteCardStatementUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return DeleteCardStatementUseCase(provide_service(session))

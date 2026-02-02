@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transactions.domain.models import TransactionPublic
 from app.domains.transactions.service import TransactionService
 from app.domains.transactions.service import provide as provide_service
@@ -26,6 +28,10 @@ class GetTransactionUseCase:
         return self.service.get_transaction(transaction_id)
 
 
-def provide() -> GetTransactionUseCase:
-    """Provide an instance of GetTransactionUseCase."""
-    return GetTransactionUseCase(provide_service())
+def provide(session: Session) -> GetTransactionUseCase:
+    """Provide an instance of GetTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return GetTransactionUseCase(provide_service(session))

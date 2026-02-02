@@ -1,5 +1,7 @@
 """Usecase for creating a credit card."""
 
+from sqlmodel import Session
+
 from app.domains.credit_cards.domain.models import (
     CreditCardCreate,
     CreditCardPublic,
@@ -26,8 +28,12 @@ class CreateCreditCardUseCase:
         return self.service.create_card(card_data)
 
 
-def provide() -> CreateCreditCardUseCase:
-    """Provide an instance of CreateCreditCardUseCase."""
+def provide(session: Session) -> CreateCreditCardUseCase:
+    """Provide an instance of CreateCreditCardUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.credit_cards.service import provide as provide_service
 
-    return CreateCreditCardUseCase(provide_service())
+    return CreateCreditCardUseCase(provide_service(session))

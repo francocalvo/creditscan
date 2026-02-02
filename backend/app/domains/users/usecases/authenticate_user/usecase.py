@@ -1,5 +1,7 @@
 """Usecase for authenticating a user."""
 
+from sqlmodel import Session
+
 from app.core.config import settings
 from app.domains.users.domain.errors import DuplicateUserError
 from app.domains.users.domain.models import UserCreate, UserPublic
@@ -60,10 +62,13 @@ class AuthenticateUserUseCase:
         return user
 
 
-def provide() -> AuthenticateUserUseCase:
-    """Provide an instance of CreateUserUseCase.
+def provide(session: Session) -> AuthenticateUserUseCase:
+    """Provide an instance of AuthenticateUserUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
-        CreateUserUseCase: A new instance with the user service
+        AuthenticateUserUseCase: A new instance with the user service
     """
-    return AuthenticateUserUseCase(provide_user_service())
+    return AuthenticateUserUseCase(provide_user_service(session))

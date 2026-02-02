@@ -1,8 +1,9 @@
 """Card statement service implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
+
+from sqlmodel import Session
 
 from app.domains.card_statements.domain.models import (
     CardStatementCreate,
@@ -59,7 +60,10 @@ class CardStatementService:
         self.repository.delete(statement_id)
 
 
-@lru_cache
-def provide() -> CardStatementService:
-    """Provide an instance of CardStatementService."""
-    return CardStatementService(provide_repository())
+def provide(session: Session) -> CardStatementService:
+    """Provide an instance of CardStatementService.
+
+    Args:
+        session: The database session to use.
+    """
+    return CardStatementService(provide_repository(session))

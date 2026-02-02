@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.tags.domain.models import TagPublic, TagUpdate
 from app.domains.tags.service import TagService
 from app.domains.tags.service import provide as provide_service
@@ -31,6 +33,10 @@ class UpdateTagUseCase:
         return self.service.update_tag(tag_id, tag_data)
 
 
-def provide() -> UpdateTagUseCase:
-    """Provide an instance of UpdateTagUseCase."""
-    return UpdateTagUseCase(provide_service())
+def provide(session: Session) -> UpdateTagUseCase:
+    """Provide an instance of UpdateTagUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return UpdateTagUseCase(provide_service(session))

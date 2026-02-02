@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transactions.service import TransactionService
 from app.domains.transactions.service import provide as provide_service
 
@@ -22,6 +24,10 @@ class DeleteTransactionUseCase:
         self.service.delete_transaction(transaction_id)
 
 
-def provide() -> DeleteTransactionUseCase:
-    """Provide an instance of DeleteTransactionUseCase."""
-    return DeleteTransactionUseCase(provide_service())
+def provide(session: Session) -> DeleteTransactionUseCase:
+    """Provide an instance of DeleteTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return DeleteTransactionUseCase(provide_service(session))

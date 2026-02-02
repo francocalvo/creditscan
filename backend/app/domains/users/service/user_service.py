@@ -1,7 +1,8 @@
 """User service implementation."""
 
 import uuid
-from functools import lru_cache
+
+from sqlmodel import Session
 
 from app.core.security import verify_password
 from app.domains.users.domain.models import (
@@ -138,11 +139,13 @@ class UserService:
         return None
 
 
-@lru_cache
-def provide() -> UserService:
+def provide(session: Session) -> UserService:
     """Provide an instance of UserService.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         UserService: An instance of UserService with a repository.
     """
-    return UserService(provide_repository())
+    return UserService(provide_repository(session))

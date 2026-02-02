@@ -1,5 +1,7 @@
 """Usecase for creating a tag."""
 
+from sqlmodel import Session
+
 from app.domains.tags.domain.models import TagCreate, TagPublic
 from app.domains.tags.service import TagService
 from app.domains.tags.service import provide as provide_service
@@ -24,6 +26,10 @@ class CreateTagUseCase:
         return self.service.create_tag(tag_data)
 
 
-def provide() -> CreateTagUseCase:
-    """Provide an instance of CreateTagUseCase."""
-    return CreateTagUseCase(provide_service())
+def provide(session: Session) -> CreateTagUseCase:
+    """Provide an instance of CreateTagUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return CreateTagUseCase(provide_service(session))

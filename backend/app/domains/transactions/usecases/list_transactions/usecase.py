@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transactions.domain.models import TransactionsPublic
 from app.domains.transactions.service import TransactionService
 from app.domains.transactions.service import provide as provide_service
@@ -37,6 +39,10 @@ class ListTransactionsUseCase:
         return self.service.list_transactions(skip=skip, limit=limit, filters=filters)
 
 
-def provide() -> ListTransactionsUseCase:
-    """Provide an instance of ListTransactionsUseCase."""
-    return ListTransactionsUseCase(provide_service())
+def provide(session: Session) -> ListTransactionsUseCase:
+    """Provide an instance of ListTransactionsUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return ListTransactionsUseCase(provide_service(session))

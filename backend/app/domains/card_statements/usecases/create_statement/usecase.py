@@ -1,5 +1,7 @@
 """Usecase for creating a card statement."""
 
+from sqlmodel import Session
+
 from app.domains.card_statements.domain.models import (
     CardStatementCreate,
     CardStatementPublic,
@@ -27,6 +29,10 @@ class CreateCardStatementUseCase:
         return self.service.create_statement(statement_data)
 
 
-def provide() -> CreateCardStatementUseCase:
-    """Provide an instance of CreateCardStatementUseCase."""
-    return CreateCardStatementUseCase(provide_service())
+def provide(session: Session) -> CreateCardStatementUseCase:
+    """Provide an instance of CreateCardStatementUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return CreateCardStatementUseCase(provide_service(session))

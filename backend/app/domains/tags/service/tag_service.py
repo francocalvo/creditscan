@@ -1,8 +1,9 @@
 """Tag service implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
+
+from sqlmodel import Session
 
 from app.domains.tags.domain.models import (
     TagCreate,
@@ -53,7 +54,10 @@ class TagService:
         self.repository.delete(tag_id)
 
 
-@lru_cache
-def provide() -> TagService:
-    """Provide an instance of TagService."""
-    return TagService(provide_repository())
+def provide(session: Session) -> TagService:
+    """Provide an instance of TagService.
+
+    Args:
+        session: The database session to use.
+    """
+    return TagService(provide_repository(session))

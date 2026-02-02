@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transaction_tags.service import TransactionTagService
 from app.domains.transaction_tags.service import provide as provide_service
 
@@ -23,6 +25,10 @@ class RemoveTagFromTransactionUseCase:
         self.service.remove_tag_from_transaction(transaction_id, tag_id)
 
 
-def provide() -> RemoveTagFromTransactionUseCase:
-    """Provide an instance of RemoveTagFromTransactionUseCase."""
-    return RemoveTagFromTransactionUseCase(provide_service())
+def provide(session: Session) -> RemoveTagFromTransactionUseCase:
+    """Provide an instance of RemoveTagFromTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return RemoveTagFromTransactionUseCase(provide_service(session))
