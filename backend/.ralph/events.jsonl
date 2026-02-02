@@ -1,1 +1,0 @@
-{"payload":"M4 test migration done. 29/32 tests pass. 3 failures are pre-existing M3 API bugs (not migration issues): test_reset_password (UserPublic mutation), test_get_existing_user_permissions_error (404 vs 403), test_retrieve_users (405). Lint passes.","topic":"final.complete","ts":"2026-02-02T20:29:35.109190+00:00"}
