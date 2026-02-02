@@ -7,14 +7,15 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, delete
 
 from app.core.config import settings
-from app.core.db import engine, init_db
+from app.core.db import init_db
 from app.main import app
 from app.models import User
+from app.pkgs.database import get_engine
 
 
 @pytest.fixture(scope="session", autouse=True)
 def db() -> Generator[Session, None, None]:
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         init_db()
         yield session
         statement = delete(User)
