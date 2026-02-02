@@ -8,6 +8,7 @@ from .delete_user import router as delete_user_router
 from .get_balance import router as get_balance_router
 from .get_me import router as get_me_router
 from .get_user import router as get_user_router
+from .list_users import router as list_users_router
 from .signup import router as signup_router
 from .update_me import router as update_me_router
 from .update_password_me import router as update_password_me_router
@@ -16,6 +17,7 @@ from .update_user import router as update_user_router
 router = APIRouter(prefix="/users", tags=["users"])
 
 # Include all user routes
+router.include_router(list_users_router)
 router.include_router(create_user_router)
 router.include_router(get_me_router)
 router.include_router(get_balance_router)

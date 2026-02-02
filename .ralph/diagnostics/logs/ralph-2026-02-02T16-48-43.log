@@ -1,0 +1,36 @@
+2026-02-02T19:48:43.719197Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T19:48:43.719292Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T19:48:43.719303Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T19:48:43.719308Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T19:48:43.719605Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 2 open, 5 closed) into prompt
+2026-02-02T19:52:05.082454Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T19:52:05.082659Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T19:52:05.082702Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T19:52:05.082716Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T19:52:05.083018Z  INFO ralph_core::event_loop: Injecting scratchpad (3314 chars) into prompt
+2026-02-02T19:52:05.083310Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 2 open, 5 closed) into prompt
+2026-02-02T19:57:47.288645Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T19:57:47.288900Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T19:57:47.288924Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T19:57:47.288934Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T19:57:47.289179Z  INFO ralph_core::event_loop: Injecting scratchpad (5335 chars) into prompt
+2026-02-02T19:57:47.289778Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 1 open, 6 closed) into prompt
+2026-02-02T19:59:07.245694Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T19:59:07.246888Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T19:59:07.246927Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T19:59:07.246941Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T19:59:07.247287Z  INFO ralph_core::event_loop: Injecting scratchpad (7242 chars) into prompt
+2026-02-02T19:59:07.247765Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 1 open, 6 closed) into prompt
+2026-02-02T20:00:37.467457Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T20:00:37.467687Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T20:00:37.467709Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T20:00:37.467719Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T20:00:37.467954Z  INFO ralph_core::event_loop: Injecting scratchpad (9543 chars) into prompt
+2026-02-02T20:00:37.468246Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 1 open, 6 closed) into prompt
+2026-02-02T20:01:45.304717Z  INFO ralph_core::event_loop: Memory injection check: enabled=true, inject=Auto, workspace_root="/Users/francocalvo/worktrees/pf-app/feat-test-db-injection"
+2026-02-02T20:01:45.305581Z  INFO ralph_core::event_loop: Looking for memories at: "/Users/francocalvo/worktrees/pf-app/feat-test-db-injection/.ralph/agent/memories.md" (exists: false)
+2026-02-02T20:01:45.305629Z  INFO ralph_core::event_loop: Successfully loaded 0 memories from store
+2026-02-02T20:01:45.305635Z  INFO ralph_core::event_loop: Memory store is empty - no memories to inject
+2026-02-02T20:01:45.305951Z  INFO ralph_core::event_loop: Injecting scratchpad (15502 chars) into prompt
+2026-02-02T20:01:45.306274Z  INFO ralph_core::event_loop: Injecting ready tasks (1 ready, 1 open, 6 closed) into prompt
+2026-02-02T20:18:23.689716Z  INFO ralph_tui::app: Ctrl+C detected, signaling main loop

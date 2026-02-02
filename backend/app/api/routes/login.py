@@ -9,6 +9,7 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
+from app.domains.users.repository import provide as provide_repository
 from app.domains.users.service import provide as provide_user_service
 from app.models import Message, NewPassword, Token, UserPublic
 from app.utils import (
@@ -90,8 +91,8 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
     if not email:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    auth_user_service = provide_user_service(session)
-    user = auth_user_service.get_user_by_email(email)
+    user_repo = provide_repository(session)
+    user = user_repo.get_by_email(email)
 
     if not user:
         raise HTTPException(
