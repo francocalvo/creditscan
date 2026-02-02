@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.models import CardStatementsPublic
 from app.domains.card_statements.usecases.list_statements import (
     provide as provide_list_statements,
@@ -16,6 +16,7 @@ router = APIRouter()
 
 @router.get("/", response_model=CardStatementsPublic)
 def list_card_statements(
+    session: SessionDep,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100,
@@ -27,7 +28,7 @@ def list_card_statements(
     By default, returns the current user's statements. Superusers can filter by user_id.
     Can also filter by card_id.
     """
-    usecase = provide_list_statements()
+    usecase = provide_list_statements(session)
 
     # If user_id is not provided, use current user's ID
     # If user_id is provided but user is not superuser, only show their own statements

@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -29,6 +29,7 @@ router = APIRouter()
 
 @router.post("/", response_model=TransactionTagPublic, status_code=201)
 def add_tag_to_transaction(
+    session: SessionDep,
     transaction_tag_in: TransactionTagCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -39,11 +40,11 @@ def add_tag_to_transaction(
     """
     try:
         # Verify that the transaction exists and belongs to the user
-        get_transaction_usecase = provide_get_transaction()
+        get_transaction_usecase = provide_get_transaction(session)
         transaction = get_transaction_usecase.execute(transaction_tag_in.transaction_id)
 
         # Verify ownership through the statement
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
         if statement.user_id != current_user.id and not current_user.is_superuser:
@@ -53,7 +54,7 @@ def add_tag_to_transaction(
             )
 
         # Verify that the tag exists and belongs to the user
-        get_tag_usecase = provide_get_tag()
+        get_tag_usecase = provide_get_tag(session)
         tag = get_tag_usecase.execute(transaction_tag_in.tag_id)
 
         if tag.user_id != current_user.id and not current_user.is_superuser:
@@ -63,7 +64,7 @@ def add_tag_to_transaction(
             )
 
         # Add the tag to the transaction
-        usecase = provide_add_tag()
+        usecase = provide_add_tag(session)
         return usecase.execute(transaction_tag_in)
     except TransactionNotFoundError:
         raise HTTPException(status_code=404, detail="Transaction not found")

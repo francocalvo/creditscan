@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -21,7 +21,9 @@ router = APIRouter()
 
 
 @router.get("/transaction/{transaction_id}", response_model=list[TransactionTagPublic])
-def get_transaction_tags(transaction_id: uuid.UUID, current_user: CurrentUser) -> Any:
+def get_transaction_tags(
+    session: SessionDep, transaction_id: uuid.UUID, current_user: CurrentUser
+) -> Any:
     """Get all tags for a transaction.
 
     Users can only view tags for transactions they own.
@@ -29,15 +31,15 @@ def get_transaction_tags(transaction_id: uuid.UUID, current_user: CurrentUser) -
     """
     try:
         # Verify that the transaction exists and belongs to the user
-        get_transaction_usecase = provide_get_transaction()
+        get_transaction_usecase = provide_get_transaction(session)
         transaction = get_transaction_usecase.execute(transaction_id)
 
         # Verify ownership through the statement
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
         if statement.user_id == current_user.id or current_user.is_superuser:
-            usecase = provide_get_tags()
+            usecase = provide_get_tags(session)
             return usecase.execute(transaction_id)
 
         raise HTTPException(

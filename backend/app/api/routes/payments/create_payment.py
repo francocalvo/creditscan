@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.payments.domain.models import PaymentCreate, PaymentPublic
 from app.domains.payments.usecases.create_payment import provide
 
@@ -15,6 +15,7 @@ router = APIRouter()
 
 @router.post("/", response_model=PaymentPublic, status_code=201)
 def create_payment(
+    session: SessionDep,
     payment_in: PaymentCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -30,5 +31,5 @@ def create_payment(
             detail="You can only create payments for yourself",
         )
 
-    usecase = provide()
+    usecase = provide(session)
     return usecase.execute(payment_in)

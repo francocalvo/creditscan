@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.users.domain.errors import UserNotFoundError
 from app.domains.users.domain.models import UserPublic
 from app.domains.users.service import provide as provide_user_service
@@ -14,10 +14,12 @@ router = APIRouter()
 
 
 @router.get("/{user_id}", response_model=UserPublic)
-def get_user_by_id(user_id: uuid.UUID, current_user: CurrentUser) -> Any:
+def get_user_by_id(
+    session: SessionDep, user_id: uuid.UUID, current_user: CurrentUser
+) -> Any:
     """Get a specific user by id."""
     try:
-        service = provide_user_service()
+        service = provide_user_service(session)
         user = service.get_user(user_id)
 
         # Allow users to see their own data, or superusers to see any user

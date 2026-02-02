@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.credit_cards.domain.errors import InvalidCreditCardDataError
 from app.domains.credit_cards.domain.models import (
     CreditCardCreate,
@@ -17,6 +17,7 @@ router = APIRouter()
 
 @router.post("/", response_model=CreditCardPublic, status_code=201)
 def create_credit_card(
+    session: SessionDep,
     card_in: CreditCardCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -33,7 +34,7 @@ def create_credit_card(
         )
 
     try:
-        usecase = provide()
+        usecase = provide(session)
         return usecase.execute(card_in)
     except InvalidCreditCardDataError as e:
         raise HTTPException(status_code=400, detail=str(e))

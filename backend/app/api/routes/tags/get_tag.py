@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.tags.domain.errors import TagNotFoundError
 from app.domains.tags.domain.models import TagPublic
 from app.domains.tags.usecases.get_tag import provide as provide_get_tag
@@ -14,14 +14,14 @@ router = APIRouter()
 
 
 @router.get("/{tag_id}", response_model=TagPublic)
-def get_tag(tag_id: uuid.UUID, current_user: CurrentUser) -> Any:
+def get_tag(session: SessionDep, tag_id: uuid.UUID, current_user: CurrentUser) -> Any:
     """Get a specific tag by ID.
 
     Users can only view their own tags.
     Superusers can view any tag.
     """
     try:
-        usecase = provide_get_tag()
+        usecase = provide_get_tag(session)
         tag = usecase.execute(tag_id)
 
         # Allow users to see their own tags, or superusers to see any tag

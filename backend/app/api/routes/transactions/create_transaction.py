@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -23,6 +23,7 @@ router = APIRouter()
 
 @router.post("/", response_model=TransactionPublic, status_code=201)
 def create_transaction(
+    session: SessionDep,
     transaction_in: TransactionCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -33,7 +34,7 @@ def create_transaction(
     """
     try:
         # Verify that the statement exists and belongs to the user
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction_in.statement_id)
 
         if statement.user_id != current_user.id and not current_user.is_superuser:
@@ -43,7 +44,7 @@ def create_transaction(
             )
 
         # Create the transaction
-        usecase = provide_create_transaction()
+        usecase = provide_create_transaction(session)
         return usecase.execute(transaction_in)
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")

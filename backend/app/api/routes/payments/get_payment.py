@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.payments.domain.errors import PaymentNotFoundError
 from app.domains.payments.domain.models import PaymentPublic
 from app.domains.payments.usecases.get_payment import provide
@@ -17,6 +17,7 @@ router = APIRouter()
 
 @router.get("/{payment_id}", response_model=PaymentPublic)
 def get_payment(
+    session: SessionDep,
     payment_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> Any:
@@ -26,7 +27,7 @@ def get_payment(
     Superusers can view any payment.
     """
     try:
-        usecase = provide()
+        usecase = provide(session)
         payment = usecase.execute(payment_id)
 
         # Check if user has permission to view this payment

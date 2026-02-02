@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -25,6 +25,7 @@ router = APIRouter()
 
 @router.delete("/transaction/{transaction_id}/tag/{tag_id}", status_code=204)
 def remove_tag_from_transaction(
+    session: SessionDep,
     transaction_id: uuid.UUID,
     tag_id: uuid.UUID,
     current_user: CurrentUser,
@@ -36,11 +37,11 @@ def remove_tag_from_transaction(
     """
     try:
         # Verify that the transaction exists and belongs to the user
-        get_transaction_usecase = provide_get_transaction()
+        get_transaction_usecase = provide_get_transaction(session)
         transaction = get_transaction_usecase.execute(transaction_id)
 
         # Verify ownership through the statement
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
         if statement.user_id != current_user.id and not current_user.is_superuser:
@@ -50,7 +51,7 @@ def remove_tag_from_transaction(
             )
 
         # Remove the tag from the transaction
-        usecase = provide_remove_tag()
+        usecase = provide_remove_tag(session)
         usecase.execute(transaction_id, tag_id)
     except TransactionNotFoundError:
         raise HTTPException(status_code=404, detail="Transaction not found")

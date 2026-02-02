@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.payments.domain.errors import PaymentNotFoundError
 from app.domains.payments.usecases.delete_payment import provide
 from app.domains.payments.usecases.get_payment import provide as provide_get
@@ -18,6 +18,7 @@ router = APIRouter()
 
 @router.delete("/{payment_id}", response_model=Message)
 def delete_payment(
+    session: SessionDep,
     payment_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> Any:
@@ -28,7 +29,7 @@ def delete_payment(
     """
     try:
         # First, check if payment exists and user has permission
-        get_usecase = provide_get()
+        get_usecase = provide_get(session)
         existing_payment = get_usecase.execute(payment_id)
 
         if (
@@ -40,7 +41,7 @@ def delete_payment(
                 detail="You don't have permission to delete this payment",
             )
 
-        usecase = provide()
+        usecase = provide(session)
         usecase.execute(payment_id)
         return Message(message="Payment deleted successfully")
     except PaymentNotFoundError as e:

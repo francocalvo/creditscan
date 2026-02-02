@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.domain.models import CreditCardPublic
 from app.domains.credit_cards.usecases.get_card import provide
@@ -15,6 +15,7 @@ router = APIRouter()
 
 @router.get("/{card_id}", response_model=CreditCardPublic)
 def get_credit_card(
+    session: SessionDep,
     card_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> Any:
@@ -24,7 +25,7 @@ def get_credit_card(
     Superusers can get any card.
     """
     try:
-        usecase = provide()
+        usecase = provide(session)
         card = usecase.execute(card_id)
 
         # Ensure users can only access their own cards

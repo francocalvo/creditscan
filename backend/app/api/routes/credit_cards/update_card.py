@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.domain.models import (
     CreditCardPublic,
@@ -19,6 +19,7 @@ router = APIRouter()
 
 @router.patch("/{card_id}", response_model=CreditCardPublic)
 def update_credit_card(
+    session: SessionDep,
     card_id: uuid.UUID,
     card_in: CreditCardUpdate,
     current_user: CurrentUser,
@@ -30,7 +31,7 @@ def update_credit_card(
     """
     try:
         # First check if the card exists and belongs to the user
-        get_usecase = provide_get_card()
+        get_usecase = provide_get_card(session)
         card = get_usecase.execute(card_id)
 
         # Ensure users can only update their own cards
@@ -40,7 +41,7 @@ def update_credit_card(
                 detail="You can only update your own cards",
             )
 
-        update_usecase = provide_update_card()
+        update_usecase = provide_update_card(session)
         return update_usecase.execute(card_id, card_in)
     except CreditCardNotFoundError:
         raise HTTPException(status_code=404, detail="Credit card not found")

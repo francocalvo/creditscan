@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.delete_statement import (
     provide as provide_delete_statement,
@@ -18,6 +18,7 @@ router = APIRouter()
 
 @router.delete("/{statement_id}", status_code=204)
 def delete_card_statement(
+    session: SessionDep,
     statement_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> None:
@@ -28,7 +29,7 @@ def delete_card_statement(
     """
     try:
         # First, check if the statement exists and belongs to the user
-        get_usecase = provide_get_statement()
+        get_usecase = provide_get_statement(session)
         existing_statement = get_usecase.execute(statement_id)
 
         if (
@@ -41,7 +42,7 @@ def delete_card_statement(
             )
 
         # Delete the statement
-        delete_usecase = provide_delete_statement()
+        delete_usecase = provide_delete_statement(session)
         delete_usecase.execute(statement_id)
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")

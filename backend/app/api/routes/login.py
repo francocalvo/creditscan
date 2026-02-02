@@ -23,12 +23,13 @@ router = APIRouter(tags=["login"])
 
 @router.post("/login/access-token")
 def login_access_token(
+    session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    auth_user_service = provide_user_service()
+    auth_user_service = provide_user_service(session)
     user = auth_user_service.authenticate(
         email=form_data.username, password=form_data.password
     )
@@ -55,11 +56,11 @@ def test_token(current_user: CurrentUser) -> Any:
 
 # TODO: do this in the domain
 @router.post("/password-recovery/{email}")
-def recover_password(email: str) -> Message:
+def recover_password(session: SessionDep, email: str) -> Message:
     """
     Password Recovery
     """
-    auth_user_service = provide_user_service()
+    auth_user_service = provide_user_service(session)
     user = auth_user_service.get_user_by_email(email)
 
     if not user:
@@ -89,7 +90,7 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
     if not email:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    auth_user_service = provide_user_service()
+    auth_user_service = provide_user_service(session)
     user = auth_user_service.get_user_by_email(email)
 
     if not user:
@@ -111,11 +112,11 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
     dependencies=[Depends(get_current_active_superuser)],
     response_class=HTMLResponse,
 )
-def recover_password_html_content(email: str) -> Any:
+def recover_password_html_content(session: SessionDep, email: str) -> Any:
     """
     HTML Content for Password Recovery
     """
-    auth_user_service = provide_user_service()
+    auth_user_service = provide_user_service(session)
     user = auth_user_service.get_user_by_email(email)
 
     if not user:

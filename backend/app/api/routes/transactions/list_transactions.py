@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -20,6 +20,7 @@ router = APIRouter()
 
 @router.get("/", response_model=TransactionsPublic)
 def list_transactions(
+    session: SessionDep,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100,
@@ -34,7 +35,7 @@ def list_transactions(
     if statement_id:
         # Verify that the statement exists and belongs to the user
         try:
-            get_statement_usecase = provide_get_statement()
+            get_statement_usecase = provide_get_statement(session)
             statement = get_statement_usecase.execute(statement_id)
 
             if statement.user_id != current_user.id and not current_user.is_superuser:
@@ -45,5 +46,5 @@ def list_transactions(
         except CardStatementNotFoundError:
             raise HTTPException(status_code=404, detail="Card statement not found")
 
-    usecase = provide_list_transactions()
+    usecase = provide_list_transactions(session)
     return usecase.execute(skip=skip, limit=limit, statement_id=statement_id)

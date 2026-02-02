@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -22,6 +22,7 @@ router = APIRouter()
 
 @router.delete("/{transaction_id}", status_code=204)
 def delete_transaction(
+    session: SessionDep,
     transaction_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> None:
@@ -32,11 +33,11 @@ def delete_transaction(
     """
     try:
         # First, check if the transaction exists and verify ownership
-        get_transaction_usecase = provide_get_transaction()
+        get_transaction_usecase = provide_get_transaction(session)
         existing_transaction = get_transaction_usecase.execute(transaction_id)
 
         # Verify ownership through the statement
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(existing_transaction.statement_id)
 
         if statement.user_id != current_user.id and not current_user.is_superuser:
@@ -46,7 +47,7 @@ def delete_transaction(
             )
 
         # Delete the transaction
-        delete_usecase = provide_delete_transaction()
+        delete_usecase = provide_delete_transaction(session)
         delete_usecase.execute(transaction_id)
     except TransactionNotFoundError:
         raise HTTPException(status_code=404, detail="Transaction not found")

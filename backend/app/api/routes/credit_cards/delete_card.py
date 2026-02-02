@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.usecases.delete_card import provide as provide_delete_card
 from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
@@ -14,6 +14,7 @@ router = APIRouter()
 
 @router.delete("/{card_id}", status_code=204)
 def delete_credit_card(
+    session: SessionDep,
     card_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> None:
@@ -24,7 +25,7 @@ def delete_credit_card(
     """
     try:
         # First check if the card exists and belongs to the user
-        get_usecase = provide_get_card()
+        get_usecase = provide_get_card(session)
         card = get_usecase.execute(card_id)
 
         # Ensure users can only delete their own cards
@@ -34,7 +35,7 @@ def delete_credit_card(
                 detail="You can only delete your own cards",
             )
 
-        delete_usecase = provide_delete_card()
+        delete_usecase = provide_delete_card(session)
         delete_usecase.execute(card_id)
     except CreditCardNotFoundError:
         raise HTTPException(status_code=404, detail="Credit card not found")

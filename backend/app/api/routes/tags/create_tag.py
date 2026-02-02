@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.tags.domain.errors import InvalidTagDataError
 from app.domains.tags.domain.models import TagCreate, TagPublic
 from app.domains.tags.usecases.create_tag import provide as provide_create_tag
@@ -14,6 +14,7 @@ router = APIRouter()
 
 @router.post("/", response_model=TagPublic, status_code=201)
 def create_tag(
+    session: SessionDep,
     tag_in: TagCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -30,7 +31,7 @@ def create_tag(
         )
 
     try:
-        usecase = provide_create_tag()
+        usecase = provide_create_tag(session)
         return usecase.execute(tag_in)
     except InvalidTagDataError as e:
         raise HTTPException(status_code=400, detail=str(e))

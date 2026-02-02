@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import InvalidCardStatementDataError
 from app.domains.card_statements.domain.models import (
     CardStatementCreate,
@@ -20,6 +20,7 @@ router = APIRouter()
 
 @router.post("/", response_model=CardStatementPublic, status_code=201)
 def create_card_statement(
+    session: SessionDep,
     statement_in: CardStatementCreate,
     current_user: CurrentUser,
 ) -> Any:
@@ -30,7 +31,7 @@ def create_card_statement(
     """
     # Verify the credit card exists and belongs to the user
     try:
-        get_card_usecase = provide_get_card()
+        get_card_usecase = provide_get_card(session)
         card = get_card_usecase.execute(statement_in.card_id)
 
         # Ensure users can only create statements for their own cards
@@ -46,7 +47,7 @@ def create_card_statement(
         )
 
     try:
-        usecase = provide_create_statement()
+        usecase = provide_create_statement(session)
         return usecase.execute(statement_in)
     except InvalidCardStatementDataError as e:
         raise HTTPException(status_code=400, detail=str(e))

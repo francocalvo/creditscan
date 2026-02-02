@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.domain.models import CardStatementPublic
 from app.domains.card_statements.usecases.get_statement import (
@@ -16,14 +16,16 @@ router = APIRouter()
 
 
 @router.get("/{statement_id}", response_model=CardStatementPublic)
-def get_card_statement(statement_id: uuid.UUID, current_user: CurrentUser) -> Any:
+def get_card_statement(
+    session: SessionDep, statement_id: uuid.UUID, current_user: CurrentUser
+) -> Any:
     """Get a specific card statement by ID.
 
     Users can only view their own statements.
     Superusers can view any statement.
     """
     try:
-        usecase = provide_get_statement()
+        usecase = provide_get_statement(session)
         statement = usecase.execute(statement_id)
 
         # Allow users to see their own statements, or superusers to see any statement
