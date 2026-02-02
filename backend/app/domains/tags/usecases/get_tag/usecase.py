@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.tags.domain.models import TagPublic
 from app.domains.tags.service import TagService
 from app.domains.tags.service import provide as provide_service
@@ -26,6 +28,10 @@ class GetTagUseCase:
         return self.service.get_tag(tag_id)
 
 
-def provide() -> GetTagUseCase:
-    """Provide an instance of GetTagUseCase."""
-    return GetTagUseCase(provide_service())
+def provide(session: Session) -> GetTagUseCase:
+    """Provide an instance of GetTagUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return GetTagUseCase(provide_service(session))

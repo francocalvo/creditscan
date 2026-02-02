@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.credit_cards.domain.models import CreditCardPublic
 from app.domains.credit_cards.service import CreditCardService
 
@@ -25,8 +27,12 @@ class GetCreditCardUseCase:
         return self.service.get_card(card_id)
 
 
-def provide() -> GetCreditCardUseCase:
-    """Provide an instance of GetCreditCardUseCase."""
+def provide(session: Session) -> GetCreditCardUseCase:
+    """Provide an instance of GetCreditCardUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.credit_cards.service import provide as provide_service
 
-    return GetCreditCardUseCase(provide_service())
+    return GetCreditCardUseCase(provide_service(session))

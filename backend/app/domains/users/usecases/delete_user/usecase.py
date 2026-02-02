@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.users.domain.errors import InvalidUserDataError
 from app.domains.users.service import UserService
 from app.domains.users.service import provide as provide_user_service
@@ -44,10 +46,13 @@ class DeleteUserUseCase:
         self.user_service.delete_user(user_id)
 
 
-def provide() -> DeleteUserUseCase:
+def provide(session: Session) -> DeleteUserUseCase:
     """Provide an instance of DeleteUserUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         DeleteUserUseCase: A new instance with the user service
     """
-    return DeleteUserUseCase(provide_user_service())
+    return DeleteUserUseCase(provide_user_service(session))

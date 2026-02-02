@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.tags.domain.models import TagsPublic
 from app.domains.tags.service import TagService
 from app.domains.tags.service import provide as provide_service
@@ -37,6 +39,10 @@ class ListTagsUseCase:
         return self.service.list_tags(skip=skip, limit=limit, filters=filters)
 
 
-def provide() -> ListTagsUseCase:
-    """Provide an instance of ListTagsUseCase."""
-    return ListTagsUseCase(provide_service())
+def provide(session: Session) -> ListTagsUseCase:
+    """Provide an instance of ListTagsUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return ListTagsUseCase(provide_service(session))

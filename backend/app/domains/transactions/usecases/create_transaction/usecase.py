@@ -1,5 +1,7 @@
 """Usecase for creating a transaction."""
 
+from sqlmodel import Session
+
 from app.domains.transactions.domain.models import (
     TransactionCreate,
     TransactionPublic,
@@ -27,6 +29,10 @@ class CreateTransactionUseCase:
         return self.service.create_transaction(transaction_data)
 
 
-def provide() -> CreateTransactionUseCase:
-    """Provide an instance of CreateTransactionUseCase."""
-    return CreateTransactionUseCase(provide_service())
+def provide(session: Session) -> CreateTransactionUseCase:
+    """Provide an instance of CreateTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return CreateTransactionUseCase(provide_service(session))

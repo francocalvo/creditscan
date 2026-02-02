@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transaction_tags.domain.models import TransactionTagPublic
 from app.domains.transaction_tags.service import TransactionTagService
 from app.domains.transaction_tags.service import provide as provide_service
@@ -26,6 +28,10 @@ class GetTransactionTagsUseCase:
         return self.service.get_transaction_tags(transaction_id)
 
 
-def provide() -> GetTransactionTagsUseCase:
-    """Provide an instance of GetTransactionTagsUseCase."""
-    return GetTransactionTagsUseCase(provide_service())
+def provide(session: Session) -> GetTransactionTagsUseCase:
+    """Provide an instance of GetTransactionTagsUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return GetTransactionTagsUseCase(provide_service(session))

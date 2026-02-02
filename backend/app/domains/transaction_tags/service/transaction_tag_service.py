@@ -1,7 +1,8 @@
 """Transaction tag service implementation."""
 
 import uuid
-from functools import lru_cache
+
+from sqlmodel import Session
 
 from app.domains.transaction_tags.domain.models import (
     TransactionTagCreate,
@@ -44,7 +45,10 @@ class TransactionTagService:
         self.repository.delete(transaction_id, tag_id)
 
 
-@lru_cache
-def provide() -> TransactionTagService:
-    """Provide an instance of TransactionTagService."""
-    return TransactionTagService(provide_repository())
+def provide(session: Session) -> TransactionTagService:
+    """Provide an instance of TransactionTagService.
+
+    Args:
+        session: The database session to use.
+    """
+    return TransactionTagService(provide_repository(session))

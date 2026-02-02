@@ -1,7 +1,6 @@
 """Transaction tag repository implementation."""
 
 import uuid
-from functools import lru_cache
 
 from sqlmodel import Session, select
 
@@ -12,7 +11,6 @@ from app.domains.transaction_tags.domain.models import (
     TransactionTag,
     TransactionTagCreate,
 )
-from app.pkgs.database import get_db_session
 
 
 class TransactionTagRepository:
@@ -66,7 +64,13 @@ class TransactionTagRepository:
         self.db_session.commit()
 
 
-@lru_cache
-def provide() -> TransactionTagRepository:
-    """Provide an instance of TransactionTagRepository."""
-    return TransactionTagRepository(get_db_session())
+def provide(session: Session) -> TransactionTagRepository:
+    """Provide an instance of TransactionTagRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        TransactionTagRepository: An instance of TransactionTagRepository with the given session.
+    """
+    return TransactionTagRepository(session)

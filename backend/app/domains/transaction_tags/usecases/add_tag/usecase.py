@@ -1,5 +1,7 @@
 """Usecase for adding a tag to a transaction."""
 
+from sqlmodel import Session
+
 from app.domains.transaction_tags.domain.models import (
     TransactionTagCreate,
     TransactionTagPublic,
@@ -29,6 +31,10 @@ class AddTagToTransactionUseCase:
         return self.service.add_tag_to_transaction(transaction_tag_data)
 
 
-def provide() -> AddTagToTransactionUseCase:
-    """Provide an instance of AddTagToTransactionUseCase."""
-    return AddTagToTransactionUseCase(provide_service())
+def provide(session: Session) -> AddTagToTransactionUseCase:
+    """Provide an instance of AddTagToTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return AddTagToTransactionUseCase(provide_service(session))

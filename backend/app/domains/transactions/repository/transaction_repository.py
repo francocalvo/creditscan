@@ -1,7 +1,6 @@
 """Transaction repository implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -12,7 +11,6 @@ from app.domains.transactions.domain.models import (
     TransactionCreate,
     TransactionUpdate,
 )
-from app.pkgs.database import get_db_session
 
 
 class TransactionRepository:
@@ -97,7 +95,13 @@ class TransactionRepository:
         self.db_session.commit()
 
 
-@lru_cache
-def provide() -> TransactionRepository:
-    """Provide an instance of TransactionRepository."""
-    return TransactionRepository(get_db_session())
+def provide(session: Session) -> TransactionRepository:
+    """Provide an instance of TransactionRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        TransactionRepository: An instance of TransactionRepository with the given session.
+    """
+    return TransactionRepository(session)

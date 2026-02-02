@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.payments.domain.models import PaymentsPublic
 from app.domains.payments.service import PaymentService
 
@@ -35,8 +37,12 @@ class ListPaymentsUseCase:
         return self.service.list_payments(skip=skip, limit=limit, filters=filters)
 
 
-def provide() -> ListPaymentsUseCase:
-    """Provide an instance of ListPaymentsUseCase."""
+def provide(session: Session) -> ListPaymentsUseCase:
+    """Provide an instance of ListPaymentsUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.payments.service import provide as provide_service
 
-    return ListPaymentsUseCase(provide_service())
+    return ListPaymentsUseCase(provide_service(session))

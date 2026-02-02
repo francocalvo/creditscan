@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
@@ -20,18 +20,20 @@ router = APIRouter()
 
 
 @router.get("/{transaction_id}", response_model=TransactionPublic)
-def get_transaction(transaction_id: uuid.UUID, current_user: CurrentUser) -> Any:
+def get_transaction(
+    session: SessionDep, transaction_id: uuid.UUID, current_user: CurrentUser
+) -> Any:
     """Get a specific transaction by ID.
 
     Users can only view transactions for statements they own.
     Superusers can view any transaction.
     """
     try:
-        usecase = provide_get_transaction()
+        usecase = provide_get_transaction(session)
         transaction = usecase.execute(transaction_id)
 
         # Verify ownership through the statement
-        get_statement_usecase = provide_get_statement()
+        get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
         if statement.user_id == current_user.id or current_user.is_superuser:

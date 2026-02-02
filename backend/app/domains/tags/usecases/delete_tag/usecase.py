@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.tags.service import TagService
 from app.domains.tags.service import provide as provide_service
 
@@ -22,6 +24,10 @@ class DeleteTagUseCase:
         self.service.delete_tag(tag_id)
 
 
-def provide() -> DeleteTagUseCase:
-    """Provide an instance of DeleteTagUseCase."""
-    return DeleteTagUseCase(provide_service())
+def provide(session: Session) -> DeleteTagUseCase:
+    """Provide an instance of DeleteTagUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return DeleteTagUseCase(provide_service(session))

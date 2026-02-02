@@ -1,15 +1,16 @@
 from unittest.mock import patch
 
-from app.crud import create_user
-from app.tests.utils.user import user_authentication_headers
-from app.tests.utils.utils import random_email, random_lower_string
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.security import verify_password
+from app.domains.users.repository import UserRepository
 from app.models import UserCreate
 from app.utils import generate_password_reset_token
+
+from ...utils.user import user_authentication_headers
+from ...utils.utils import random_email, random_lower_string
 
 
 def test_get_access_token(client: TestClient) -> None:
@@ -84,7 +85,7 @@ def test_reset_password(client: TestClient, db: Session) -> None:
         is_active=True,
         is_superuser=False,
     )
-    user = create_user(session=db, user_create=user_create)
+    user = UserRepository(db).create(user_create)
     token = generate_password_reset_token(email=email)
     headers = user_authentication_headers(client=client, email=email, password=password)
     data = {"new_password": new_password, "token": token}

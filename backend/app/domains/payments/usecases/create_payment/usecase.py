@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sqlmodel import Session
+
 from app.domains.payments.domain.models import PaymentCreate, PaymentPublic
 from app.domains.payments.service import PaymentService
 
@@ -25,8 +27,12 @@ class CreatePaymentUseCase:
         return self.service.create_payment(payment_data)
 
 
-def provide() -> CreatePaymentUseCase:
-    """Provide an instance of CreatePaymentUseCase."""
+def provide(session: Session) -> CreatePaymentUseCase:
+    """Provide an instance of CreatePaymentUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.payments.service import provide as provide_service
 
-    return CreatePaymentUseCase(provide_service())
+    return CreatePaymentUseCase(provide_service(session))

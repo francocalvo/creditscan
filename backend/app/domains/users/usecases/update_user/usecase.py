@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.users.domain.errors import DuplicateUserError
 from app.domains.users.domain.models import UserPublic, UserUpdate, UserUpdateMe
 from app.domains.users.service import UserService
@@ -56,10 +58,13 @@ class UpdateUserUseCase:
         return self.user_service.update_user(user_id, update_data)
 
 
-def provide() -> UpdateUserUseCase:
+def provide(session: Session) -> UpdateUserUseCase:
     """Provide an instance of UpdateUserUseCase.
+
+    Args:
+        session: The database session to use.
 
     Returns:
         UpdateUserUseCase: A new instance with the user service
     """
-    return UpdateUserUseCase(provide_user_service())
+    return UpdateUserUseCase(provide_user_service(session))

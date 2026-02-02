@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.transactions.domain.models import (
     TransactionPublic,
     TransactionUpdate,
@@ -34,6 +36,10 @@ class UpdateTransactionUseCase:
         return self.service.update_transaction(transaction_id, transaction_data)
 
 
-def provide() -> UpdateTransactionUseCase:
-    """Provide an instance of UpdateTransactionUseCase."""
-    return UpdateTransactionUseCase(provide_service())
+def provide(session: Session) -> UpdateTransactionUseCase:
+    """Provide an instance of UpdateTransactionUseCase.
+
+    Args:
+        session: The database session to use.
+    """
+    return UpdateTransactionUseCase(provide_service(session))

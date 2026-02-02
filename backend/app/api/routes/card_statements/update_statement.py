@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import (
     CardStatementNotFoundError,
     InvalidCardStatementDataError,
@@ -26,6 +26,7 @@ router = APIRouter()
 
 @router.patch("/{statement_id}", response_model=CardStatementPublic)
 def update_card_statement(
+    session: SessionDep,
     statement_id: uuid.UUID,
     statement_in: CardStatementUpdate,
     current_user: CurrentUser,
@@ -37,7 +38,7 @@ def update_card_statement(
     """
     try:
         # First, check if the statement exists and belongs to the user
-        get_usecase = provide_get_statement()
+        get_usecase = provide_get_statement(session)
         existing_statement = get_usecase.execute(statement_id)
 
         if (
@@ -50,7 +51,7 @@ def update_card_statement(
             )
 
         # Update the statement
-        update_usecase = provide_update_statement()
+        update_usecase = provide_update_statement(session)
         return update_usecase.execute(statement_id, statement_in)
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")

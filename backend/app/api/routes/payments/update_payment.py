@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import CurrentUser
+from app.api.deps import CurrentUser, SessionDep
 from app.domains.payments.domain.errors import PaymentNotFoundError
 from app.domains.payments.domain.models import PaymentPublic, PaymentUpdate
 from app.domains.payments.usecases.get_payment import provide as provide_get
@@ -18,6 +18,7 @@ router = APIRouter()
 
 @router.patch("/{payment_id}", response_model=PaymentPublic)
 def update_payment(
+    session: SessionDep,
     payment_id: uuid.UUID,
     payment_in: PaymentUpdate,
     current_user: CurrentUser,
@@ -29,7 +30,7 @@ def update_payment(
     """
     try:
         # First, check if payment exists and user has permission
-        get_usecase = provide_get()
+        get_usecase = provide_get(session)
         existing_payment = get_usecase.execute(payment_id)
 
         if (
@@ -41,7 +42,7 @@ def update_payment(
                 detail="You don't have permission to update this payment",
             )
 
-        usecase = provide()
+        usecase = provide(session)
         return usecase.execute(payment_id, payment_in)
     except PaymentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

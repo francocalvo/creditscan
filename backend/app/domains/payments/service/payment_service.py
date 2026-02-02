@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from functools import lru_cache
 from typing import Any
+
+from sqlmodel import Session
 
 from app.domains.card_statements.domain.models import CardStatementUpdate
 from app.domains.card_statements.repository.card_statement_repository import (
@@ -111,12 +112,17 @@ class PaymentService:
         self._update_statement_payment_status(statement_id)
 
 
-@lru_cache
-def provide() -> PaymentService:
-    """Provide an instance of PaymentService."""
+def provide(session: Session) -> PaymentService:
+    """Provide an instance of PaymentService.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.card_statements.repository import (
         provide as provide_card_statement_repository,
     )
     from app.domains.payments.repository import provide as provide_repository
 
-    return PaymentService(provide_repository(), provide_card_statement_repository())
+    return PaymentService(
+        provide_repository(session), provide_card_statement_repository(session)
+    )

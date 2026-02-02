@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from sqlmodel import Session
+
 from app.domains.payments.domain.models import PaymentPublic, PaymentUpdate
 from app.domains.payments.service import PaymentService
 
@@ -30,8 +32,12 @@ class UpdatePaymentUseCase:
         return self.service.update_payment(payment_id, payment_data)
 
 
-def provide() -> UpdatePaymentUseCase:
-    """Provide an instance of UpdatePaymentUseCase."""
+def provide(session: Session) -> UpdatePaymentUseCase:
+    """Provide an instance of UpdatePaymentUseCase.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.payments.service import provide as provide_service
 
-    return UpdatePaymentUseCase(provide_service())
+    return UpdatePaymentUseCase(provide_service(session))

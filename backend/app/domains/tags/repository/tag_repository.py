@@ -1,14 +1,12 @@
 """Tag repository implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 from sqlmodel import Session, func, select
 
 from app.domains.tags.domain.errors import TagNotFoundError
 from app.domains.tags.domain.models import Tag, TagCreate, TagUpdate
-from app.pkgs.database import get_db_session
 
 
 class TagRepository:
@@ -87,7 +85,13 @@ class TagRepository:
         self.db_session.commit()
 
 
-@lru_cache
-def provide() -> TagRepository:
-    """Provide an instance of TagRepository."""
-    return TagRepository(get_db_session())
+def provide(session: Session) -> TagRepository:
+    """Provide an instance of TagRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        TagRepository: An instance of TagRepository with the given session.
+    """
+    return TagRepository(session)

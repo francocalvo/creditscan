@@ -1,7 +1,6 @@
 """Credit card repository implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -12,7 +11,6 @@ from app.domains.credit_cards.domain.models import (
     CreditCardCreate,
     CreditCardUpdate,
 )
-from app.pkgs.database import get_db_session
 
 
 class CreditCardRepository:
@@ -91,7 +89,13 @@ class CreditCardRepository:
         self.db_session.commit()
 
 
-@lru_cache
-def provide() -> CreditCardRepository:
-    """Provide an instance of CreditCardRepository."""
-    return CreditCardRepository(get_db_session())
+def provide(session: Session) -> CreditCardRepository:
+    """Provide an instance of CreditCardRepository.
+
+    Args:
+        session: The database session to use.
+
+    Returns:
+        CreditCardRepository: An instance of CreditCardRepository with the given session.
+    """
+    return CreditCardRepository(session)

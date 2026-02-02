@@ -1,8 +1,9 @@
 """Credit card service implementation."""
 
 import uuid
-from functools import lru_cache
 from typing import Any
+
+from sqlmodel import Session
 
 from app.domains.credit_cards.domain.models import (
     CreditCardCreate,
@@ -56,9 +57,12 @@ class CreditCardService:
         self.repository.delete(card_id)
 
 
-@lru_cache
-def provide() -> CreditCardService:
-    """Provide an instance of CreditCardService."""
+def provide(session: Session) -> CreditCardService:
+    """Provide an instance of CreditCardService.
+
+    Args:
+        session: The database session to use.
+    """
     from app.domains.credit_cards.repository import provide as provide_repository
 
-    return CreditCardService(provide_repository())
+    return CreditCardService(provide_repository(session))
