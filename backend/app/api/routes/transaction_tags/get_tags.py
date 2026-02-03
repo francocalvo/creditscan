@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.deps import CurrentUser, SessionDep
 from app.domains.card_statements.domain.errors import CardStatementNotFoundError
-from app.domains.card_statements.repository import (
-    provide as provide_card_statement_repo,
+from app.domains.card_statements.usecases.get_statement import (
+    provide as provide_get_statement,
 )
 from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
