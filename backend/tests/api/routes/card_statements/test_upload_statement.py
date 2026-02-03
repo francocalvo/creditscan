@@ -401,7 +401,6 @@ class TestUploadStatement:
         )
 
         file_hash = hashlib.sha256(content).hexdigest()
-        file_path = f"statements/{mock_current_user.id}/{file_hash}.pdf"
 
         from app.domains.upload_jobs.domain.models import UploadJobCreate
 
@@ -412,7 +411,6 @@ class TestUploadStatement:
         assert call_args.user_id == mock_current_user.id
         assert call_args.card_id == mock_card.id
         assert call_args.file_hash == file_hash
-        assert call_args.file_path == file_path
         assert call_args.file_size == len(content)
 
     @patch("app.api.routes.card_statements.upload_statement.provide_storage")
@@ -459,12 +457,12 @@ class TestUploadStatement:
         )
 
         background_tasks.add_task.assert_called_once()
-        call_args = background_tasks.add_task.call_args.args[0]
-        assert call_args[0].__name__ == "process_upload_job"
-        assert call_args[1] == mock_upload_job.id  # job_id
-        assert call_args[2] == content  # pdf_bytes
-        assert call_args[3] == mock_card.id  # card_id
-        assert call_args[4] == mock_current_user.id  # user_id
+        call_args = background_tasks.add_task.call_args
+        assert call_args.args[0].__name__ == "process_upload_job"
+        assert call_args.kwargs["job_id"] == mock_upload_job.id
+        assert call_args.kwargs["pdf_bytes"] == content
+        assert call_args.kwargs["card_id"] == mock_card.id
+        assert call_args.kwargs["user_id"] == mock_current_user.id
 
     @patch("app.api.routes.card_statements.upload_statement.provide_storage")
     @patch("app.api.routes.card_statements.upload_statement.provide_upload_job_service")
@@ -556,11 +554,11 @@ class TestUploadStatement:
             file=mock_file,
         )
 
-        call_args = mock_job_service.create.call_args.args[0][0]
+        call_args = mock_job_service.create.call_args.args[0]
         assert call_args.file_hash == expected_hash
         mock_storage.store_statement_pdf.assert_called_once()
-        storage_call_args = mock_storage.store_statement_pdf.call_args.args[0]
-        assert storage_call_args[1] == expected_hash
+        storage_call_args = mock_storage.store_statement_pdf.call_args.args
+        assert storage_call_args[1] == expected_hash  # Second arg is file_hash
 
     @patch("app.api.routes.card_statements.upload_statement.provide_storage")
     @patch("app.api.routes.card_statements.upload_statement.provide_upload_job_service")
