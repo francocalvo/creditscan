@@ -1,0 +1,285 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
+import StatusBadge from '@/components/dashboard/StatusBadge.vue'
+import { type StatementWithCard } from '@/composables/useStatements'
+import { getCardWithLast4 } from '@/composables/useCreditCards'
+
+interface Props {
+  visible: boolean
+  statement: StatementWithCard | null
+}
+
+interface Emits {
+  (e: 'update:visible', value: boolean): void
+  (e: 'pay', statement: StatementWithCard): void
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+// Internal visible state that syncs with prop
+const internalVisible = computed({
+  get: () => props.visible,
+  set: (value: boolean) => {
+    emit('update:visible', value)
+  }
+})
+
+// Computed properties
+const cardDisplay = computed(() => {
+  if (!props.statement?.card) return 'Unknown Card'
+  return getCardWithLast4(props.statement.card)
+})
+
+const formattedPeriod = computed(() => {
+  if (!props.statement?.period_start || !props.statement?.period_end) return 'N/A'
+  const start = new Date(props.statement.period_start)
+  const end = new Date(props.statement.period_end)
+
+  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+    return end.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  return `${start.toLocaleDateString('en-US', { month: 'short' })} - ${end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+})
+
+// Helper functions
+const formatCurrency = (amount: number | null): string => {
+  if (amount === null) return '$0.00'
+  return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+const formatDate = (dateStr: string | null): string => {
+  if (!dateStr) return 'N/A'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+// Event handlers
+const handleClose = () => {
+  internalVisible.value = false
+}
+
+const handlePay = () => {
+  if (props.statement) {
+    emit('pay', props.statement)
+  }
+}
+</script>
+
+<template>
+  <Dialog
+    v-model:visible="internalVisible"
+    modal
+    :style="{ width: '850px' }"
+    :closable="true"
+    :draggable="false"
+  >
+    <template #header>
+      <div v-if="statement" class="modal-header">
+        <div class="header-left">
+          <p class="card-info">{{ cardDisplay }}</p>
+          <p class="period">{{ formattedPeriod }}</p>
+        </div>
+        <StatusBadge :status="statement.status" />
+      </div>
+    </template>
+
+    <div v-if="statement" class="modal-content">
+      <!-- Summary Section -->
+      <section class="summary-section">
+        <h3 class="section-title">Statement Summary</h3>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <p class="summary-label">Previous Balance</p>
+            <p class="summary-value">{{ formatCurrency(statement.previous_balance) }}</p>
+          </div>
+
+          <div class="summary-item summary-item--highlight">
+            <p class="summary-label">Current Balance</p>
+            <p class="summary-value">{{ formatCurrency(statement.current_balance) }}</p>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Minimum Payment</p>
+            <p class="summary-value">{{ formatCurrency(statement.minimum_payment) }}</p>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Due Date</p>
+            <p class="summary-value">{{ formatDate(statement.due_date) }}</p>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Close Date</p>
+            <p class="summary-value">{{ formatDate(statement.close_date) }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transactions Placeholder -->
+      <section class="transactions-section">
+        <h3 class="section-title">Transactions</h3>
+        <div class="transactions-placeholder">
+          <p>Transactions section will be added in Step 5</p>
+        </div>
+      </section>
+
+      <!-- Action Buttons -->
+      <div class="modal-actions">
+        <Button
+          label="Pay"
+          icon="pi pi-credit-card"
+          :disabled="statement.is_fully_paid"
+          @click="handlePay"
+          severity="primary"
+        />
+        <Button
+          label="Close"
+          icon="pi pi-times"
+          @click="handleClose"
+          severity="secondary"
+          outlined
+        />
+      </div>
+    </div>
+  </Dialog>
+</template>
+
+<style scoped>
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.card-info {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.period {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+  margin: 0;
+  font-weight: 500;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--surface-50);
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+  margin: 0;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 1.125rem;
+  color: var(--text-color);
+  margin: 0;
+  font-weight: 600;
+}
+
+.summary-item--highlight {
+  background: linear-gradient(135deg, var(--primary-color-alpha-10) 0%, var(--surface-50) 100%);
+  border-color: var(--primary-color);
+}
+
+.summary-item--highlight .summary-value {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.transactions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transactions-placeholder {
+  padding: 2rem;
+  text-align: center;
+  background: var(--surface-50);
+  border-radius: 8px;
+  border: 1px dashed var(--surface-border);
+  color: var(--text-color-secondary);
+}
+
+.transactions-placeholder p {
+  margin: 0;
+  font-size: 0.938rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .p-button {
+    width: 100%;
+  }
+}
+</style>
