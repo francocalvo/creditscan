@@ -1,6 +1,5 @@
 """Create rule endpoint."""
 
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException

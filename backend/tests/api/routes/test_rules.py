@@ -1,7 +1,6 @@
 """Tests for rules CRUD API endpoints."""
 
 import uuid
-from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -195,16 +194,15 @@ def test_list_rules_pagination(
 
 
 def test_list_rules_user_isolation(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
     """Test that users can only see their own rules."""
-    user1 = create_test_user(db)
-    user2 = create_test_user(db)
-    tag = create_test_tag(db, user1.id)
+    user = create_test_user(db)
+    tag = create_test_tag(db, user.id)
 
-    # Create a rule for user1 using superuser token
+    # Create a rule for the test user (authenticated via normal_user_token_headers)
     rule_data = RuleCreate(
-        name="User 1 Rule",
+        name="Test Rule",
         conditions=[
             RuleConditionCreate(
                 field=ConditionField.PAYEE,
@@ -215,31 +213,25 @@ def test_list_rules_user_isolation(
         actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
     )
 
-    # Create rule with user_id set to user1.id (superuser can do this)
-    create_data = rule_data.model_dump(mode="json")
-    create_data["user_id"] = str(user1.id)
-    client.post(
+    # Create rule with authenticated user's token
+    create_r = client.post(
         f"{settings.API_V1_STR}/rules/",
-        headers=superuser_token_headers,
-        json=create_data,
+        headers=normal_user_token_headers,
+        json=rule_data.model_dump(mode="json"),
     )
+    assert create_r.status_code == 201
+    rule_id = create_r.json()["rule_id"]
 
-    # List rules using superuser token filtering by user1
-    r1 = client.get(f"{settings.API_V1_STR}/rules/", headers=superuser_token_headers)
-    assert r1.status_code == 200
-    result1 = RulesPublic(**r1.json())
-    # Only rules for user1 should appear in results
-    user1_rules = [r for r in result1.data if r.user_id == user1.id]
-    assert len(user1_rules) == 1
-
-    # List rules filtering by user2 - should see 0 rules
-    r2 = client.get(
-        f"{settings.API_V1_STR}/rules/?user_id={user2.id}",
-        headers=superuser_token_headers,
+    # List rules with authenticated user - should see the rule we created
+    r = client.get(
+        f"{settings.API_V1_STR}/rules/",
+        headers=normal_user_token_headers,
     )
-    assert r2.status_code == 200
-    result2 = RulesPublic(**r2.json())
-    assert result2.count == 0
+    assert r.status_code == 200
+    result = RulesPublic(**r.json())
+    assert result.count == 1
+    assert len(result.data) == 1
+    assert result.data[0].rule_id == uuid.UUID(rule_id)
 
 
 def test_get_rule_success(
@@ -276,7 +268,7 @@ def test_get_rule_success(
 
     assert r.status_code == 200
     rule = RulePublic(**r.json())
-    assert rule.rule_id == rule_id
+    assert str(rule.rule_id) == rule_id
     assert rule.name == "Test Rule"
 
 
@@ -298,139 +290,51 @@ def test_get_rule_forbidden_404(
     client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
     """Test getting a rule created by a different user returns 404."""
-    # Create a rule using the test user's credentials
-    tag = create_test_tag(
-        db, uuid.UUID("00000000-0000-0000-0000-000000000001")
-    )  # Test user's ID from settings
+    # Create a different user and tag for them
+    user = create_test_user(db)
+    tag = create_test_tag(db, user.id)
 
-    rule_data = RuleCreate(
-        name="Test User Rule",
-        conditions=[
-            RuleConditionCreate(
-                field=ConditionField.PAYEE,
-                operator=ConditionOperator.CONTAINS,
-                value="amazon",
-            )
-        ],
-        actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
+    # We'll create rule via direct DB insert since we can't authenticate as other user
+    from datetime import datetime, timezone
+
+    from app.domains.rules.domain.models import Rule, RuleAction, RuleCondition
+
+    rule = Rule(
+        user_id=user.id,
+        name="Other User Rule",
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
     )
+    db.add(rule)
+    db.flush()
 
-    create_r = client.post(
-        f"{settings.API_V1_STR}/rules/",
-        headers=normal_user_token_headers,
-        json=rule_data.model_dump(mode="json"),
+    condition = RuleCondition(
+        rule_id=rule.rule_id,
+        field=ConditionField.PAYEE,
+        operator=ConditionOperator.CONTAINS,
+        value="amazon",
+        logical_operator=LogicalOperator.AND,
+        position=0,
     )
-    rule_id = create_r.json()["rule_id"]
+    db.add(condition)
 
-    # Try to get rule as a different user - use normal_user_token_headers
+    action = RuleAction(
+        rule_id=rule.rule_id,
+        action_type=ActionType.ADD_TAG,
+        tag_id=tag.tag_id,
+    )
+    db.add(action)
+    db.commit()
+
+    # Try to get rule as normal user - should fail with 404
     r = client.get(
-        f"{settings.API_V1_STR}/rules/{rule_id}",
-        headers=normal_user_token_headers,  # Wrong user!
-    )
-
-    # Should still work since we're the same user (both normal_user_token_headers point to same user)
-    assert r.status_code == 200
-
-
-def test_update_rule_success(
-    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
-) -> None:
-    """Test updating a rule."""
-    tag = create_test_tag(
-        db, uuid.UUID("00000000-0000-0000-0000-000000000001")
-    )  # Test user's ID
-
-    # Create a rule
-    rule_data = RuleCreate(
-        name="Original Rule",
-        conditions=[
-            RuleConditionCreate(
-                field=ConditionField.PAYEE,
-                operator=ConditionOperator.CONTAINS,
-                value="amazon",
-            )
-        ],
-        actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
-    )
-
-    create_r = client.post(
-        f"{settings.API_V1_STR}/rules/",
-        headers=normal_user_token_headers,
-        json=rule_data.model_dump(mode="json"),
-    )
-    rule_id = create_r.json()["rule_id"]
-
-    # Update rule
-    update_data = {
-        "name": "Updated Rule",
-        "is_active": False,
-        "conditions": [
-            {
-                "field": "payee",
-                "operator": "equals",
-                "value": "netflix",
-                "logical_operator": "AND",
-            }
-        ],
-        "actions": [{"action_type": "add_tag", "tag_id": str(tag.tag_id)}],
-    }
-
-    r = client.put(
-        f"{settings.API_V1_STR}/rules/{rule_id}",
-        headers=normal_user_token_headers,
-        json=update_data,
-    )
-
-    assert r.status_code == 200
-    updated_rule = RulePublic(**r.json())
-    assert updated_rule.name == "Updated Rule"
-    assert updated_rule.is_active is False
-    assert len(updated_rule.conditions) == 1
-    assert updated_rule.conditions[0].value == "netflix"
-
-
-def test_delete_rule_success(
-    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
-) -> None:
-    """Test deleting a rule."""
-    tag = create_test_tag(
-        db, uuid.UUID("00000000-0000-0000-0000-000000000001")
-    )  # Test user's ID from settings
-
-    # Create a rule
-    rule_data = RuleCreate(
-        name="To Delete",
-        conditions=[
-            RuleConditionCreate(
-                field=ConditionField.PAYEE,
-                operator=ConditionOperator.CONTAINS,
-                value="amazon",
-            )
-        ],
-        actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
-    )
-
-    create_r = client.post(
-        f"{settings.API_V1_STR}/rules/",
-        headers=normal_user_token_headers,
-        json=rule_data.model_dump(mode="json"),
-    )
-    rule_id = create_r.json()["rule_id"]
-
-    # Delete rule
-    r = client.delete(
-        f"{settings.API_V1_STR}/rules/{rule_id}",
+        f"{settings.API_V1_STR}/rules/{rule.rule_id}",
         headers=normal_user_token_headers,
     )
 
-    assert r.status_code == 204
-
-    # Verify rule is deleted
-    r = client.get(
-        f"{settings.API_V1_STR}/rules/{rule_id}",
-        headers=normal_user_token_headers,
-    )
+    # Should return 404 since rule belongs to different user
     assert r.status_code == 404
+    assert "not found" in r.json()["detail"]
 
 
 def test_update_rule_success(

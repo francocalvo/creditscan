@@ -32,7 +32,7 @@ def update_rule(
     """
     try:
         usecase = provide_update_rule(session)
-        return usecase.execute(rule_id, rule_in, current_user.id)
+        return usecase.execute(rule_id, current_user.id, rule_in)
     except RuleNotFoundError:
         raise HTTPException(status_code=404, detail="Rule not found")
     except RuleValidationError as e:
