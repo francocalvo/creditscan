@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
@@ -21,15 +21,32 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 // Transactions composable
-const { transactions, isLoading, error, fetchTransactions, reset } = useStatementTransactions()
+const { transactions, totalCount, isLoading, error, fetchTransactions, reset } = useStatementTransactions()
+
+// Pagination
+const PAGE_SIZE = 15
+const currentPage = ref(1)
+
+const totalPages = computed(() => {
+  if (totalCount.value === 0) return 1
+  return Math.ceil(totalCount.value / PAGE_SIZE)
+})
+
+const paginationInfo = computed(() => {
+  const startItem = (currentPage.value - 1) * PAGE_SIZE + 1
+  const endItem = Math.min(currentPage.value * PAGE_SIZE, totalCount.value)
+  return `${startItem}-${endItem} of ${totalCount.value}`
+})
 
 // Watch for modal open/close to fetch/reset transactions
 watch(
   () => props.visible,
   (newVisible) => {
     if (newVisible && props.statement) {
-      fetchTransactions(props.statement.id)
+      currentPage.value = 1
+      fetchTransactions(props.statement.id, { skip: 0, limit: PAGE_SIZE })
     } else if (!newVisible) {
+      currentPage.value = 1
       reset()
     }
   }
@@ -85,9 +102,15 @@ const formatInstallments = (cur: number | null, tot: number | null): string => {
   return '-'
 }
 
+const goToPage = (page: number) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  fetchTransactions(props.statement!.id, { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+}
+
 const handleRetry = () => {
   if (props.statement) {
-    fetchTransactions(props.statement.id)
+    fetchTransactions(props.statement.id, { skip: (currentPage.value - 1) * PAGE_SIZE, limit: PAGE_SIZE })
   }
 }
 
@@ -201,6 +224,38 @@ const handlePay = () => {
             </tr>
           </tbody>
         </table>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="pagination">
+          <span class="pagination-info">{{ paginationInfo }}</span>
+          <div class="pagination-nav">
+            <Button
+              icon="pi pi-chevron-left"
+              severity="secondary"
+              text
+              :disabled="currentPage === 1"
+              @click="goToPage(currentPage - 1)"
+              aria-label="Previous page"
+            />
+            <Button
+              v-for="page in totalPages"
+              :key="page"
+              :label="page.toString()"
+              severity="secondary"
+              :outlined="page !== currentPage"
+              @click="goToPage(page)"
+              :aria-current="page === currentPage ? 'page' : undefined"
+            />
+            <Button
+              icon="pi pi-chevron-right"
+              severity="secondary"
+              text
+              :disabled="currentPage === totalPages"
+              @click="goToPage(currentPage + 1)"
+              aria-label="Next page"
+            />
+          </div>
+        </div>
       </section>
 
       <!-- Action Buttons -->
@@ -433,6 +488,31 @@ const handlePay = () => {
 
 .transactions-table .tags {
   color: var(--text-color-secondary);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.pagination-nav {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.pagination-nav :deep(.p-button) {
+  min-width: 2.25rem;
 }
 
 .modal-actions {
