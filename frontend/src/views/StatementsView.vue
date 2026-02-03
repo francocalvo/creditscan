@@ -55,6 +55,7 @@ const showPaymentModal = ref(false)
 const showDetailModal = ref(false)
 const selectedStatement = ref<typeof statementsWithCard.value[0] | null>(null)
 const isProcessingPayment = ref(false)
+const isTransitioningModals = ref(false)
 
 const tabs = [
   { id: 'statements', label: 'Statements' },
@@ -162,10 +163,13 @@ const handleViewDetails = (statement: typeof statementsWithCard.value[0]) => {
 
 // Handle Pay button click from detail modal
 const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
+  if (isTransitioningModals.value) return
+  isTransitioningModals.value = true
   showDetailModal.value = false
   nextTick(() => {
     selectedStatement.value = statement
     showPaymentModal.value = true
+    isTransitioningModals.value = false
   })
 }
 
