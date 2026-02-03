@@ -547,7 +547,7 @@ describe('UploadStatementModal', () => {
 
       await navigateToProcessingStep(wrapper)
 
-      expect(wrapper.text()).toContain('close this window and we\'ll continue processing')
+      expect(wrapper.text()).toContain('close this modal. We\'ll notify you when it\'s done.')
     })
 
     it('Job completion (completed) transitions to success step', async () => {
@@ -583,6 +583,32 @@ describe('UploadStatementModal', () => {
       mockJobStatus.value = 'failed'
       await wrapper.vm.$nextTick()
 
+      expect(wrapper.find('.error-step').exists()).toBe(true)
+    })
+
+    it('Upload failure transitions to error step', async () => {
+      const wrapper = createWrapper()
+
+      // Navigate to upload step
+      const dropdown = wrapper.find('select')
+      await dropdown.setValue('card-1')
+      const nextButton = wrapper.findAll('button').find((b) => b.text() === 'Next')
+      await nextButton!.trigger('click')
+
+      // Select a file
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+      await fileDropZone.vm.$emit('update:modelValue', mockFile)
+
+      // Mock uploadStatement to throw an error
+      mockUploadStatement.mockRejectedValue(new Error('Network error'))
+
+      // Click Upload
+      const uploadButton = wrapper.findAll('button').find((b) => b.text() === 'Upload')
+      await uploadButton!.trigger('click')
+      await flushPromises()
+
+      // Should transition to error step
       expect(wrapper.find('.error-step').exists()).toBe(true)
     })
   })

@@ -128,16 +128,18 @@ async function handleUpload(): Promise<void> {
     return
   }
 
+  // Transition to processing step immediately
+  currentStep.value = 'processing'
+  validationError.value = null
+
   try {
     const job = await uploadStatement(selectedCardId.value, selectedFile.value)
 
     // Start background polling for job status updates
     startBackgroundPolling(job.id, handleJobComplete)
-
-    // Transition to processing step
-    currentStep.value = 'processing'
   } catch (error) {
-    // Error is captured by uploadErrorMessage
+    // Transition to error step to show the user something went wrong
+    currentStep.value = 'error'
     console.error('Upload failed:', error)
   }
 }
@@ -305,7 +307,7 @@ onMounted(() => {
         <div class="processing-content">
           <p class="processing-message">{{ processingStatusMessage }}</p>
           <p class="processing-hint">
-            You can close this window and we'll continue processing in the background.
+            You can close this modal. We'll notify you when it's done.
           </p>
         </div>
       </div>
