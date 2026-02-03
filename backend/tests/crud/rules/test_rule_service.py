@@ -414,3 +414,235 @@ class TestDeleteRule:
         # Verify it still exists for user1
         rule = service.get_rule(created.rule_id, user1.id)
         assert rule is not None
+
+
+class TestOperatorValidation:
+    """Tests for operator-field validation."""
+
+    def test_create_rule_invalid_operator_for_payee_raises_error(
+        self, db: Session
+    ) -> None:
+        """Test creating a rule with invalid operator for payee field raises error."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        rule_data = RuleCreate(
+            name="Invalid Operator Rule",
+            conditions=[
+                RuleConditionCreate(
+                    field=ConditionField.PAYEE,
+                    operator=ConditionOperator.GT,  # GT is not valid for payee
+                    value="test",
+                )
+            ],
+            actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)],
+        )
+
+        with pytest.raises(RuleValidationError, match="not valid for field"):
+            service.create_rule(rule_data, user.id)
+
+    def test_create_rule_invalid_operator_for_description_raises_error(
+        self, db: Session
+    ) -> None:
+        """Test creating a rule with invalid operator for description field raises error."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        rule_data = RuleCreate(
+            name="Invalid Operator Rule",
+            conditions=[
+                RuleConditionCreate(
+                    field=ConditionField.DESCRIPTION,
+                    operator=ConditionOperator.LT,  # LT is not valid for description
+                    value="test",
+                )
+            ],
+            actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)],
+        )
+
+        with pytest.raises(RuleValidationError, match="not valid for field"):
+            service.create_rule(rule_data, user.id)
+
+    def test_create_rule_invalid_operator_for_amount_raises_error(
+        self, db: Session
+    ) -> None:
+        """Test creating a rule with invalid operator for amount field raises error."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        rule_data = RuleCreate(
+            name="Invalid Operator Rule",
+            conditions=[
+                RuleConditionCreate(
+                    field=ConditionField.AMOUNT,
+                    operator=ConditionOperator.CONTAINS,  # CONTAINS is not valid for amount
+                    value="100.00",
+                )
+            ],
+            actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)],
+        )
+
+        with pytest.raises(RuleValidationError, match="not valid for field"):
+            service.create_rule(rule_data, user.id)
+
+    def test_create_rule_invalid_operator_for_date_raises_error(
+        self, db: Session
+    ) -> None:
+        """Test creating a rule with invalid operator for date field raises error."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        rule_data = RuleCreate(
+            name="Invalid Operator Rule",
+            conditions=[
+                RuleConditionCreate(
+                    field=ConditionField.DATE,
+                    operator=ConditionOperator.GT,  # GT is not valid for date
+                    value="2024-06-01",
+                )
+            ],
+            actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)],
+        )
+
+        with pytest.raises(RuleValidationError, match="not valid for field"):
+            service.create_rule(rule_data, user.id)
+
+    def test_create_rule_between_without_value_secondary_raises_error(
+        self, db: Session
+    ) -> None:
+        """Test creating a rule with BETWEEN but no value_secondary raises error."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        rule_data = RuleCreate(
+            name="Missing Value Secondary Rule",
+            conditions=[
+                RuleConditionCreate(
+                    field=ConditionField.AMOUNT,
+                    operator=ConditionOperator.BETWEEN,
+                    value="50.00",
+                    value_secondary=None,  # Missing value_secondary
+                )
+            ],
+            actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)],
+        )
+
+        with pytest.raises(
+            RuleValidationError, match="requires 'value_secondary' to be set"
+        ):
+            service.create_rule(rule_data, user.id)
+
+    def test_create_rule_valid_operators_for_each_field(self, db: Session) -> None:
+        """Test that valid operators for each field work correctly."""
+        user = create_test_user(db)
+        tag_id = create_test_tag(db, user.id)
+        service = get_service(db)
+
+        # Valid payee operators
+        for operator in [
+            ConditionOperator.CONTAINS,
+            ConditionOperator.EQUALS,
+        ]:
+            rule_data = RuleCreate(
+                name=f"Payee {operator.value}",
+                conditions=[
+                    RuleConditionCreate(
+                        field=ConditionField.PAYEE,
+                        operator=operator,
+                        value="test",
+                    )
+                ],
+                actions=[
+                    RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)
+                ],
+            )
+            rule = service.create_rule(rule_data, user.id)
+            assert rule.conditions[0].operator == operator
+
+        # Valid description operators
+        for operator in [
+            ConditionOperator.CONTAINS,
+            ConditionOperator.EQUALS,
+        ]:
+            rule_data = RuleCreate(
+                name=f"Description {operator.value}",
+                conditions=[
+                    RuleConditionCreate(
+                        field=ConditionField.DESCRIPTION,
+                        operator=operator,
+                        value="test",
+                    )
+                ],
+                actions=[
+                    RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)
+                ],
+            )
+            rule = service.create_rule(rule_data, user.id)
+            assert rule.conditions[0].operator == operator
+
+        # Valid amount operators
+        for operator in [
+            ConditionOperator.EQUALS,
+            ConditionOperator.GT,
+            ConditionOperator.LT,
+            ConditionOperator.BETWEEN,
+        ]:
+            if operator == ConditionOperator.BETWEEN:
+                condition = RuleConditionCreate(
+                    field=ConditionField.AMOUNT,
+                    operator=operator,
+                    value="50.00",
+                    value_secondary="100.00",
+                )
+            else:
+                condition = RuleConditionCreate(
+                    field=ConditionField.AMOUNT,
+                    operator=operator,
+                    value="75.00",
+                )
+
+            rule_data = RuleCreate(
+                name=f"Amount {operator.value}",
+                conditions=[condition],
+                actions=[
+                    RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)
+                ],
+            )
+            rule = service.create_rule(rule_data, user.id)
+            assert rule.conditions[0].operator == operator
+
+        # Valid date operators
+        for operator in [
+            ConditionOperator.EQUALS,
+            ConditionOperator.BEFORE,
+            ConditionOperator.AFTER,
+            ConditionOperator.BETWEEN,
+        ]:
+            if operator == ConditionOperator.BETWEEN:
+                condition = RuleConditionCreate(
+                    field=ConditionField.DATE,
+                    operator=operator,
+                    value="2024-06-01",
+                    value_secondary="2024-06-30",
+                )
+            else:
+                condition = RuleConditionCreate(
+                    field=ConditionField.DATE,
+                    operator=operator,
+                    value="2024-06-15",
+                )
+
+            rule_data = RuleCreate(
+                name=f"Date {operator.value}",
+                conditions=[condition],
+                actions=[
+                    RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag_id)
+                ],
+            )
+            rule = service.create_rule(rule_data, user.id)
+            assert rule.conditions[0].operator == operator

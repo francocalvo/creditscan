@@ -10,7 +10,10 @@ from app.domains.rules.domain.errors import (
     TagNotFoundForActionError,
 )
 from app.domains.rules.domain.models import (
+    ConditionField,
+    ConditionOperator,
     Rule,
+    RuleConditionCreate,
     RuleCreate,
     RulePublic,
     RulesPublic,
@@ -71,7 +74,7 @@ class RuleService:
         actions = None
         if isinstance(rule_data, RuleCreate):
             actions = rule_data.actions
-        elif isinstance(rule_data, RuleUpdate) and rule_data.actions is not None:
+        elif rule_data.actions is not None:
             actions = rule_data.actions
 
         if actions:
@@ -81,6 +84,83 @@ class RuleService:
                     self._tag_repo.get_by_id(action.tag_id, include_deleted=False)
                 except TagNotFoundError:
                     raise TagNotFoundForActionError(str(action.tag_id))
+
+        # Validate conditions
+        conditions = None
+        if isinstance(rule_data, RuleCreate):
+            conditions = rule_data.conditions
+        elif rule_data.conditions is not None:
+            conditions = rule_data.conditions
+
+        if conditions:
+            for condition in conditions:
+                self._validate_operator_for_field(condition)
+                self._validate_between_requires_value_secondary(condition)
+
+    def _validate_operator_for_field(self, condition: RuleConditionCreate) -> None:
+        """Validate that the operator is valid for the field.
+
+        Args:
+            condition: The condition to validate.
+
+        Raises:
+            RuleValidationError: If the operator is not valid for the field.
+        """
+        # Operator-Field compatibility matrix
+        valid_operators = {
+            ConditionField.PAYEE: [
+                ConditionOperator.CONTAINS,
+                ConditionOperator.EQUALS,
+            ],
+            ConditionField.DESCRIPTION: [
+                ConditionOperator.CONTAINS,
+                ConditionOperator.EQUALS,
+            ],
+            ConditionField.AMOUNT: [
+                ConditionOperator.EQUALS,
+                ConditionOperator.GT,
+                ConditionOperator.LT,
+                ConditionOperator.BETWEEN,
+            ],
+            ConditionField.DATE: [
+                ConditionOperator.EQUALS,
+                ConditionOperator.BEFORE,
+                ConditionOperator.AFTER,
+                ConditionOperator.BETWEEN,
+            ],
+        }
+
+        if condition.field not in valid_operators:
+            # Shouldn't happen with enum, but defensive check
+            raise RuleValidationError(
+                f"Unknown field: {condition.field}. Valid fields: payee, description, amount, date"
+            )
+
+        valid_ops = valid_operators[condition.field]
+        if condition.operator not in valid_ops:
+            op_list = ", ".join(op.value for op in valid_ops)
+            raise RuleValidationError(
+                f"Operator '{condition.operator.value}' is not valid for field '{condition.field.value}'. Valid operators: {op_list}"
+            )
+
+    def _validate_between_requires_value_secondary(
+        self, condition: RuleConditionCreate
+    ) -> None:
+        """Validate that BETWEEN operator has value_secondary.
+
+        Args:
+            condition: The condition to validate.
+
+        Raises:
+            RuleValidationError: If value_secondary is missing for BETWEEN.
+        """
+        if (
+            condition.operator == ConditionOperator.BETWEEN
+            and condition.value_secondary is None
+        ):
+            raise RuleValidationError(
+                "Operator 'between' requires 'value_secondary' to be set"
+            )
 
     def _check_user_owns_rule(self, rule: Rule, user_id: uuid.UUID) -> None:
         """Check if the user owns the rule.

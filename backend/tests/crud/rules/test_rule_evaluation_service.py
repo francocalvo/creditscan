@@ -536,3 +536,172 @@ class TestEdgeCases:
         rule = create_rule(conditions)
         # Should still work correctly because position is used for ordering
         assert service.evaluate_rule(rule, txn) is True
+
+
+class TestZeroAndNegativeAmounts:
+    """Tests for edge cases with zero and negative amounts."""
+
+    def test_gt_zero_amount(self) -> None:
+        """Test GT operator with zero amount."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("0.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.GT,
+            value="0.00",
+        )
+        assert service.evaluate_condition(cond, txn) is False
+
+    def test_gt_negative_amount(self) -> None:
+        """Test GT operator with negative amount."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("-50.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.GT,
+            value="-100.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_lt_negative_amount(self) -> None:
+        """Test LT operator with negative amount."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("-50.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.LT,
+            value="0.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_between_zero_and_positive(self) -> None:
+        """Test BETWEEN with zero and positive bounds."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("50.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.BETWEEN,
+            value="0.00",
+            value_secondary="100.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_between_negative_and_positive(self) -> None:
+        """Test BETWEEN with negative and positive bounds (refund scenario)."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("-50.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.BETWEEN,
+            value="-100.00",
+            value_secondary="100.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_equals_zero_amount(self) -> None:
+        """Test EQUALS with zero amount."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("0.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.EQUALS,
+            value="0.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_equals_negative_amount(self) -> None:
+        """Test EQUALS with negative amount."""
+        service = RuleEvaluationService()
+        txn = create_transaction(amount=Decimal("-50.00"))
+        cond = create_condition(
+            field=ConditionField.AMOUNT,
+            operator=ConditionOperator.EQUALS,
+            value="-50.00",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+
+class TestEmptyStringEdgeCases:
+    """Tests for edge cases with empty strings."""
+
+    def test_contains_empty_string_payee(self) -> None:
+        """Test CONTAINS with empty string in payee matches anything."""
+        service = RuleEvaluationService()
+        txn = create_transaction(payee="Amazon")
+        cond = create_condition(
+            field=ConditionField.PAYEE,
+            operator=ConditionOperator.CONTAINS,
+            value="",
+        )
+        # Empty string in CONTAINS should match anything
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_contains_empty_string_description(self) -> None:
+        """Test CONTAINS with empty string in description matches anything."""
+        service = RuleEvaluationService()
+        txn = create_transaction(description="Purchase")
+        cond = create_condition(
+            field=ConditionField.DESCRIPTION,
+            operator=ConditionOperator.CONTAINS,
+            value="",
+        )
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_equals_empty_string_payee(self) -> None:
+        """Test EQUALS with empty string in payee."""
+        service = RuleEvaluationService()
+        txn = create_transaction(payee="Amazon")
+        cond = create_condition(
+            field=ConditionField.PAYEE,
+            operator=ConditionOperator.EQUALS,
+            value="",
+        )
+        # Empty string should not match non-empty payee
+        assert service.evaluate_condition(cond, txn) is False
+
+    def test_equals_empty_string_description(self) -> None:
+        """Test EQUALS with empty string in description."""
+        service = RuleEvaluationService()
+        txn = create_transaction(description="")
+        cond = create_condition(
+            field=ConditionField.DESCRIPTION,
+            operator=ConditionOperator.EQUALS,
+            value="",
+        )
+        # Empty string should match empty description
+        assert service.evaluate_condition(cond, txn) is True
+
+    def test_contains_non_empty_in_empty_payee(self) -> None:
+        """Test CONTAINS with non-empty value when payee is empty."""
+        service = RuleEvaluationService()
+        txn = create_transaction(payee="")
+        cond = create_condition(
+            field=ConditionField.PAYEE,
+            operator=ConditionOperator.CONTAINS,
+            value="test",
+        )
+        # Non-empty value in CONTAINS should not match empty payee
+        assert service.evaluate_condition(cond, txn) is False
+
+    def test_equals_non_empty_in_empty_payee(self) -> None:
+        """Test EQUALS with non-empty value when payee is empty."""
+        service = RuleEvaluationService()
+        txn = create_transaction(payee="")
+        cond = create_condition(
+            field=ConditionField.PAYEE,
+            operator=ConditionOperator.EQUALS,
+            value="test",
+        )
+        # Non-empty value should not match empty payee
+        assert service.evaluate_condition(cond, txn) is False
+
+    def test_payee_with_special_characters(self) -> None:
+        """Test CONTAINS with special characters in payee."""
+        service = RuleEvaluationService()
+        txn = create_transaction(payee="AMAZON.COM * MARKETPLACE")
+        cond = create_condition(
+            field=ConditionField.PAYEE,
+            operator=ConditionOperator.CONTAINS,
+            value="*",
+        )
+        assert service.evaluate_condition(cond, txn) is True

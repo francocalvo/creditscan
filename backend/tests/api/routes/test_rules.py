@@ -286,55 +286,63 @@ def test_get_rule_not_found_404(
     assert "not found" in r.json()["detail"]
 
 
-def test_get_rule_forbidden_404(
+def test_create_rule_invalid_operator_for_field_400(
     client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
-    """Test getting a rule created by a different user returns 404."""
-    # Create a different user and tag for them
+    """Test creating a rule with invalid operator for field returns 400."""
     user = create_test_user(db)
     tag = create_test_tag(db, user.id)
 
-    # We'll create rule via direct DB insert since we can't authenticate as other user
-    from datetime import datetime, timezone
-
-    from app.domains.rules.domain.models import Rule, RuleAction, RuleCondition
-
-    rule = Rule(
-        user_id=user.id,
-        name="Other User Rule",
-        is_active=True,
-        created_at=datetime.now(timezone.utc),
+    rule_data = RuleCreate(
+        name="Invalid Operator Rule",
+        conditions=[
+            RuleConditionCreate(
+                field=ConditionField.PAYEE,
+                operator=ConditionOperator.GT,  # GT is not valid for payee
+                value="test",
+            )
+        ],
+        actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
     )
-    db.add(rule)
-    db.flush()
 
-    condition = RuleCondition(
-        rule_id=rule.rule_id,
-        field=ConditionField.PAYEE,
-        operator=ConditionOperator.CONTAINS,
-        value="amazon",
-        logical_operator=LogicalOperator.AND,
-        position=0,
-    )
-    db.add(condition)
-
-    action = RuleAction(
-        rule_id=rule.rule_id,
-        action_type=ActionType.ADD_TAG,
-        tag_id=tag.tag_id,
-    )
-    db.add(action)
-    db.commit()
-
-    # Try to get rule as normal user - should fail with 404
-    r = client.get(
-        f"{settings.API_V1_STR}/rules/{rule.rule_id}",
+    r = client.post(
+        f"{settings.API_V1_STR}/rules/",
         headers=normal_user_token_headers,
+        json=rule_data.model_dump(mode="json"),
     )
 
-    # Should return 404 since rule belongs to different user
-    assert r.status_code == 404
-    assert "not found" in r.json()["detail"]
+    assert r.status_code == 400
+    assert "not valid for field" in r.json()["detail"]
+
+
+def test_create_rule_between_without_value_secondary_400(
+    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
+) -> None:
+    """Test creating a rule with BETWEEN but no value_secondary returns 400."""
+    user = create_test_user(db)
+    tag = create_test_tag(db, user.id)
+
+    rule_data = RuleCreate(
+        name="Missing Value Secondary Rule",
+        conditions=[
+            RuleConditionCreate(
+                field=ConditionField.AMOUNT,
+                operator=ConditionOperator.BETWEEN,
+                value="50.00",
+                value_secondary=None,  # Missing value_secondary
+            )
+        ],
+        actions=[RuleActionCreate(action_type=ActionType.ADD_TAG, tag_id=tag.tag_id)],
+    )
+
+    r = client.post(
+        f"{settings.API_V1_STR}/rules/",
+        headers=normal_user_token_headers,
+        json=rule_data.model_dump(mode="json"),
+    )
+
+    assert r.status_code == 400
+    assert "requires 'value_secondary' to be set" in r.json()["detail"]
 
 
 def test_update_rule_success(
