@@ -27,6 +27,7 @@ interface Props {
 interface Emits {
   (e: 'update:visible', value: boolean): void
   (e: 'pay', statement: StatementWithCard): void
+  (e: 'statement-updated', statement: CardStatement): void
 }
 
 type SortField = 'txn_date' | 'amount' | 'payee'
@@ -716,7 +717,8 @@ const handleSave = async () => {
   try {
     // Save statement updates if any
     if (editedStatement.value) {
-      await updateStatementApi(props.statement.id, editedStatement.value)
+      const updatedStatement = await updateStatementApi(props.statement.id, editedStatement.value)
+      emit('statement-updated', updatedStatement)
     }
 
     // Save transaction updates

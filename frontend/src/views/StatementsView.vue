@@ -187,6 +187,10 @@ const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
   })
 }
 
+const handleStatementUpdated = async () => {
+  await Promise.all([fetchStatements(), fetchBalance()])
+}
+
 const handleEditStatementFromPayment = () => {
   if (!selectedStatement.value) return
   if (isTransitioningModals.value) return
@@ -511,6 +515,7 @@ const handlePaymentSubmit = async (paymentData: {
       :statement="selectedStatement"
       :start-in-edit-mode="detailStartInEditMode"
       @pay="handlePayFromDetail"
+      @statement-updated="handleStatementUpdated"
     />
 
     <!-- Toast notifications -->
