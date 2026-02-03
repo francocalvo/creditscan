@@ -7,7 +7,7 @@
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
 
-interface StatementTransaction {
+export interface StatementTransaction {
   id: string
   statement_id: string
   txn_date: string

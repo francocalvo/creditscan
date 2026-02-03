@@ -3,6 +3,11 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Calendar from 'primevue/calendar'
+import Checkbox from 'primevue/checkbox'
+import Dropdown from 'primevue/dropdown'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import { type StatementWithCard } from '@/composables/useStatements'
 import { type CardStatement } from '@/composables/useStatements'
@@ -26,8 +31,30 @@ interface Emits {
 type SortField = 'txn_date' | 'amount' | 'payee'
 type SortOrder = 'asc' | 'desc'
 
+// New transaction interface (for unsaved transactions)
+interface NewTransaction {
+  _tempId: string
+  txn_date: string
+  payee: string
+  description: string
+  amount: number
+  currency: string
+  coupon: string | null
+  installment_cur: number | null
+  installment_tot: number | null
+}
+
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Currency options for dropdown
+const currencyOptions = [
+  { label: 'USD', value: 'USD' },
+  { label: 'EUR', value: 'EUR' },
+  { label: 'GBP', value: 'GBP' },
+  { label: 'ARS', value: 'ARS' },
+  { label: 'BRL', value: 'BRL' },
+]
 
 // Transactions composable
 const { transactions, totalCount, isLoading, error, fetchTransactions, reset, updateTransaction, createTransaction, deleteTransaction } = useStatementTransactions()
@@ -48,6 +75,259 @@ const saveError = ref<Error | null>(null)
 const editedStatement = ref<Partial<CardStatement> | null>(null)
 const editedTransactions = ref<Map<string, TransactionUpdate>>(new Map())
 const deletedTransactionIds = ref<Set<string>>(new Set())
+const newTransactions = ref<NewTransaction[]>([])
+
+// Validation computed
+const validationErrors = computed(() => {
+  const errors: Record<string, string> = {}
+
+  if (!editedStatement.value) return errors
+
+  const { due_date, close_date, period_start, period_end, previous_balance, current_balance, minimum_payment } = editedStatement.value
+
+  // Date validations
+  if (due_date && close_date) {
+    const due = new Date(due_date)
+    const close = new Date(close_date)
+    if (due < close) {
+      errors.due_date = 'Due date must not be before close date'
+    }
+  }
+
+  if (period_start && period_end) {
+    const start = new Date(period_start)
+    const end = new Date(period_end)
+    if (end < start) {
+      errors.period_end = 'Period end must not be before period start'
+    }
+  }
+
+  // Balance validations
+  if (previous_balance !== undefined && previous_balance !== null && previous_balance < 0) {
+    errors.previous_balance = 'Previous balance must be non-negative'
+  }
+
+  if (current_balance !== undefined && current_balance !== null && current_balance < 0) {
+    errors.current_balance = 'Current balance must be non-negative'
+  }
+
+  if (minimum_payment !== undefined && minimum_payment !== null && minimum_payment < 0) {
+    errors.minimum_payment = 'Minimum payment must be non-negative'
+  }
+
+  return errors
+})
+
+// Transaction validation for new transactions
+const transactionValidationErrors = computed(() => {
+  const errors: Record<string, Record<string, string>> = {}
+
+  newTransactions.value.forEach((txn) => {
+    const txnErrors: Record<string, string> = {}
+
+    // Required field validations
+    if (!txn.txn_date || txn.txn_date.trim() === '') {
+      txnErrors.txn_date = 'Date is required'
+    }
+
+    if (!txn.payee || txn.payee.trim() === '') {
+      txnErrors.payee = 'Payee is required'
+    }
+
+    if (!txn.description || txn.description.trim() === '') {
+      txnErrors.description = 'Description is required'
+    }
+
+    if (txn.amount === null || txn.amount === undefined) {
+      txnErrors.amount = 'Amount is required'
+    }
+
+    if (!txn.currency || txn.currency.trim() === '') {
+      txnErrors.currency = 'Currency is required'
+    }
+
+    // Only add to errors if there are actual errors
+    if (Object.keys(txnErrors).length > 0) {
+      errors[txn._tempId] = txnErrors
+    }
+  })
+
+  return errors
+})
+
+// Combined form validation
+const isFormValid = computed(() => {
+  // Check statement validation errors
+  const hasStatementErrors = Object.keys(validationErrors.value).length > 0
+
+  // Check transaction validation errors
+  const hasTransactionErrors = Object.keys(transactionValidationErrors.value).length > 0
+
+  return !hasStatementErrors && !hasTransactionErrors
+})
+
+// Get validation error for a specific field of a new transaction
+const getTransactionFieldError = (tempId: string, field: string): string | undefined => {
+  return transactionValidationErrors.value[tempId]?.[field]
+}
+
+// Check if a field has a validation error
+const hasTransactionFieldError = (tempId: string, field: string): boolean => {
+  return !!getTransactionFieldError(tempId, field)
+}
+
+
+// Date conversion helpers for Calendar components
+const dueDateModel = computed({
+  get: () => editedStatement.value?.due_date ? new Date(editedStatement.value.due_date) : null,
+  set: (value: Date | null) => {
+    if (editedStatement.value) {
+      editedStatement.value.due_date = value ? value.toISOString().split('T')[0] : null
+    }
+  }
+})
+
+const closeDateModel = computed({
+  get: () => editedStatement.value?.close_date ? new Date(editedStatement.value.close_date) : null,
+  set: (value: Date | null) => {
+    if (editedStatement.value) {
+      editedStatement.value.close_date = value ? value.toISOString().split('T')[0] : null
+    }
+  }
+})
+
+const periodStartModel = computed({
+  get: () => editedStatement.value?.period_start ? new Date(editedStatement.value.period_start) : null,
+  set: (value: Date | null) => {
+    if (editedStatement.value) {
+      editedStatement.value.period_start = value ? value.toISOString().split('T')[0] : null
+    }
+  }
+})
+
+const periodEndModel = computed({
+  get: () => editedStatement.value?.period_end ? new Date(editedStatement.value.period_end) : null,
+  set: (value: Date | null) => {
+    if (editedStatement.value) {
+      editedStatement.value.period_end = value ? value.toISOString().split('T')[0] : null
+    }
+  }
+})
+
+// Transaction edit helper functions
+const getTransactionValue = <T extends string | number | null | undefined>(
+  txn: StatementTransaction,
+  field: keyof TransactionUpdate
+): T => {
+  const edited = editedTransactions.value.get(txn.id)
+  if (edited !== undefined && edited[field] !== undefined) {
+    return edited[field] as T
+  }
+  return txn[field] as T
+}
+
+const setTransactionValue = (txnId: string, field: keyof TransactionUpdate, value: string | number | null) => {
+  const current = editedTransactions.value.get(txnId) || {}
+  editedTransactions.value.set(txnId, { ...current, [field]: value })
+}
+
+const isTransactionDeleted = (txnId: string): boolean => {
+  return deletedTransactionIds.value.has(txnId)
+}
+
+const toggleTransactionDeleted = (txnId: string) => {
+  if (deletedTransactionIds.value.has(txnId)) {
+    deletedTransactionIds.value.delete(txnId)
+  } else {
+    deletedTransactionIds.value.add(txnId)
+  }
+}
+
+// Get transaction date model for Calendar component
+const getTransactionDateModel = (txn: StatementTransaction) => {
+  return computed({
+    get: () => {
+      const dateValue = getTransactionValue(txn, 'txn_date')
+      return dateValue ? new Date(dateValue) : null
+    },
+    set: (value: Date | null) => {
+      setTransactionValue(txn.id, 'txn_date', value ? value.toISOString().split('T')[0] : null)
+    }
+  })
+}
+
+// Helper to handle model-value updates safely
+const handleTextUpdate = (txnId: string, field: 'payee' | 'description', value: string | undefined) => {
+  if (value !== undefined) {
+    setTransactionValue(txnId, field, value)
+  }
+}
+
+// Helper to handle date updates
+const handleDateUpdate = (txnId: string, value: Date | Date[] | null | undefined) => {
+  if (value && !Array.isArray(value)) {
+    setTransactionValue(txnId, 'txn_date', value.toISOString().split('T')[0])
+  } else {
+    setTransactionValue(txnId, 'txn_date', null)
+  }
+}
+
+// New transaction management functions
+const addNewTransaction = () => {
+  const newTxn: NewTransaction = {
+    _tempId: crypto.randomUUID(),
+    txn_date: new Date().toISOString().split('T')[0], // Today's date
+    payee: '',
+    description: '',
+    amount: 0,
+    currency: 'USD',
+    coupon: null,
+    installment_cur: null,
+    installment_tot: null,
+  }
+  newTransactions.value.push(newTxn)
+}
+
+const removeNewTransaction = (tempId: string) => {
+  const index = newTransactions.value.findIndex((t) => t._tempId === tempId)
+  if (index !== -1) {
+    newTransactions.value.splice(index, 1)
+  }
+}
+
+const updateNewTransactionValue = (tempId: string, field: keyof NewTransaction, value: unknown) => {
+  const txn = newTransactions.value.find((t) => t._tempId === tempId)
+  if (txn && value !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(txn as any)[field] = value
+  }
+}
+
+const getNewTransactionDateModel = (tempId: string) => {
+  return computed({
+    get: () => {
+      const txn = newTransactions.value.find((t) => t._tempId === tempId)
+      return txn?.txn_date ? new Date(txn.txn_date) : null
+    },
+    set: (value: Date | null) => {
+      updateNewTransactionValue(tempId, 'txn_date', value ? value.toISOString().split('T')[0] : null)
+    },
+  })
+}
+
+// Helper to check if a transaction is new
+const isNewTransaction = (item: StatementTransaction | NewTransaction): item is NewTransaction => {
+  return '_tempId' in item
+}
+
+// Helper to handle new transaction date updates
+const handleNewTransactionDateUpdate = (tempId: string, value: Date | Date[] | null | undefined) => {
+  if (value && !Array.isArray(value)) {
+    updateNewTransactionValue(tempId, 'txn_date', value.toISOString().split('T')[0])
+  } else {
+    updateNewTransactionValue(tempId, 'txn_date', null)
+  }
+}
 
 // Pagination
 const currentPage = ref(1)
@@ -167,8 +447,19 @@ const sortedTransactions = computed(() => {
   return txns
 })
 
+// Combined transactions for display (existing + new) in edit mode
+const allTransactions = computed(() => {
+  if (!isEditMode.value) {
+    return sortedTransactions.value
+  }
+
+  // In edit mode, show existing + new transactions
+  return [...sortedTransactions.value, ...newTransactions.value]
+})
+
 const placeholderRowCount = computed(() => {
-  return Math.max(0, pageSize.value - sortedTransactions.value.length)
+  const displayCount = isEditMode.value ? allTransactions.value.length : sortedTransactions.value.length
+  return Math.max(0, pageSize.value - displayCount)
 })
 
 const theadRef = ref<HTMLElement | null>(null)
@@ -199,6 +490,7 @@ watch(
       syncHeaderHeight()
     } else if (!newVisible) {
       currentPage.value = 1
+      exitEditMode()
       reset()
       resetTransactionTags()
     }
@@ -376,6 +668,7 @@ const exitEditMode = () => {
   editedStatement.value = null
   editedTransactions.value = new Map()
   deletedTransactionIds.value = new Set()
+  newTransactions.value = []
   saveError.value = null
 }
 
@@ -397,6 +690,12 @@ const handlePay = () => {
 const handleSave = async () => {
   if (!props.statement) return
 
+  // Validate form before saving
+  if (!isFormValid.value) {
+    saveError.value = new Error('Please fix all validation errors before saving')
+    return
+  }
+
   isSaving.value = true
   saveError.value = null
 
@@ -407,7 +706,7 @@ const handleSave = async () => {
     }
 
     // Save transaction updates
-    const updatePromises: Promise<any>[] = []
+    const updatePromises: Promise<unknown>[] = []
 
     editedTransactions.value.forEach((updateData, transactionId) => {
       updatePromises.push(updateTransaction(transactionId, updateData))
@@ -416,6 +715,18 @@ const handleSave = async () => {
     // Delete marked transactions
     deletedTransactionIds.value.forEach((transactionId) => {
       updatePromises.push(deleteTransaction(transactionId))
+    })
+
+    // Create new transactions
+    newTransactions.value.forEach((newTxn) => {
+      const { _tempId, ...txnData } = newTxn
+      void _tempId // Explicitly ignore unused variable
+      updatePromises.push(
+        createTransaction({
+          ...txnData,
+          statement_id: props.statement!.id,
+        })
+      )
     })
 
     await Promise.all(updatePromises)
@@ -442,8 +753,10 @@ const handleCancel = () => {
     modal
     :style="{ width: '850px' }"
     :breakpoints="{ '1024px': '90vw', '768px': '95vw' }"
-    :closable="true"
+    :closable="false"
     :draggable="false"
+    :dismissableMask="true"
+    :class="{ 'edit-mode': isEditMode }"
   >
     <template #header>
       <div v-if="statement" class="modal-header">
@@ -457,36 +770,140 @@ const handleCancel = () => {
 
     <div v-if="statement" class="modal-content">
       <!-- Save Error Message -->
-      <Message v-if="saveError" severity="error" :closable="false" class="save-error">
+      <Message v-if="saveError" severity="error" :closable="true" class="save-error" @close="saveError = null">
         {{ saveError.message }}
       </Message>
+
+      <!-- Saving Overlay -->
+      <div v-if="isSaving" class="saving-overlay">
+        <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
+        <span>Saving changes...</span>
+      </div>
       <!-- Summary Section -->
       <section class="summary-section">
         <h3 class="section-title">Statement Summary</h3>
         <div class="summary-grid">
           <div class="summary-item">
             <p class="summary-label">Previous Balance</p>
-            <p class="summary-value">{{ formatCurrency(statement.previous_balance) }}</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.previous_balance) }}</p>
+            <InputNumber
+              v-else
+              v-model="editedStatement!.previous_balance"
+              :min="0"
+              mode="currency"
+              currency="USD"
+              locale="en-US"
+              :maxFractionDigits="2"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.previous_balance }"
+            />
+            <small v-if="isEditMode && validationErrors.previous_balance" class="p-error">{{ validationErrors.previous_balance }}</small>
           </div>
 
           <div class="summary-item summary-item--highlight">
             <p class="summary-label">Current Balance</p>
-            <p class="summary-value">{{ formatCurrency(statement.current_balance) }}</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.current_balance) }}</p>
+            <InputNumber
+              v-else
+              v-model="editedStatement!.current_balance"
+              :min="0"
+              mode="currency"
+              currency="USD"
+              locale="en-US"
+              :maxFractionDigits="2"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.current_balance }"
+            />
+            <small v-if="isEditMode && validationErrors.current_balance" class="p-error">{{ validationErrors.current_balance }}</small>
           </div>
 
           <div class="summary-item">
             <p class="summary-label">Minimum Payment</p>
-            <p class="summary-value">{{ formatCurrency(statement.minimum_payment) }}</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.minimum_payment) }}</p>
+            <InputNumber
+              v-else
+              v-model="editedStatement!.minimum_payment"
+              :min="0"
+              mode="currency"
+              currency="USD"
+              locale="en-US"
+              :maxFractionDigits="2"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.minimum_payment }"
+            />
+            <small v-if="isEditMode && validationErrors.minimum_payment" class="p-error">{{ validationErrors.minimum_payment }}</small>
           </div>
 
           <div class="summary-item">
             <p class="summary-label">Due Date</p>
-            <p class="summary-value">{{ formatDate(statement.due_date) }}</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.due_date) }}</p>
+            <Calendar
+              v-else
+              v-model="dueDateModel"
+              dateFormat="yy-mm-dd"
+              showIcon
+              placeholder="Select date"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.due_date }"
+            />
+            <small v-if="isEditMode && validationErrors.due_date" class="p-error">{{ validationErrors.due_date }}</small>
           </div>
 
           <div class="summary-item">
             <p class="summary-label">Close Date</p>
-            <p class="summary-value">{{ formatDate(statement.close_date) }}</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.close_date) }}</p>
+            <Calendar
+              v-else
+              v-model="closeDateModel"
+              dateFormat="yy-mm-dd"
+              showIcon
+              placeholder="Select date"
+              :disabled="isSaving"
+              class="summary-input"
+            />
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Period Start</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.period_start) }}</p>
+            <Calendar
+              v-else
+              v-model="periodStartModel"
+              dateFormat="yy-mm-dd"
+              showIcon
+              placeholder="Select date"
+              :disabled="isSaving"
+              class="summary-input"
+            />
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Period End</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.period_end) }}</p>
+            <Calendar
+              v-else
+              v-model="periodEndModel"
+              dateFormat="yy-mm-dd"
+              showIcon
+              placeholder="Select date"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.period_end }"
+            />
+            <small v-if="isEditMode && validationErrors.period_end" class="p-error">{{ validationErrors.period_end }}</small>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Fully Paid</p>
+            <p v-if="!isEditMode" class="summary-value">{{ statement.is_fully_paid ? 'Yes' : 'No' }}</p>
+            <div v-else class="summary-checkbox">
+              <Checkbox v-model="editedStatement!.is_fully_paid" binary :inputId="'fully-paid-checkbox'" :disabled="isSaving" />
+              <label :for="'fully-paid-checkbox'" class="checkbox-label">{{ editedStatement!.is_fully_paid ? 'Yes' : 'No' }}</label>
+            </div>
           </div>
         </div>
       </section>
@@ -533,81 +950,243 @@ const handleCancel = () => {
               <div class="spinner spinner--sm"></div>
             </div>
           <table class="transactions-table">
-            <thead ref="theadRef">
-              <tr>
-                <th
-                  class="sortable"
-                  :aria-sort="getAriaSort('txn_date')"
-                  :aria-label="getSortLabel('txn_date', 'Date')"
-                  tabindex="0"
-                  @click="handleSort('txn_date')"
-                  @keydown.enter.prevent="handleSort('txn_date')"
-                  @keydown.space.prevent="handleSort('txn_date')"
-                >
-                  Date <i :class="getSortIcon('txn_date')"></i>
-                </th>
-                <th
-                  class="sortable"
-                  :aria-sort="getAriaSort('payee')"
-                  :aria-label="getSortLabel('payee', 'Payee')"
-                  tabindex="0"
-                  @click="handleSort('payee')"
-                  @keydown.enter.prevent="handleSort('payee')"
-                  @keydown.space.prevent="handleSort('payee')"
-                >
-                  Payee <i :class="getSortIcon('payee')"></i>
-                </th>
-                <th>Description</th>
-                <th
-                  class="sortable"
-                  :aria-sort="getAriaSort('amount')"
-                  :aria-label="getSortLabel('amount', 'Amount')"
-                  tabindex="0"
-                  @click="handleSort('amount')"
-                  @keydown.enter.prevent="handleSort('amount')"
-                  @keydown.space.prevent="handleSort('amount')"
-                >
-                  Amount <i :class="getSortIcon('amount')"></i>
-                </th>
-                <th>Installments</th>
-                <th>Tags</th>
+             <thead ref="theadRef">
+               <tr>
+                 <th
+                   class="sortable"
+                   :aria-sort="getAriaSort('txn_date')"
+                   :aria-label="getSortLabel('txn_date', 'Date')"
+                   tabindex="0"
+                   @click="handleSort('txn_date')"
+                   @keydown.enter.prevent="handleSort('txn_date')"
+                   @keydown.space.prevent="handleSort('txn_date')"
+                 >
+                   Date <i :class="getSortIcon('txn_date')"></i>
+                 </th>
+                 <th
+                   class="sortable"
+                   :aria-sort="getAriaSort('payee')"
+                   :aria-label="getSortLabel('payee', 'Payee')"
+                   tabindex="0"
+                   @click="handleSort('payee')"
+                   @keydown.enter.prevent="handleSort('payee')"
+                   @keydown.space.prevent="handleSort('payee')"
+                 >
+                   Payee <i :class="getSortIcon('payee')"></i>
+                 </th>
+                 <th>Description</th>
+                 <th>Currency</th>
+                 <th
+                   class="sortable"
+                   :aria-sort="getAriaSort('amount')"
+                   :aria-label="getSortLabel('amount', 'Amount')"
+                   tabindex="0"
+                   @click="handleSort('amount')"
+                   @keydown.enter.prevent="handleSort('amount')"
+                   @keydown.space.prevent="handleSort('amount')"
+                 >
+                   Amount <i :class="getSortIcon('amount')"></i>
+                 </th>
+                 <th>Installments</th>
+                 <th>Tags</th>
+                 <th v-if="isEditMode">Actions</th>
+               </tr>
+             </thead>
+            <tbody>
+               <tr
+                 v-for="item in (isEditMode ? allTransactions : sortedTransactions)"
+                 :key="isNewTransaction(item) ? item._tempId : item.id"
+                 :class="{ 'transaction-deleted': !isNewTransaction(item) && isTransactionDeleted(item.id) }"
+               >
+                  <!-- Date column -->
+                  <td v-if="!isEditMode">{{ formatTransactionDate(item.txn_date) }}</td>
+                  <td v-else-if="isNewTransaction(item)">
+                    <div class="table-input-wrapper">
+                      <Calendar
+                        :model-value="getNewTransactionDateModel(item._tempId).value"
+                        @update:model-value="(value: Date | Date[] | null | undefined) => handleNewTransactionDateUpdate(item._tempId, value)"
+                        dateFormat="yy-mm-dd"
+                        showIcon
+                        :disabled="isSaving"
+                        class="table-input"
+                        :class="{ 'p-invalid': hasTransactionFieldError(item._tempId, 'txn_date') }"
+                      />
+                      <small v-if="hasTransactionFieldError(item._tempId, 'txn_date')" class="p-error">{{ getTransactionFieldError(item._tempId, 'txn_date') }}</small>
+                    </div>
+                  </td>
+                 <td v-else>
+                   <Calendar
+                     :model-value="getTransactionDateModel(item).value"
+                     @update:model-value="(value: Date | Date[] | null | undefined) => handleDateUpdate(item.id, value)"
+                     dateFormat="yy-mm-dd"
+                     showIcon
+                     :disabled="isSaving || isTransactionDeleted(item.id)"
+                     class="table-input"
+                   />
+                 </td>
+
+                   <!-- Payee column -->
+                   <td v-if="!isEditMode" class="text-truncate payee-cell" :title="item.payee">{{ item.payee }}</td>
+                   <td v-else-if="isNewTransaction(item)">
+                     <div class="table-input-wrapper">
+                       <InputText
+                         :model-value="item.payee"
+                         @update:model-value="(val: string | undefined) => updateNewTransactionValue(item._tempId, 'payee', val)"
+                         :disabled="isSaving"
+                         class="table-input"
+                         :class="{ 'p-invalid': hasTransactionFieldError(item._tempId, 'payee') }"
+                       />
+                       <small v-if="hasTransactionFieldError(item._tempId, 'payee')" class="p-error">{{ getTransactionFieldError(item._tempId, 'payee') }}</small>
+                     </div>
+                   </td>
+                 <td v-else>
+                   <InputText
+                     :model-value="getTransactionValue(item, 'payee')"
+                     @update:model-value="(val: string | undefined) => handleTextUpdate(item.id, 'payee', val)"
+                     :disabled="isSaving || isTransactionDeleted(item.id)"
+                     class="table-input"
+                   />
+                 </td>
+
+                   <!-- Description column -->
+                   <td v-if="!isEditMode" class="text-truncate description-cell" :title="item.description">{{ item.description }}</td>
+                   <td v-else-if="isNewTransaction(item)">
+                     <div class="table-input-wrapper">
+                       <InputText
+                         :model-value="item.description"
+                         @update:model-value="(val: string | undefined) => updateNewTransactionValue(item._tempId, 'description', val)"
+                         :disabled="isSaving"
+                         class="table-input"
+                         :class="{ 'p-invalid': hasTransactionFieldError(item._tempId, 'description') }"
+                       />
+                       <small v-if="hasTransactionFieldError(item._tempId, 'description')" class="p-error">{{ getTransactionFieldError(item._tempId, 'description') }}</small>
+                     </div>
+                   </td>
+                 <td v-else>
+                   <InputText
+                     :model-value="getTransactionValue(item, 'description')"
+                     @update:model-value="(val: string | undefined) => handleTextUpdate(item.id, 'description', val)"
+                     :disabled="isSaving || isTransactionDeleted(item.id)"
+                     class="table-input"
+                   />
+                 </td>
+
+                  <!-- Currency column -->
+                  <td v-if="!isEditMode">{{ item.currency }}</td>
+                  <td v-else-if="isNewTransaction(item)">
+                    <div class="table-input-wrapper">
+                      <Dropdown
+                        :model-value="item.currency"
+                        @update:model-value="(val: string) => updateNewTransactionValue(item._tempId, 'currency', val)"
+                        :options="currencyOptions"
+                        option-label="label"
+                        option-value="value"
+                        :disabled="isSaving"
+                        class="table-input"
+                        :class="{ 'p-invalid': hasTransactionFieldError(item._tempId, 'currency') }"
+                      />
+                      <small v-if="hasTransactionFieldError(item._tempId, 'currency')" class="p-error">{{ getTransactionFieldError(item._tempId, 'currency') }}</small>
+                    </div>
+                  </td>
+                 <td v-else>
+                   <Dropdown
+                     :model-value="getTransactionValue(item, 'currency')"
+                     @update:model-value="(val: string) => setTransactionValue(item.id, 'currency', val)"
+                     :options="currencyOptions"
+                     option-label="label"
+                     option-value="value"
+                     :disabled="isSaving || isTransactionDeleted(item.id)"
+                     class="table-input"
+                   />
+                 </td>
+
+                  <!-- Amount column -->
+                  <td v-if="!isEditMode" :class="item.amount < 0 ? 'amount--negative' : 'amount--positive'">
+                    {{ formatCurrency(item.amount) }}
+                  </td>
+                  <td v-else-if="isNewTransaction(item)">
+                    <div class="table-input-wrapper">
+                      <InputNumber
+                        :model-value="item.amount"
+                        @update:model-value="(val: number | null) => updateNewTransactionValue(item._tempId, 'amount', val ?? 0)"
+                        :disabled="isSaving"
+                        class="table-input"
+                        :class="{ 'p-invalid': hasTransactionFieldError(item._tempId, 'amount') }"
+                      />
+                      <small v-if="hasTransactionFieldError(item._tempId, 'amount')" class="p-error">{{ getTransactionFieldError(item._tempId, 'amount') }}</small>
+                    </div>
+                  </td>
+                 <td v-else>
+                   <InputNumber
+                     :model-value="getTransactionValue(item, 'amount')"
+                     @update:model-value="(val: number | null) => setTransactionValue(item.id, 'amount', val ?? 0)"
+                     :disabled="isSaving || isTransactionDeleted(item.id)"
+                     class="table-input"
+                   />
+                 </td>
+
+                 <!-- Installments column (read-only in both modes for now) -->
+                 <td class="installments">{{ formatInstallments(item.installment_cur, item.installment_tot) }}</td>
+
+                 <!-- Tags column (read-only, only for existing transactions) -->
+                 <td v-if="!isEditMode && !isNewTransaction(item)" class="tags">
+                   <template v-if="getTagsForTransaction(item.id).length > 0">
+                     <span
+                       v-for="tag in getTagsForTransaction(item.id)"
+                       :key="tag.tag_id"
+                       class="tag-chip"
+                     >
+                       {{ tag.label }}
+                     </span>
+                   </template>
+                   <template v-else>-</template>
+                 </td>
+                 <td v-else>-</td>
+
+                 <!-- Actions column (edit mode only) -->
+                 <td v-if="isEditMode" class="actions-cell">
+                   <!-- New transaction: show Remove button -->
+                   <Button
+                     v-if="isNewTransaction(item)"
+                     icon="pi pi-times"
+                     severity="danger"
+                     text
+                     size="small"
+                     :disabled="isSaving"
+                     @click="removeNewTransaction(item._tempId)"
+                     aria-label="Remove new transaction"
+                   />
+                   <!-- Existing transaction: show Delete/Restore button -->
+                   <Button
+                     v-else-if="!isTransactionDeleted(item.id)"
+                     icon="pi pi-trash"
+                     severity="danger"
+                     text
+                     size="small"
+                     :disabled="isSaving"
+                     @click="toggleTransactionDeleted(item.id)"
+                     aria-label="Delete transaction"
+                   />
+                   <Button
+                     v-else
+                     icon="pi pi-undo"
+                     severity="secondary"
+                     text
+                     size="small"
+                     :disabled="isSaving"
+                     @click="toggleTransactionDeleted(item.id)"
+                     aria-label="Restore transaction"
+                   />
+                 </td>
+               </tr>
+              <tr
+                v-for="index in placeholderRowCount"
+                :key="`placeholder-${index}`"
+                class="placeholder-row"
+                aria-hidden="true"
+              >
+                <td v-for="col in (isEditMode ? 8 : 7)" :key="col">&nbsp;</td>
               </tr>
-            </thead>
-           <tbody>
-              <tr v-for="txn in sortedTransactions" :key="txn.id">
-                <td>{{ formatTransactionDate(txn.txn_date) }}</td>
-               <td class="text-truncate payee-cell" :title="txn.payee">{{ txn.payee }}</td>
-               <td class="text-truncate description-cell" :title="txn.description">{{ txn.description }}</td>
-               <td :class="txn.amount < 0 ? 'amount--negative' : 'amount--positive'">
-                 {{ formatCurrency(txn.amount) }}
-               </td>
-              <td class="installments">{{ formatInstallments(txn.installment_cur, txn.installment_tot) }}</td>
-               <td class="tags">
-                 <template v-if="getTagsForTransaction(txn.id).length > 0">
-                   <span
-                     v-for="tag in getTagsForTransaction(txn.id)"
-                     :key="tag.tag_id"
-                     class="tag-chip"
-                   >
-                     {{ tag.label }}
-                   </span>
-                 </template>
-                 <template v-else>-</template>
-               </td>
-           </tr>
-            <tr
-              v-for="index in placeholderRowCount"
-              :key="`placeholder-${index}`"
-              class="placeholder-row"
-              aria-hidden="true"
-            >
-              <td>&nbsp;</td>
-              <td>&nbsp;</td>
-              <td>&nbsp;</td>
-              <td>&nbsp;</td>
-              <td>&nbsp;</td>
-              <td>&nbsp;</td>
-            </tr>
          </tbody>
        </table>
           </div>
@@ -680,15 +1259,25 @@ const handleCancel = () => {
           <!-- Edit mode buttons -->
           <template v-else>
             <Button
+              label="Add Transaction"
+              icon="pi pi-plus"
+              :disabled="isSaving"
+              @click="addNewTransaction"
+              severity="secondary"
+              outlined
+            />
+            <Button
               label="Save"
               icon="pi pi-check"
               :loading="isSaving"
+              :disabled="!isFormValid || isSaving"
               @click="handleSave"
               severity="primary"
             />
             <Button
               label="Cancel"
               icon="pi pi-times"
+              :disabled="isSaving"
               @click="handleCancel"
               severity="secondary"
               outlined
@@ -732,10 +1321,32 @@ const handleCancel = () => {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  position: relative;
 }
 
 .save-error {
   margin-bottom: 0;
+}
+
+.saving-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  z-index: 10;
+  color: var(--text-color-secondary);
+}
+
+.saving-overlay span {
+  font-size: 0.938rem;
+  font-weight: 500;
 }
 
 .summary-section {
@@ -755,6 +1366,23 @@ const handleCancel = () => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
+}
+
+.summary-input {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.summary-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.checkbox-label {
+  font-size: 1rem;
+  color: var(--text-color);
 }
 
 .summary-item {
@@ -779,6 +1407,13 @@ const handleCancel = () => {
   color: var(--text-color);
   margin: 0;
   font-weight: 600;
+}
+
+.summary-item small.p-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--red-500);
 }
 
 .summary-item--highlight {
@@ -1040,6 +1675,36 @@ const handleCancel = () => {
 
 .description-cell {
   max-width: 200px;
+}
+
+/* Transaction edit styles */
+.transaction-deleted {
+  opacity: 0.5;
+  text-decoration: line-through;
+  background: var(--surface-100);
+}
+
+.table-input {
+  width: 100%;
+  min-width: 100px;
+}
+
+.table-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.table-input-wrapper small.p-error {
+  font-size: 0.7rem;
+  color: var(--red-500);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.actions-cell {
+  text-align: center;
 }
 
 .modal-footer {
