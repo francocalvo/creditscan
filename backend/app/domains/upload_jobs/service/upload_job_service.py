@@ -1,7 +1,7 @@
 """Upload job service implementation."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session
 
@@ -37,7 +37,7 @@ class UploadJobService:
         self,
         job_id: uuid.UUID,
         status: UploadJobStatus,
-        **kwargs,
+        **kwargs: object,
     ) -> UploadJobPublic:
         """Update upload job status and optional fields.
 
@@ -66,7 +66,7 @@ class UploadJobService:
             job_id,
             job.status,
             retry_count=job.retry_count + 1,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
         return UploadJobPublic.model_validate(updated_job)
 
