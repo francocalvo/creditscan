@@ -8,6 +8,9 @@ Exchanges:
 import logging
 from decimal import Decimal
 
+import httpx
+
+from app.domains.upload_jobs.domain.errors import CurrencyConversionError
 from app.pkgs.currency.client import ExchangeRateClient
 from app.pkgs.extraction.models import Money
 
@@ -38,9 +41,7 @@ class CurrencyService:
             Total converted amount rounded to 2 decimal places
 
         Raises:
-            httpx.HTTPStatusError: If API request fails
-            KeyError: If currency not found in rates
-            httpx.TimeoutException: If request times out
+            CurrencyConversionError: If conversion fails
         """
         total = Decimal("0")
 
@@ -53,16 +54,49 @@ class CurrencyService:
                 )
             else:
                 # Different currency: fetch rate and convert
-                rate = await self.client.get_rate(
-                    from_currency=balance.currency, to_currency=target_currency
-                )
-                converted_amount = balance.amount * rate
-                total += converted_amount
-                logger.info(
-                    f"Converted {balance.amount} {balance.currency} -> "
-                    f"{converted_amount} {target_currency} "
-                    f"(rate: {rate})"
-                )
+                try:
+                    rate = await self.client.get_rate(
+                        from_currency=balance.currency, to_currency=target_currency
+                    )
+                    converted_amount = balance.amount * rate
+                    total += converted_amount
+                    logger.info(
+                        f"Converted {balance.amount} {balance.currency} -> "
+                        f"{converted_amount} {target_currency} "
+                        f"(rate: {rate})"
+                    )
+                except httpx.HTTPStatusError as e:
+                    logger.error(
+                        f"API error converting {balance.currency} to {target_currency}: {e}"
+                    )
+                    raise CurrencyConversionError(
+                        f"Failed to fetch exchange rate for {balance.currency}",
+                        source_currency=balance.currency,
+                    ) from e
+                except httpx.TimeoutException as e:
+                    logger.error(
+                        f"Timeout converting {balance.currency} to {target_currency}"
+                    )
+                    raise CurrencyConversionError(
+                        f"Timeout fetching exchange rate for {balance.currency}",
+                        source_currency=balance.currency,
+                    ) from e
+                except KeyError as e:
+                    logger.error(
+                        f"Currency not found: {balance.currency} or {target_currency}"
+                    )
+                    raise CurrencyConversionError(
+                        f"Currency rate not available for {balance.currency}",
+                        source_currency=balance.currency,
+                    ) from e
+                except Exception as e:
+                    logger.error(
+                        f"Unexpected error converting {balance.currency} to {target_currency}: {e}"
+                    )
+                    raise CurrencyConversionError(
+                        f"Currency conversion failed for {balance.currency}",
+                        source_currency=balance.currency,
+                    ) from e
 
         # Round to 2 decimal places
         rounded_total = total.quantize(Decimal("0.01"))
