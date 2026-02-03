@@ -8,6 +8,7 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
+import { parseDateString } from '@/utils/date'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -156,7 +157,7 @@ const getCardLatestBalance = (cardId: string) => {
     .filter(s => s.card_id === cardId)
     .sort((a, b) => {
       if (!a.period_end || !b.period_end) return 0
-      return new Date(b.period_end).getTime() - new Date(a.period_end).getTime()
+      return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
   
   return cardStatements.length > 0 ? cardStatements[0].current_balance : null

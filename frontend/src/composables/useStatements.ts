@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { OpenAPI } from '@/api'
 import { useCreditCards, type CreditCard } from './useCreditCards'
+import { parseDateString } from '@/utils/date'
 
 export interface CardStatement {
   id: string
@@ -50,7 +51,7 @@ export function useStatements() {
 
     if (!statement.due_date) return 'pending'
 
-    const dueDate = new Date(statement.due_date)
+    const dueDate = parseDateString(statement.due_date)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -125,14 +126,14 @@ export function useStatements() {
 
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return 'N/A'
-    const date = new Date(dateStr)
+    const date = parseDateString(dateStr)
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   const formatPeriod = (startDate: string | null, endDate: string | null): string => {
     if (!startDate || !endDate) return 'N/A'
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    const start = parseDateString(startDate)
+    const end = parseDateString(endDate)
 
     if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
       return end.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })

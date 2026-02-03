@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { TransactionsService, type Transaction } from '@/api/transactions'
 import { useToast } from 'primevue/usetoast'
+import { parseDateString } from '@/utils/date'
 
 export function useTransactions() {
     const transactions = ref<Transaction[]>([])
@@ -15,7 +16,7 @@ export function useTransactions() {
             const response = await TransactionsService.listTransactions()
             // Sort by date descending (newest first)
             transactions.value = response.data.sort((a, b) => {
-                return new Date(b.txn_date).getTime() - new Date(a.txn_date).getTime()
+                return parseDateString(b.txn_date).getTime() - parseDateString(a.txn_date).getTime()
             })
         } catch (err: any) {
             console.error('Error fetching transactions:', err)
@@ -39,7 +40,7 @@ export function useTransactions() {
     }
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
+        return parseDateString(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'

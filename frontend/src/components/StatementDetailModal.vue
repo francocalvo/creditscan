@@ -17,6 +17,7 @@ import { type StatementTransaction, type TransactionUpdate } from '@/composables
 import { useTags, type Tag } from '@/composables/useTags'
 import { useTransactionTags } from '@/composables/useTransactionTags'
 import { useStatements } from '@/composables/useStatements'
+import { parseDateString, toDateOnlyString } from '@/utils/date'
 
 interface Props {
   visible: boolean
@@ -91,16 +92,16 @@ const validationErrors = computed(() => {
 
   // Date validations
   if (due_date && close_date) {
-    const due = new Date(due_date)
-    const close = new Date(close_date)
+    const due = parseDateString(due_date)
+    const close = parseDateString(close_date)
     if (due < close) {
       errors.due_date = 'Due date must not be before close date'
     }
   }
 
   if (period_start && period_end) {
-    const start = new Date(period_start)
-    const end = new Date(period_end)
+    const start = parseDateString(period_start)
+    const end = parseDateString(period_end)
     if (end < start) {
       errors.period_end = 'Period end must not be before period start'
     }
@@ -170,13 +171,6 @@ const isFormValid = computed(() => {
   return !hasStatementErrors && !hasTransactionErrors
 })
 
-const toDateOnlyString = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 // Get validation error for a specific field of a new transaction
 const getTransactionFieldError = (tempId: string, field: string): string | undefined => {
   return transactionValidationErrors.value[tempId]?.[field]
@@ -190,7 +184,7 @@ const hasTransactionFieldError = (tempId: string, field: string): boolean => {
 
 // Date conversion helpers for Calendar components
 const dueDateModel = computed({
-  get: () => editedStatement.value?.due_date ? new Date(editedStatement.value.due_date) : null,
+  get: () => editedStatement.value?.due_date ? parseDateString(editedStatement.value.due_date) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
       editedStatement.value.due_date = value ? toDateOnlyString(value) : null
@@ -199,7 +193,7 @@ const dueDateModel = computed({
 })
 
 const closeDateModel = computed({
-  get: () => editedStatement.value?.close_date ? new Date(editedStatement.value.close_date) : null,
+  get: () => editedStatement.value?.close_date ? parseDateString(editedStatement.value.close_date) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
       editedStatement.value.close_date = value ? toDateOnlyString(value) : null
@@ -208,7 +202,7 @@ const closeDateModel = computed({
 })
 
 const periodStartModel = computed({
-  get: () => editedStatement.value?.period_start ? new Date(editedStatement.value.period_start) : null,
+  get: () => editedStatement.value?.period_start ? parseDateString(editedStatement.value.period_start) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
       editedStatement.value.period_start = value ? toDateOnlyString(value) : null
@@ -217,7 +211,7 @@ const periodStartModel = computed({
 })
 
 const periodEndModel = computed({
-  get: () => editedStatement.value?.period_end ? new Date(editedStatement.value.period_end) : null,
+  get: () => editedStatement.value?.period_end ? parseDateString(editedStatement.value.period_end) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
       editedStatement.value.period_end = value ? toDateOnlyString(value) : null
@@ -258,8 +252,8 @@ const toggleTransactionDeleted = (txnId: string) => {
 const getTransactionDateModel = (txn: StatementTransaction) => {
   return computed({
     get: () => {
-      const dateValue = getTransactionValue(txn, 'txn_date')
-      return dateValue ? new Date(dateValue) : null
+      const dateValue = getTransactionValue<string | null>(txn, 'txn_date')
+      return dateValue ? parseDateString(dateValue) : null
     },
     set: (value: Date | null) => {
       setTransactionValue(txn.id, 'txn_date', value ? toDateOnlyString(value) : null)
@@ -318,7 +312,7 @@ const getNewTransactionDateModel = (tempId: string) => {
   return computed({
     get: () => {
       const txn = newTransactions.value.find((t) => t._tempId === tempId)
-      return txn?.txn_date ? new Date(txn.txn_date) : null
+      return txn?.txn_date ? parseDateString(txn.txn_date) : null
     },
     set: (value: Date | null) => {
       updateNewTransactionValue(tempId, 'txn_date', value ? toDateOnlyString(value) : null)
@@ -440,8 +434,8 @@ const sortedTransactions = computed(() => {
 
   if (sortField.value === 'txn_date') {
     txns.sort((a, b) => {
-      const aTime = new Date(a.txn_date).getTime()
-      const bTime = new Date(b.txn_date).getTime()
+      const aTime = parseDateString(a.txn_date).getTime()
+      const bTime = parseDateString(b.txn_date).getTime()
       return sortOrder.value === 'asc' ? aTime - bTime : bTime - aTime
     })
   } else if (sortField.value === 'amount') {
@@ -562,8 +556,8 @@ const cardDisplay = computed(() => {
 
 const formattedPeriod = computed(() => {
   if (!props.statement?.period_start || !props.statement?.period_end) return 'N/A'
-  const start = new Date(props.statement.period_start)
-  const end = new Date(props.statement.period_end)
+  const start = parseDateString(props.statement.period_start)
+  const end = parseDateString(props.statement.period_end)
 
   if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
     return end.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -580,12 +574,12 @@ const formatCurrency = (amount: number | null): string => {
 
 const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return 'N/A'
-  const date = new Date(dateStr)
+  const date = parseDateString(dateStr)
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 const formatTransactionDate = (dateStr: string): string => {
-  const date = new Date(dateStr)
+  const date = parseDateString(dateStr)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
