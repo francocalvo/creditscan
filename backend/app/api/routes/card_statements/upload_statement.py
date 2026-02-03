@@ -12,6 +12,7 @@ from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 from app.domains.upload_jobs.domain.errors import DuplicateFileError
 from app.domains.upload_jobs.domain.models import UploadJobCreate, UploadJobPublic
+from app.domains.upload_jobs.repository import provide as provide_upload_job_repository
 from app.domains.upload_jobs.service import provide as provide_upload_job_service
 from app.domains.upload_jobs.usecases.process_upload import process_upload_job
 from app.pkgs.storage import provide as provide_storage
@@ -94,6 +95,15 @@ def upload_statement(
     # Calculate SHA-256 hash
     file_hash = hashlib.sha256(contents).hexdigest()
 
+    # Check for duplicate file BEFORE storing to S3
+    repository = provide_upload_job_repository(session)
+    existing_job = repository.get_by_file_hash(file_hash, current_user.id)
+    if existing_job:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Duplicate file already uploaded (job_id: {existing_job.id})",
+        )
+
     # Store PDF in S3
     storage = provide_storage()
     file_path = storage.store_statement_pdf(current_user.id, file_hash, contents)
@@ -110,6 +120,13 @@ def upload_statement(
         )
         job = job_service.create(job_create)
     except DuplicateFileError as e:
+        # This is a fallback in case of race condition
+        # Delete the uploaded file since we won't process it
+        try:
+            storage.client.delete(file_path)
+            logger.info(f"Deleted orphaned file due to duplicate: {file_path}")
+        except Exception as delete_error:
+            logger.error(f"Failed to delete orphaned file {file_path}: {delete_error}")
         raise HTTPException(
             status_code=400,
             detail=f"Duplicate file already uploaded (job_id: {e.existing_job_id})",
