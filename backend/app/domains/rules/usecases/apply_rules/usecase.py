@@ -2,7 +2,6 @@
 
 import uuid
 
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.domains.rules.domain.models import (
@@ -13,12 +12,8 @@ from app.domains.rules.domain.models import (
 )
 from app.domains.rules.repository import RuleRepository
 from app.domains.rules.repository import provide as provide_rule_repo
-from app.domains.rules.service import (
-    RuleEvaluationService,
-)
-from app.domains.rules.service import (
-    provide as provide_rule_evaluation,
-)
+from app.domains.rules.service import RuleEvaluationService, provide_rule_evaluation
+from app.domains.tags.domain.errors import TagNotFoundError
 from app.domains.tags.repository import TagRepository
 from app.domains.tags.repository import provide as provide_tag_repo
 from app.domains.transaction_tags.domain.models import TransactionTagCreate
@@ -82,18 +77,19 @@ class ApplyRulesUseCase:
         transactions: list[Transaction] = []
 
         if request.transaction_ids:
-            # Fetch specific transactions
+            # Fetch specific transactions, verifying ownership
             for tx_id in request.transaction_ids:
-                try:
-                    transaction = self.transaction_repo.get_by_id(tx_id)
+                transaction = self.transaction_repo.get_by_id_for_user(tx_id, user_id)
+                if transaction:
                     transactions.append(transaction)
-                except Exception:
-                    # Skip transactions that don't exist
-                    pass
+                # Skip transactions that don't exist or don't belong to user
         elif request.statement_id:
-            # Fetch all transactions for the statement
-            transactions = self.transaction_repo.list(
-                filters={"statement_id": request.statement_id}, limit=10000
+            # Fetch all transactions for the statement, verifying ownership
+            # Note: statement_id filtering is passed to list_for_user
+            transactions = self.transaction_repo.list_for_user(
+                user_id=user_id,
+                filters={"statement_id": request.statement_id},
+                limit=10000,
             )
         else:
             # No scope defined, return empty response
@@ -122,22 +118,19 @@ class ApplyRulesUseCase:
                             if tag.deleted_at is not None:
                                 # Skip soft-deleted tags
                                 continue
-                        except Exception:
+                        except TagNotFoundError:
                             # Tag doesn't exist, skip
                             continue
 
                         # Try to create transaction-tag relationship
-                        try:
-                            self.transaction_tag_repo.create(
-                                TransactionTagCreate(
-                                    transaction_id=transaction.id, tag_id=action.tag_id
-                                )
+                        result = self.transaction_tag_repo.create_or_ignore(
+                            TransactionTagCreate(
+                                transaction_id=transaction.id, tag_id=action.tag_id
                             )
+                        )
+                        if result is not None:
                             applied_tags.append(action.tag_id)
                             tags_applied_count += 1
-                        except IntegrityError:
-                            # Duplicate relationship (idempotent), silently ignore
-                            pass
 
                     # If any tags were applied, record the rule match
                     if applied_tags:
