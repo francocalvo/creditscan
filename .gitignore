@@ -2,3 +2,12 @@
 specs
 ralph.yml
 PROMPT.md
+
+
+# AI Stuff 
+**/.codex/*
+**/.claude/*
+**/.opencode/*
+**/.agents/*
+**/.ralph/*
+**/specs/*
