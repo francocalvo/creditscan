@@ -9,6 +9,8 @@ from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
 )
+from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
+from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 from app.domains.tags.domain.errors import TagNotFoundError
 from app.domains.tags.usecases.get_tag import provide as provide_get_tag
 from app.domains.transaction_tags.domain.errors import (
@@ -47,7 +49,11 @@ def add_tag_to_transaction(
         get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
-        if statement.user_id != current_user.id and not current_user.is_superuser:
+        # Check ownership through the credit card
+        get_card_usecase = provide_get_card(session)
+        card = get_card_usecase.execute(statement.card_id)
+
+        if card.user_id != current_user.id and not current_user.is_superuser:
             raise HTTPException(
                 status_code=403,
                 detail="You don't have permission to add tags to this transaction",
@@ -72,5 +78,7 @@ def add_tag_to_transaction(
         raise HTTPException(status_code=404, detail="Tag not found")
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")
+    except CreditCardNotFoundError:
+        raise HTTPException(status_code=404, detail="Credit card not found")
     except InvalidTransactionTagDataError as e:
         raise HTTPException(status_code=400, detail=str(e))

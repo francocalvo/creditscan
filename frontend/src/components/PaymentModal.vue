@@ -4,8 +4,9 @@ import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
-import Calendar from 'primevue/calendar'
+import DatePicker from 'primevue/datepicker'
 import Message from 'primevue/message'
+import { toDateOnlyString } from '@/utils/date'
 
 interface Props {
   visible: boolean
@@ -18,6 +19,7 @@ interface Props {
 interface Emits {
   (e: 'update:visible', value: boolean): void
   (e: 'submit', paymentData: PaymentData): void
+  (e: 'edit-statement'): void
 }
 
 interface PaymentData {
@@ -94,13 +96,17 @@ const handleSubmit = () => {
   const paymentData: PaymentData = {
     statement_id: props.statementId,
     amount: paymentAmount.value,
-    payment_date: paymentDate.value.toISOString().split('T')[0],
+    payment_date: toDateOnlyString(paymentDate.value),
     currency: currency.value
   }
 
   emit('submit', paymentData)
 }
 
+const handleEditStatement = () => {
+  emit('edit-statement')
+  internalVisible.value = false
+}
 
 const formatCurrency = (amount: number | null): string => {
   if (amount === null) return '$0.00'
@@ -167,7 +173,7 @@ const formatCurrency = (amount: number | null): string => {
         <label for="paymentDate" class="field-label">
           Payment Date <span class="required">*</span>
         </label>
-        <Calendar
+        <DatePicker
           id="paymentDate"
           v-model="paymentDate"
           dateFormat="yy-mm-dd"
@@ -194,9 +200,17 @@ const formatCurrency = (amount: number | null): string => {
 
       <div class="button-group">
         <Button
+          label="Edit Statement"
+          icon="pi pi-pencil"
+          @click="handleEditStatement"
+          :disabled="props.isSubmitting"
+          severity="secondary"
+          outlined
+        />
+        <Button
           label="Cancel"
           icon="pi pi-times"
-          @click="() => internalVisible = false"
+          @click="internalVisible = false"
           :disabled="props.isSubmitting"
           severity="secondary"
           outlined
@@ -314,4 +328,3 @@ const formatCurrency = (amount: number | null): string => {
   width: 100%;
 }
 </style>
-

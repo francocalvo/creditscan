@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { OpenAPI } from '@/api'
 import { useCreditCards, type CreditCard } from './useCreditCards'
+import { parseDateString } from '@/utils/date'
 
 export interface CardStatement {
   id: string
@@ -50,7 +51,7 @@ export function useStatements() {
 
     if (!statement.due_date) return 'pending'
 
-    const dueDate = new Date(statement.due_date)
+    const dueDate = parseDateString(statement.due_date)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -125,14 +126,14 @@ export function useStatements() {
 
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return 'N/A'
-    const date = new Date(dateStr)
+    const date = parseDateString(dateStr)
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   const formatPeriod = (startDate: string | null, endDate: string | null): string => {
     if (!startDate || !endDate) return 'N/A'
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    const start = parseDateString(startDate)
+    const end = parseDateString(endDate)
 
     if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
       return end.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -224,6 +225,57 @@ export function useStatements() {
     }
   }
 
+  const updateStatement = async (
+    statementId: string,
+    updateData: Partial<{
+      due_date: string | null
+      close_date: string | null
+      period_start: string | null
+      period_end: string | null
+      previous_balance: number | null
+      current_balance: number | null
+      minimum_payment: number | null
+      is_fully_paid: boolean
+    }>
+  ) => {
+    error.value = null
+
+    try {
+      const token =
+        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+
+      const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to update statement: ${response.statusText}`)
+      }
+
+      const updatedStatement = await response.json()
+
+      // Update local statements array
+      const index = statements.value.findIndex((s) => s.id === statementId)
+      if (index !== -1) {
+        statements.value[index] = { ...statements.value[index], ...updatedStatement }
+      }
+
+      return updatedStatement
+    } catch (e) {
+      error.value = e instanceof Error ? e : new Error('Failed to update statement')
+      console.error('Error updating statement:', e)
+      throw error.value
+    }
+  }
+
   return {
     statements,
     statementsWithCard,
@@ -235,6 +287,7 @@ export function useStatements() {
     fetchStatements,
     fetchBalance,
     createPayment,
+    updateStatement,
     formatCurrency,
     formatDate,
     formatPeriod,

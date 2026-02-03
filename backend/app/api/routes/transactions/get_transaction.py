@@ -10,6 +10,8 @@ from app.domains.card_statements.domain.errors import CardStatementNotFoundError
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
 )
+from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
+from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 from app.domains.transactions.domain.errors import TransactionNotFoundError
 from app.domains.transactions.domain.models import TransactionPublic
 from app.domains.transactions.usecases.get_transaction import (
@@ -36,7 +38,10 @@ def get_transaction(
         get_statement_usecase = provide_get_statement(session)
         statement = get_statement_usecase.execute(transaction.statement_id)
 
-        if statement.user_id == current_user.id or current_user.is_superuser:
+        get_card_usecase = provide_get_card(session)
+        card = get_card_usecase.execute(statement.card_id)
+
+        if card.user_id == current_user.id or current_user.is_superuser:
             return transaction
 
         raise HTTPException(
@@ -47,3 +52,5 @@ def get_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")
+    except CreditCardNotFoundError:
+        raise HTTPException(status_code=404, detail="Credit card not found")
