@@ -50,6 +50,54 @@ const totalPages = computed(() => {
   return Math.ceil(totalCount.value / PAGE_SIZE)
 })
 
+// Smart pagination with ellipsis
+const visiblePages = computed<(number | null)[]>(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+
+  // Show all pages if there are 7 or fewer
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  // Otherwise, show pages with ellipsis
+  const pages: (number | null)[] = []
+
+  // Always include first page
+  pages.push(1)
+
+  // Show ellipsis after first page if current is far from start
+  if (current > 3) {
+    pages.push(null)
+  }
+
+  // Show pages around current page
+  const startPage = Math.max(2, current - 1)
+  const endPage = Math.min(total - 1, current + 1)
+
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i)
+  }
+
+  // Show ellipsis before last page if current is far from end
+  if (current < total - 2) {
+    pages.push(null)
+  }
+
+  // Always include last page
+  pages.push(total)
+
+  // Remove consecutive duplicates
+  const filteredPages: (number | null)[] = []
+  for (let i = 0; i < pages.length; i++) {
+    if (pages[i] !== pages[i - 1]) {
+      filteredPages.push(pages[i])
+    }
+  }
+
+  return filteredPages
+})
+
 const paginationInfo = computed(() => {
   const startItem = (currentPage.value - 1) * PAGE_SIZE + 1
   const endItem = Math.min(currentPage.value * PAGE_SIZE, totalCount.value)
@@ -335,13 +383,13 @@ const handlePay = () => {
               </tr>
             </thead>
            <tbody>
-             <tr v-for="txn in sortedTransactions" :key="txn.id">
-               <td>{{ formatTransactionDate(txn.txn_date) }}</td>
-              <td>{{ txn.payee }}</td>
-              <td>{{ txn.description }}</td>
-              <td :class="txn.amount < 0 ? 'amount--negative' : 'amount--positive'">
-                {{ formatCurrency(txn.amount) }}
-              </td>
+              <tr v-for="txn in sortedTransactions" :key="txn.id">
+                <td>{{ formatTransactionDate(txn.txn_date) }}</td>
+               <td class="text-truncate payee-cell" :title="txn.payee">{{ txn.payee }}</td>
+               <td class="text-truncate description-cell" :title="txn.description">{{ txn.description }}</td>
+               <td :class="txn.amount < 0 ? 'amount--negative' : 'amount--positive'">
+                 {{ formatCurrency(txn.amount) }}
+               </td>
               <td class="installments">{{ formatInstallments(txn.installment_cur, txn.installment_tot) }}</td>
                <td class="tags">
                  <template v-if="getTagsForTransaction(txn.id).length > 0">
@@ -359,38 +407,40 @@ const handlePay = () => {
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="pagination">
-          <span class="pagination-info">{{ paginationInfo }}</span>
-          <div class="pagination-nav">
-            <Button
-              icon="pi pi-chevron-left"
-              severity="secondary"
-              text
-              :disabled="currentPage === 1"
-              @click="goToPage(currentPage - 1)"
-              aria-label="Previous page"
-            />
-            <Button
-               v-for="page in totalPages"
-               :key="page"
-               :label="page.toString()"
+         <!-- Pagination -->
+         <div v-if="totalPages > 1" class="pagination">
+           <span class="pagination-info">{{ paginationInfo }}</span>
+           <div class="pagination-nav">
+             <Button
+               icon="pi pi-chevron-left"
                severity="secondary"
-               :outlined="page !== currentPage"
-               @click="goToPage(page)"
-               :aria-label="'Go to page ' + page"
-               :aria-current="page === currentPage ? 'page' : undefined"
+               text
+               :disabled="currentPage === 1"
+               @click="goToPage(currentPage - 1)"
+               aria-label="Previous page"
              />
-            <Button
-              icon="pi pi-chevron-right"
-              severity="secondary"
-              text
-              :disabled="currentPage === totalPages"
-              @click="goToPage(currentPage + 1)"
-              aria-label="Next page"
-            />
-          </div>
-        </div>
+             <template v-for="(page, index) in visiblePages" :key="page ?? `ellipsis-${index}`">
+               <Button
+                  v-if="page !== null"
+                  :label="page.toString()"
+                  severity="secondary"
+                  :outlined="page !== currentPage"
+                  @click="goToPage(page)"
+                  :aria-label="'Go to page ' + page"
+                  :aria-current="page === currentPage ? 'page' : undefined"
+                />
+                <span v-else class="pagination-ellipsis">...</span>
+             </template>
+             <Button
+               icon="pi pi-chevron-right"
+               severity="secondary"
+               text
+               :disabled="currentPage === totalPages"
+               @click="goToPage(currentPage + 1)"
+               aria-label="Next page"
+             />
+           </div>
+         </div>
       </section>
 
       <!-- Action Buttons -->
@@ -682,6 +732,28 @@ const handlePay = () => {
 
 .pagination-nav :deep(.p-button) {
   min-width: 2.25rem;
+}
+
+.pagination-ellipsis {
+  padding: 0 0.5rem;
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+  user-select: none;
+}
+
+/* Text Truncation */
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payee-cell {
+  max-width: 180px;
+}
+
+.description-cell {
+  max-width: 200px;
 }
 
 .modal-actions {
