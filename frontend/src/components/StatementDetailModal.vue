@@ -272,6 +272,7 @@ const handlePay = () => {
     v-model:visible="internalVisible"
     modal
     :style="{ width: '850px' }"
+    :breakpoints="{ '1024px': '90vw', '768px': '95vw' }"
     :closable="true"
     :draggable="false"
   >
@@ -341,7 +342,8 @@ const handlePay = () => {
         </div>
 
         <!-- Transactions Table -->
-         <table v-else class="transactions-table">
+         <div v-else class="table-wrapper">
+          <table class="transactions-table">
             <thead>
               <tr>
                 <th
@@ -403,9 +405,10 @@ const handlePay = () => {
                  </template>
                  <template v-else>-</template>
                </td>
-            </tr>
-          </tbody>
-        </table>
+           </tr>
+         </tbody>
+       </table>
+       </div>
 
          <!-- Pagination -->
          <div v-if="totalPages > 1" class="pagination">
@@ -633,10 +636,16 @@ const handlePay = () => {
 }
 
 /* Transactions Table */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .transactions-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.938rem;
+  min-width: 700px;
 }
 
 .transactions-table th {
@@ -764,15 +773,21 @@ const handlePay = () => {
 }
 
 /* Responsive design */
+@media (max-width: 1024px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-item:last-child {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 768px) {
   .modal-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
-  }
-
-  .summary-grid {
-    grid-template-columns: 1fr;
   }
 
   .modal-actions {
@@ -781,6 +796,16 @@ const handlePay = () => {
 
   .modal-actions .p-button {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-item:last-child {
+    grid-column: auto;
   }
 }
 </style>

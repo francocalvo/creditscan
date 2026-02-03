@@ -1,3 +1,10 @@
+/**
+ * Composable for fetching tag mappings for transactions.
+ *
+ * Fetches tag IDs for multiple transactions in parallel. Failures are handled
+ * gracefully by returning empty arrays for transactions that couldn't be fetched.
+ * This ensures that tag display errors don't prevent the rest of the UI from rendering.
+ */
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
 
@@ -10,6 +17,15 @@ export function useTransactionTags() {
   const tagsByTransaction = ref<Map<string, string[]>>(new Map())
   const isLoading = ref(false)
 
+  /**
+   * Fetches tag IDs for multiple transactions in parallel.
+   *
+   * Fetches tag mappings for all provided transaction IDs simultaneously.
+   * Failures are silent - transactions that fail to fetch will have an empty
+   * array of tags instead of throwing errors.
+   *
+   * @param transactionIds - Array of transaction IDs to fetch tags for
+   */
   const fetchTagsForTransactions = async (transactionIds: string[]): Promise<void> => {
     // Early return if no transaction IDs to fetch
     if (transactionIds.length === 0) {
@@ -85,10 +101,19 @@ export function useTransactionTags() {
     }
   }
 
+  /**
+   * Returns tag IDs for a specific transaction.
+   *
+   * @param transactionId - The ID of the transaction to get tags for
+   * @returns Array of tag IDs, or empty array if none found or not yet fetched
+   */
   const getTagIdsForTransaction = (transactionId: string): string[] => {
     return tagsByTransaction.value.get(transactionId) || []
   }
 
+  /**
+   * Clears all tag mappings from the cache.
+   */
   const reset = (): void => {
     tagsByTransaction.value = new Map()
   }

@@ -1,3 +1,9 @@
+/**
+ * Composable for fetching transactions filtered by statement ID.
+ *
+ * Provides methods to fetch transactions with pagination support.
+ * Useful for displaying paginated transaction lists in statement detail modals.
+ */
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
 
@@ -25,6 +31,12 @@ export function useStatementTransactions() {
   const isLoading = ref(false)
   const error = ref<Error | null>(null)
 
+  /**
+   * Fetches transactions for a specific statement with pagination options.
+   *
+   * @param statementId - The ID of the statement to fetch transactions for
+   * @param options - Optional pagination parameters (skip and limit)
+   */
   const fetchTransactions = async (
     statementId: string,
     options?: { skip?: number; limit?: number }
@@ -71,6 +83,9 @@ export function useStatementTransactions() {
     }
   }
 
+  /**
+   * Clears all transactions and resets state.
+   */
   const reset = () => {
     transactions.value = []
     totalCount.value = 0
