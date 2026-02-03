@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useStatements } from '@/composables/useStatements'
 import { getCardDisplayName } from '@/composables/useCreditCards'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
+import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -51,8 +52,10 @@ const filterStatus = ref('all')
 
 // Payment modal state
 const showPaymentModal = ref(false)
+const showDetailModal = ref(false)
 const selectedStatement = ref<typeof statementsWithCard.value[0] | null>(null)
 const isProcessingPayment = ref(false)
+const isTransitioningModals = ref(false)
 
 const tabs = [
   { id: 'statements', label: 'Statements' },
@@ -150,6 +153,24 @@ const getCardLatestBalance = (cardId: string) => {
 const handlePayClick = (statement: typeof statementsWithCard.value[0]) => {
   selectedStatement.value = statement
   showPaymentModal.value = true
+}
+
+// Handle View Details button click
+const handleViewDetails = (statement: typeof statementsWithCard.value[0]) => {
+  selectedStatement.value = statement
+  showDetailModal.value = true
+}
+
+// Handle Pay button click from detail modal
+const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
+  if (isTransitioningModals.value) return
+  isTransitioningModals.value = true
+  showDetailModal.value = false
+  nextTick(() => {
+    selectedStatement.value = statement
+    showPaymentModal.value = true
+    isTransitioningModals.value = false
+  })
 }
 
 // Handle payment submission
@@ -296,7 +317,7 @@ const handlePaymentSubmit = async (paymentData: {
                   >
                     Pay
                   </button>
-                  <button class="action-button">View Details</button>
+                  <button class="action-button" @click="handleViewDetails(statement)">View Details</button>
                 </div>
               </td>
             </tr>
@@ -452,6 +473,14 @@ const handlePaymentSubmit = async (paymentData: {
       :statement-card="getStatementCardDisplay(selectedStatement)"
       :is-submitting="isProcessingPayment"
       @submit="handlePaymentSubmit"
+    />
+
+    <!-- Statement Detail Modal -->
+    <StatementDetailModal
+      v-if="selectedStatement"
+      v-model:visible="showDetailModal"
+      :statement="selectedStatement"
+      @pay="handlePayFromDetail"
     />
 
     <!-- Toast notifications -->
