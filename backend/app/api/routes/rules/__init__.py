@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from .apply_rules import router as apply_rules_router
 from .create_rule import router as create_rule_router
 from .delete_rule import router as delete_rule_router
 from .get_rule import router as get_rule_router
@@ -10,6 +11,7 @@ from .update_rule import router as update_rule_router
 
 router = APIRouter(prefix="/rules", tags=["rules"])
 
+router.include_router(apply_rules_router)
 router.include_router(create_rule_router)
 router.include_router(list_rules_router)
 router.include_router(get_rule_router)
