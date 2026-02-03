@@ -181,6 +181,19 @@ const handleSort = (field: SortField) => {
   }
 }
 
+const getAriaSort = (field: SortField): 'ascending' | 'descending' | 'none' => {
+  if (field !== sortField.value) return 'none'
+  return sortOrder.value === 'asc' ? 'ascending' : 'descending'
+}
+
+const getSortLabel = (field: SortField, columnName: string): string => {
+  if (field !== sortField.value) {
+    return `Sort by ${columnName}`
+  }
+  const direction = sortOrder.value === 'asc' ? 'ascending' : 'descending'
+  return `Sort by ${columnName}, currently sorted ${direction}. Click to sort ${sortOrder.value === 'asc' ? 'descending' : 'ascending'}.`
+}
+
 const getSortIcon = (field: SortField): string => {
   if (field !== sortField.value) {
     return 'pi pi-sort-alt'
@@ -261,13 +274,13 @@ const handlePay = () => {
         <h3 class="section-title">Transactions</h3>
 
         <!-- Loading State -->
-        <div v-if="isLoading" class="loading-state">
+        <div v-if="isLoading" class="loading-state" role="status" aria-live="polite" aria-label="Loading transactions">
           <div class="spinner"></div>
           <p>Loading transactions...</p>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="error" class="error-state">
+        <div v-else-if="error" class="error-state" role="alert">
           <i class="pi pi-exclamation-circle"></i>
           <p>Failed to load transactions</p>
           <Button label="Retry" size="small" severity="secondary" @click="handleRetry" />
@@ -281,22 +294,46 @@ const handlePay = () => {
 
         <!-- Transactions Table -->
          <table v-else class="transactions-table">
-           <thead>
-             <tr>
-               <th class="sortable" @click="handleSort('txn_date')">
-                 Date <i :class="getSortIcon('txn_date')"></i>
-               </th>
-               <th class="sortable" @click="handleSort('payee')">
-                 Payee <i :class="getSortIcon('payee')"></i>
-               </th>
-               <th>Description</th>
-               <th class="sortable" @click="handleSort('amount')">
-                 Amount <i :class="getSortIcon('amount')"></i>
-               </th>
-               <th>Installments</th>
-               <th>Tags</th>
-             </tr>
-           </thead>
+            <thead>
+              <tr>
+                <th
+                  class="sortable"
+                  :aria-sort="getAriaSort('txn_date')"
+                  :aria-label="getSortLabel('txn_date', 'Date')"
+                  tabindex="0"
+                  @click="handleSort('txn_date')"
+                  @keydown.enter.prevent="handleSort('txn_date')"
+                  @keydown.space.prevent="handleSort('txn_date')"
+                >
+                  Date <i :class="getSortIcon('txn_date')"></i>
+                </th>
+                <th
+                  class="sortable"
+                  :aria-sort="getAriaSort('payee')"
+                  :aria-label="getSortLabel('payee', 'Payee')"
+                  tabindex="0"
+                  @click="handleSort('payee')"
+                  @keydown.enter.prevent="handleSort('payee')"
+                  @keydown.space.prevent="handleSort('payee')"
+                >
+                  Payee <i :class="getSortIcon('payee')"></i>
+                </th>
+                <th>Description</th>
+                <th
+                  class="sortable"
+                  :aria-sort="getAriaSort('amount')"
+                  :aria-label="getSortLabel('amount', 'Amount')"
+                  tabindex="0"
+                  @click="handleSort('amount')"
+                  @keydown.enter.prevent="handleSort('amount')"
+                  @keydown.space.prevent="handleSort('amount')"
+                >
+                  Amount <i :class="getSortIcon('amount')"></i>
+                </th>
+                <th>Installments</th>
+                <th>Tags</th>
+              </tr>
+            </thead>
            <tbody>
              <tr v-for="txn in sortedTransactions" :key="txn.id">
                <td>{{ formatTransactionDate(txn.txn_date) }}</td>
@@ -335,14 +372,15 @@ const handlePay = () => {
               aria-label="Previous page"
             />
             <Button
-              v-for="page in totalPages"
-              :key="page"
-              :label="page.toString()"
-              severity="secondary"
-              :outlined="page !== currentPage"
-              @click="goToPage(page)"
-              :aria-current="page === currentPage ? 'page' : undefined"
-            />
+               v-for="page in totalPages"
+               :key="page"
+               :label="page.toString()"
+               severity="secondary"
+               :outlined="page !== currentPage"
+               @click="goToPage(page)"
+               :aria-label="'Go to page ' + page"
+               :aria-current="page === currentPage ? 'page' : undefined"
+             />
             <Button
               icon="pi pi-chevron-right"
               severity="secondary"
