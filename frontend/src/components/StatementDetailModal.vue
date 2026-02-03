@@ -6,6 +6,8 @@ import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import { type StatementWithCard } from '@/composables/useStatements'
 import { getCardWithLast4 } from '@/composables/useCreditCards'
 import { useStatementTransactions } from '@/composables/useStatementTransactions'
+import { useTags, type Tag } from '@/composables/useTags'
+import { useTransactionTags } from '@/composables/useTransactionTags'
 
 interface Props {
   visible: boolean
@@ -25,6 +27,10 @@ const emit = defineEmits<Emits>()
 
 // Transactions composable
 const { transactions, totalCount, isLoading, error, fetchTransactions, reset } = useStatementTransactions()
+
+// Tags composables
+const { fetchTags, getTagById } = useTags()
+const { fetchTagsForTransactions, getTagIdsForTransaction, reset: resetTransactionTags } = useTransactionTags()
 
 // Pagination
 const PAGE_SIZE = 15
@@ -76,15 +82,25 @@ const sortedTransactions = computed(() => {
 // Watch for modal open/close to fetch/reset transactions
 watch(
   () => props.visible,
-  (newVisible) => {
+  async (newVisible) => {
     if (newVisible && props.statement) {
       currentPage.value = 1
       sortField.value = 'txn_date'
       sortOrder.value = 'desc'
-      fetchTransactions(props.statement.id, { skip: 0, limit: PAGE_SIZE })
+
+      // Fetch tags (uses cache if already fetched)
+      await fetchTags()
+
+      // Fetch transactions
+      await fetchTransactions(props.statement.id, { skip: 0, limit: PAGE_SIZE })
+
+      // Fetch tag mappings for the transactions
+      const transactionIds = transactions.value.map((t) => t.id)
+      await fetchTagsForTransactions(transactionIds)
     } else if (!newVisible) {
       currentPage.value = 1
       reset()
+      resetTransactionTags()
     }
   }
 )
@@ -139,10 +155,21 @@ const formatInstallments = (cur: number | null, tot: number | null): string => {
   return '-'
 }
 
-const goToPage = (page: number) => {
+const getTagsForTransaction = (transactionId: string): Tag[] => {
+  const tagIds = getTagIdsForTransaction(transactionId)
+  return tagIds
+    .map((tagId) => getTagById(tagId))
+    .filter((tag): tag is Tag => tag !== undefined)
+}
+
+const goToPage = async (page: number) => {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
-  fetchTransactions(props.statement!.id, { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+  await fetchTransactions(props.statement!.id, { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+
+  // Fetch tag mappings for new page's transactions
+  const transactionIds = transactions.value.map((t) => t.id)
+  await fetchTagsForTransactions(transactionIds)
 }
 
 const handleSort = (field: SortField) => {
@@ -279,7 +306,18 @@ const handlePay = () => {
                 {{ formatCurrency(txn.amount) }}
               </td>
               <td class="installments">{{ formatInstallments(txn.installment_cur, txn.installment_tot) }}</td>
-              <td class="tags">-</td>
+               <td class="tags">
+                 <template v-if="getTagsForTransaction(txn.id).length > 0">
+                   <span
+                     v-for="tag in getTagsForTransaction(txn.id)"
+                     :key="tag.tag_id"
+                     class="tag-chip"
+                   >
+                     {{ tag.label }}
+                   </span>
+                 </template>
+                 <template v-else>-</template>
+               </td>
             </tr>
           </tbody>
         </table>
@@ -546,7 +584,21 @@ const handlePay = () => {
 }
 
 .transactions-table .tags {
-  color: var(--text-color-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  background: var(--primary-50);
+  color: var(--primary-700);
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .transactions-table th.sortable {
