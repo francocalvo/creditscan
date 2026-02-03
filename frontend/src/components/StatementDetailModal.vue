@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, withDefaults } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -21,6 +21,7 @@ import { useStatements } from '@/composables/useStatements'
 interface Props {
   visible: boolean
   statement: StatementWithCard | null
+  startInEditMode?: boolean
 }
 
 interface Emits {
@@ -44,7 +45,9 @@ interface NewTransaction {
   installment_tot: number | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  startInEditMode: false
+})
 const emit = defineEmits<Emits>()
 
 // Currency options for dropdown
@@ -479,6 +482,10 @@ watch(
       currentPage.value = 1
       sortField.value = 'txn_date'
       sortOrder.value = 'desc'
+
+      if (props.startInEditMode) {
+        enterEditMode()
+      }
 
       // Fetch tags (uses cache if already fetched)
       await fetchTags()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useStatements } from '@/composables/useStatements'
 import { getCardDisplayName } from '@/composables/useCreditCards'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
@@ -53,9 +53,14 @@ const filterStatus = ref('all')
 // Payment modal state
 const showPaymentModal = ref(false)
 const showDetailModal = ref(false)
+const detailStartInEditMode = ref(false)
 const selectedStatement = ref<typeof statementsWithCard.value[0] | null>(null)
 const isProcessingPayment = ref(false)
 const isTransitioningModals = ref(false)
+
+watch(showDetailModal, (isVisible) => {
+  if (!isVisible) detailStartInEditMode.value = false
+})
 
 const tabs = [
   { id: 'statements', label: 'Statements' },
@@ -158,6 +163,7 @@ const handlePayClick = (statement: typeof statementsWithCard.value[0]) => {
 // Handle View Details button click
 const handleViewDetails = (statement: typeof statementsWithCard.value[0]) => {
   selectedStatement.value = statement
+  detailStartInEditMode.value = false
   showDetailModal.value = true
 }
 
@@ -169,6 +175,20 @@ const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
   nextTick(() => {
     selectedStatement.value = statement
     showPaymentModal.value = true
+    isTransitioningModals.value = false
+  })
+}
+
+const handleEditStatementFromPayment = () => {
+  if (!selectedStatement.value) return
+  if (isTransitioningModals.value) return
+
+  isTransitioningModals.value = true
+  showPaymentModal.value = false
+
+  nextTick(() => {
+    detailStartInEditMode.value = true
+    showDetailModal.value = true
     isTransitioningModals.value = false
   })
 }
@@ -473,6 +493,7 @@ const handlePaymentSubmit = async (paymentData: {
       :statement-card="getStatementCardDisplay(selectedStatement)"
       :is-submitting="isProcessingPayment"
       @submit="handlePaymentSubmit"
+      @edit-statement="handleEditStatementFromPayment"
     />
 
     <!-- Statement Detail Modal -->
@@ -480,6 +501,7 @@ const handlePaymentSubmit = async (paymentData: {
       v-if="selectedStatement"
       v-model:visible="showDetailModal"
       :statement="selectedStatement"
+      :start-in-edit-mode="detailStartInEditMode"
       @pay="handlePayFromDetail"
     />
 
@@ -940,4 +962,3 @@ const handlePaymentSubmit = async (paymentData: {
   text-transform: uppercase;
 }
 </style>
-
