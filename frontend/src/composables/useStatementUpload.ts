@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { OpenAPI } from '@/api'
+import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 /**
  * Represents an upload job returned by the backend.
@@ -46,7 +47,7 @@ export function useStatementUpload() {
   async function getAuthToken(): Promise<string> {
     const token =
       typeof OpenAPI.TOKEN === 'function'
-        ? await OpenAPI.TOKEN({} as any)
+        ? await OpenAPI.TOKEN({} as ApiRequestOptions<string>)
         : OpenAPI.TOKEN || ''
     return token
   }
@@ -131,7 +132,6 @@ export function useStatementUpload() {
     const response = await fetch(`${OpenAPI.BASE}/api/v1/upload-jobs/${jobIdToCheck}`, {
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
     })
 

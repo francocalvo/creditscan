@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { useStatementUpload } from '../useStatementUpload'
-import { OpenAPI } from '@/api'
 import type { UploadJob } from '../useStatementUpload'
 
 // Mock OpenAPI module

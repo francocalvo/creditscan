@@ -1,29 +1,42 @@
+# Create load modal for cc statements
+
+**Agent:** frontend
+**Status:** In progress
+**Dependencies:** https://www.notion.so/2faf6e7f0572803691dbe22683966e7b
+
 ## User Story
 **As a** user,
-**I want to** see detailed financial analytics,
-**So that** I can understand my spending patterns and make better financial decisions.
+**I want** a modal to upload new credit card statements,
+**So that** I can easily add new data to the system.
 
 ## Repo Notes
-- The Analytics tab currently exists as a placeholder in `frontend/src/views/StatementsView.vue`.
-- Backend currently does not expose analytics aggregation endpoints.
-- Backend *does* expose `GET /api/v1/transactions` with `skip`/`limit`.
+- The header button currently navigates to `/upload-statement` (`frontend/src/layouts/DefaultLayout.vue`), but no route/view exists yet.
 
-## MVP Approach (No new backend endpoints)
-- Build charts based on the most recent N transactions fetched via `GET /api/v1/transactions`.
-- Add simple date-range UI client-side; if server-side filtering is needed later, extend the transactions endpoint.
+## Status / Dependency
+This is blocked until the backend upload workflow exists.
 
-## Future (Backend-supported)
-- Add aggregation endpoints when data volume makes client-side aggregation too expensive:
-	- `GET /api/v1/analytics/spending-by-month`
-	- `GET /api/v1/analytics/spending-by-tag`
-	- `GET /api/v1/analytics/top-merchants`
+## UX Plan (Modal)
 
-## Technical Implementation
-- Use PrimeVue Chart components.
-- Create `frontend/src/composables/useAnalytics.ts` for aggregation logic + loading states.
+### Step 1: Select Card
+- Dropdown for existing cards (use `useCreditCards` / already-loaded cards).
+
+### Step 2: Upload File
+- PDF-only validation
+- Drag & drop + file picker
+
+### Step 3: Processing
+- Loading indicator during upload
+- Show clear errors for unsupported format / extraction failure
+
+### Step 4: Confirmation (Optional)
+- If backend supports it: show extracted summary + transaction count before final save
+
+## API Integration
+Check implemented in backend!
 
 ## Acceptance Criteria
-- [ ] Monthly spending chart displayed
-- [ ] Spending by tag/category chart displayed (based on available data)
-- [ ] Top merchants list
-- [ ] Loading/empty states handled
+- [ ] Modal opens from header button
+- [ ] Card selection works
+- [ ] PDF upload works with progress/loading
+- [ ] Success/error feedback displayed
+- [ ] Statement appears in list after upload

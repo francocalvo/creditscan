@@ -9,6 +9,7 @@ import Menu from 'primevue/menu'
 
 import logoLight from '@/assets/logo.svg'
 import logoDark from '@/assets/logo-dark.svg'
+import UploadStatementModal from '@/components/UploadStatementModal.vue'
 
 // Default layout for authenticated users
 const router = useRouter()
@@ -78,9 +79,18 @@ const userInitials = computed(() => {
   return authStore.user.full_name[0].toUpperCase()
 })
 
-// Upload statement action
+// Upload statement modal state
+const showUploadModal = ref(false)
+
+// Upload statement action - open modal instead of navigating
 const handleUploadStatement = () => {
-  router.push('/upload-statement')
+  showUploadModal.value = true
+}
+
+// Handle successful upload - navigate to statement detail
+const handleUploadComplete = (statementId: string) => {
+  showUploadModal.value = false
+  router.push(`/statements/${statementId}`)
 }
 
 // Dark mode toggle
@@ -131,6 +141,12 @@ const toggleDarkMode = () => {
     <main class="content">
       <router-view></router-view>
     </main>
+
+    <!-- Upload Statement Modal -->
+    <UploadStatementModal
+      v-model:visible="showUploadModal"
+      @upload-complete="handleUploadComplete"
+    />
   </div>
 </template>
 
