@@ -1,8 +1,9 @@
 """Upload job repository implementation."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.domains.upload_jobs.domain.errors import (
@@ -25,18 +26,43 @@ class UploadJobRepository:
 
     def create(self, data: UploadJobCreate) -> UploadJob:
         """Create a new upload job."""
-        # Check for duplicate file hash for the same user
-        existing = self.get_by_file_hash(data.file_hash, data.user_id)
-        if existing:
-            raise DuplicateFileError(
-                f"File with hash {data.file_hash} already exists for this user",
-                existing.id,
-            )
-
         job = UploadJob.model_validate(data)
+
+        # Use a nested transaction (savepoint) if the session is already in a transaction
+        # This ensures that a rollback only affects this operation, not the entire transaction
+        if self.db_session.in_transaction():
+            nested = self.db_session.begin_nested()
+        else:
+            nested = None
+
         self.db_session.add(job)
-        self.db_session.commit()
-        self.db_session.refresh(job)
+        try:
+            if nested:
+                nested.commit()
+            else:
+                self.db_session.commit()
+            self.db_session.refresh(job)
+        except IntegrityError as e:
+            if nested:
+                nested.rollback()
+            else:
+                self.db_session.rollback()
+            # Check if it's the unique constraint violation on (user_id, file_hash)
+            error_str = str(e).lower()
+            if (
+                "uq_upload_job_user_file_hash" in error_str
+                or "unique constraint failed" in error_str
+                or "unique constraint" in error_str
+            ):
+                # Find the existing job
+                existing = self.get_by_file_hash(data.file_hash, data.user_id)
+                if existing:
+                    raise DuplicateFileError(
+                        f"File with hash {data.file_hash} already exists for this user",
+                        existing.id,
+                    )
+            # Re-raise if not a duplicate file error or no existing job found
+            raise
         return job
 
     def get_by_id(self, job_id: uuid.UUID) -> UploadJob:
@@ -58,7 +84,7 @@ class UploadJobRepository:
         self,
         job_id: uuid.UUID,
         status: UploadJobStatus,
-        **kwargs,
+        **kwargs: object,
     ) -> UploadJob:
         """Update upload job status and optional fields.
 
@@ -72,7 +98,7 @@ class UploadJobRepository:
         """
         job = self.get_by_id(job_id)
         job.status = status
-        job.updated_at = datetime.utcnow()
+        job.updated_at = datetime.now(timezone.utc)
 
         # Update optional fields if provided
         for key, value in kwargs.items():
@@ -83,6 +109,35 @@ class UploadJobRepository:
         self.db_session.commit()
         self.db_session.refresh(job)
         return job
+
+    def list_pending_jobs(self) -> list[UploadJob]:
+        """List all jobs with pending status.
+
+        Returns:
+            List of pending upload jobs that need to be resumed.
+        """
+        query = select(UploadJob).where(UploadJob.status == UploadJobStatus.PENDING)
+        result = self.db_session.exec(query)
+        return list(result)
+
+    def list_stale_processing_jobs(self, minutes: int = 30) -> list[UploadJob]:
+        """List jobs stuck in processing state for too long.
+
+        Args:
+            minutes: Number of minutes to consider a job stale.
+
+        Returns:
+            List of stale processing jobs that may need to be resumed.
+        """
+        from datetime import timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+        query = select(UploadJob).where(
+            UploadJob.status == UploadJobStatus.PROCESSING,
+            UploadJob.updated_at < cutoff,
+        )
+        result = self.db_session.exec(query)
+        return list(result)
 
 
 def provide(session: Session) -> UploadJobRepository:
