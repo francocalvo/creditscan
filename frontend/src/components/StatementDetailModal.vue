@@ -2,12 +2,16 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import { type StatementWithCard } from '@/composables/useStatements'
+import { type CardStatement } from '@/composables/useStatements'
 import { getCardWithLast4 } from '@/composables/useCreditCards'
 import { useStatementTransactions } from '@/composables/useStatementTransactions'
+import { type StatementTransaction, type TransactionUpdate } from '@/composables/useStatementTransactions'
 import { useTags, type Tag } from '@/composables/useTags'
 import { useTransactionTags } from '@/composables/useTransactionTags'
+import { useStatements } from '@/composables/useStatements'
 
 interface Props {
   visible: boolean
@@ -26,11 +30,24 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 // Transactions composable
-const { transactions, totalCount, isLoading, error, fetchTransactions, reset } = useStatementTransactions()
+const { transactions, totalCount, isLoading, error, fetchTransactions, reset, updateTransaction, createTransaction, deleteTransaction } = useStatementTransactions()
+
+// Statements composable
+const { updateStatement: updateStatementApi } = useStatements()
 
 // Tags composables
 const { fetchTags, getTagById } = useTags()
 const { fetchTagsForTransactions, getTagIdsForTransaction, reset: resetTransactionTags } = useTransactionTags()
+
+// Edit mode state
+const isEditMode = ref(false)
+const isSaving = ref(false)
+const saveError = ref<Error | null>(null)
+
+// Form state
+const editedStatement = ref<Partial<CardStatement> | null>(null)
+const editedTransactions = ref<Map<string, TransactionUpdate>>(new Map())
+const deletedTransactionIds = ref<Set<string>>(new Set())
 
 // Pagination
 const currentPage = ref(1)
@@ -330,8 +347,44 @@ const handleRetry = () => {
   fetchCurrentPage()
 }
 
+// Edit mode functions
+const enterEditMode = () => {
+  if (!props.statement) return
+
+  // Initialize edited statement with current values
+  editedStatement.value = {
+    due_date: props.statement.due_date,
+    close_date: props.statement.close_date,
+    period_start: props.statement.period_start,
+    period_end: props.statement.period_end,
+    previous_balance: props.statement.previous_balance,
+    current_balance: props.statement.current_balance,
+    minimum_payment: props.statement.minimum_payment,
+    is_fully_paid: props.statement.is_fully_paid,
+  }
+
+  // Initialize empty transaction edits
+  editedTransactions.value = new Map()
+  deletedTransactionIds.value = new Set()
+
+  isEditMode.value = true
+  saveError.value = null
+}
+
+const exitEditMode = () => {
+  isEditMode.value = false
+  editedStatement.value = null
+  editedTransactions.value = new Map()
+  deletedTransactionIds.value = new Set()
+  saveError.value = null
+}
+
 // Event handlers
 const handleClose = () => {
+  if (isEditMode.value) {
+    // Discard unsaved changes and exit edit mode
+    exitEditMode()
+  }
   internalVisible.value = false
 }
 
@@ -339,6 +392,47 @@ const handlePay = () => {
   if (props.statement) {
     emit('pay', props.statement)
   }
+}
+
+const handleSave = async () => {
+  if (!props.statement) return
+
+  isSaving.value = true
+  saveError.value = null
+
+  try {
+    // Save statement updates if any
+    if (editedStatement.value) {
+      await updateStatementApi(props.statement.id, editedStatement.value)
+    }
+
+    // Save transaction updates
+    const updatePromises: Promise<any>[] = []
+
+    editedTransactions.value.forEach((updateData, transactionId) => {
+      updatePromises.push(updateTransaction(transactionId, updateData))
+    })
+
+    // Delete marked transactions
+    deletedTransactionIds.value.forEach((transactionId) => {
+      updatePromises.push(deleteTransaction(transactionId))
+    })
+
+    await Promise.all(updatePromises)
+
+    // Refresh data and exit edit mode
+    await fetchCurrentPage()
+    exitEditMode()
+  } catch (e) {
+    saveError.value = e instanceof Error ? e : new Error('Failed to save changes')
+    console.error('Error saving changes:', e)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const handleCancel = () => {
+  exitEditMode()
 }
 </script>
 
@@ -362,6 +456,10 @@ const handlePay = () => {
     </template>
 
     <div v-if="statement" class="modal-content">
+      <!-- Save Error Message -->
+      <Message v-if="saveError" severity="error" :closable="false" class="save-error">
+        {{ saveError.message }}
+      </Message>
       <!-- Summary Section -->
       <section class="summary-section">
         <h3 class="section-title">Statement Summary</h3>
@@ -554,20 +652,48 @@ const handlePay = () => {
         </div>
 
         <div class="footer-actions">
-          <Button
-            label="Pay"
-            icon="pi pi-credit-card"
-            :disabled="statement.is_fully_paid"
-            @click="handlePay"
-            severity="primary"
-          />
-          <Button
-            label="Close"
-            icon="pi pi-times"
-            @click="handleClose"
-            severity="secondary"
-            outlined
-          />
+          <!-- View mode buttons -->
+          <template v-if="!isEditMode">
+            <Button
+              label="Pay"
+              icon="pi pi-credit-card"
+              :disabled="statement.is_fully_paid"
+              @click="handlePay"
+              severity="primary"
+            />
+            <Button
+              label="Edit"
+              icon="pi pi-pencil"
+              @click="enterEditMode"
+              severity="primary"
+              outlined
+            />
+            <Button
+              label="Close"
+              icon="pi pi-times"
+              @click="handleClose"
+              severity="secondary"
+              outlined
+            />
+          </template>
+
+          <!-- Edit mode buttons -->
+          <template v-else>
+            <Button
+              label="Save"
+              icon="pi pi-check"
+              :loading="isSaving"
+              @click="handleSave"
+              severity="primary"
+            />
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              @click="handleCancel"
+              severity="secondary"
+              outlined
+            />
+          </template>
         </div>
       </div>
     </template>
@@ -606,6 +732,10 @@ const handlePay = () => {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+.save-error {
+  margin-bottom: 0;
 }
 
 .summary-section {
