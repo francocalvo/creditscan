@@ -17,6 +17,9 @@ interface Emits {
   (e: 'pay', statement: StatementWithCard): void
 }
 
+type SortField = 'txn_date' | 'amount' | 'payee'
+type SortOrder = 'asc' | 'desc'
+
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
@@ -26,6 +29,15 @@ const { transactions, totalCount, isLoading, error, fetchTransactions, reset } =
 // Pagination
 const PAGE_SIZE = 15
 const currentPage = ref(1)
+
+// Sorting
+const sortField = ref<SortField>('txn_date')
+const sortOrder = ref<SortOrder>('desc')
+const DEFAULT_SORT_ORDERS: Record<SortField, SortOrder> = {
+  txn_date: 'desc',
+  amount: 'asc',
+  payee: 'asc'
+}
 
 const totalPages = computed(() => {
   if (totalCount.value === 0) return 1
@@ -38,12 +50,37 @@ const paginationInfo = computed(() => {
   return `${startItem}-${endItem} of ${totalCount.value}`
 })
 
+const sortedTransactions = computed(() => {
+  const txns = [...transactions.value]
+
+  if (sortField.value === 'txn_date') {
+    txns.sort((a, b) => {
+      const aTime = new Date(a.txn_date).getTime()
+      const bTime = new Date(b.txn_date).getTime()
+      return sortOrder.value === 'asc' ? aTime - bTime : bTime - aTime
+    })
+  } else if (sortField.value === 'amount') {
+    txns.sort((a, b) => {
+      return sortOrder.value === 'asc' ? a.amount - b.amount : b.amount - a.amount
+    })
+  } else if (sortField.value === 'payee') {
+    txns.sort((a, b) => {
+      const comparison = a.payee.toLowerCase().localeCompare(b.payee.toLowerCase())
+      return sortOrder.value === 'asc' ? comparison : -comparison
+    })
+  }
+
+  return txns
+})
+
 // Watch for modal open/close to fetch/reset transactions
 watch(
   () => props.visible,
   (newVisible) => {
     if (newVisible && props.statement) {
       currentPage.value = 1
+      sortField.value = 'txn_date'
+      sortOrder.value = 'desc'
       fetchTransactions(props.statement.id, { skip: 0, limit: PAGE_SIZE })
     } else if (!newVisible) {
       currentPage.value = 1
@@ -106,6 +143,22 @@ const goToPage = (page: number) => {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
   fetchTransactions(props.statement!.id, { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+}
+
+const handleSort = (field: SortField) => {
+  if (field === sortField.value) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortOrder.value = DEFAULT_SORT_ORDERS[field]
+  }
+}
+
+const getSortIcon = (field: SortField): string => {
+  if (field !== sortField.value) {
+    return 'pi pi-sort-alt'
+  }
+  return sortOrder.value === 'asc' ? 'pi pi-sort-amount-up' : 'pi pi-sort-amount-down'
 }
 
 const handleRetry = () => {
@@ -200,20 +253,26 @@ const handlePay = () => {
         </div>
 
         <!-- Transactions Table -->
-        <table v-else class="transactions-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Payee</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Installments</th>
-              <th>Tags</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="txn in transactions" :key="txn.id">
-              <td>{{ formatTransactionDate(txn.txn_date) }}</td>
+         <table v-else class="transactions-table">
+           <thead>
+             <tr>
+               <th class="sortable" @click="handleSort('txn_date')">
+                 Date <i :class="getSortIcon('txn_date')"></i>
+               </th>
+               <th class="sortable" @click="handleSort('payee')">
+                 Payee <i :class="getSortIcon('payee')"></i>
+               </th>
+               <th>Description</th>
+               <th class="sortable" @click="handleSort('amount')">
+                 Amount <i :class="getSortIcon('amount')"></i>
+               </th>
+               <th>Installments</th>
+               <th>Tags</th>
+             </tr>
+           </thead>
+           <tbody>
+             <tr v-for="txn in sortedTransactions" :key="txn.id">
+               <td>{{ formatTransactionDate(txn.txn_date) }}</td>
               <td>{{ txn.payee }}</td>
               <td>{{ txn.description }}</td>
               <td :class="txn.amount < 0 ? 'amount--negative' : 'amount--positive'">
@@ -488,6 +547,26 @@ const handlePay = () => {
 
 .transactions-table .tags {
   color: var(--text-color-secondary);
+}
+
+.transactions-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.transactions-table th.sortable:hover {
+  background: var(--surface-100);
+}
+
+.transactions-table th.sortable i {
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.transactions-table th.sortable i.pi-sort-amount-up,
+.transactions-table th.sortable i.pi-sort-amount-down {
+  color: var(--primary-color);
 }
 
 /* Pagination */
