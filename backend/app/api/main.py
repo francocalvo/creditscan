@@ -10,6 +10,7 @@ from app.api.routes import (
     tags,
     transaction_tags,
     transactions,
+    upload_jobs,
     users,
     utils,
 )
@@ -22,6 +23,7 @@ api_router.include_router(credit_cards.router)
 api_router.include_router(card_statements.router)
 api_router.include_router(payments.router)
 api_router.include_router(transactions.router)
+api_router.include_router(upload_jobs.router)
 api_router.include_router(tags.router)
 api_router.include_router(transaction_tags.router)
 api_router.include_router(rules.router)
