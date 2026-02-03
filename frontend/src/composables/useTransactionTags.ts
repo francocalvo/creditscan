@@ -6,11 +6,6 @@ export interface TransactionTagMapping {
   tag_id: string
 }
 
-export interface TransactionTagsResponse {
-  data: TransactionTagMapping[]
-  count: number
-}
-
 export function useTransactionTags() {
   const tagsByTransaction = ref<Map<string, string[]>>(new Map())
   const isLoading = ref(false)
@@ -68,8 +63,8 @@ export function useTransactionTags() {
           // Check for HTTP error response
           if (response.ok) {
             try {
-              const data: TransactionTagsResponse = await response.json()
-              const tagIds = data.data.map((mapping) => mapping.tag_id)
+              const data: TransactionTagMapping[] = await response.json()
+              const tagIds = data.map((mapping) => mapping.tag_id)
               tagsByTransaction.value.set(txnId, tagIds)
             } catch {
               // Failed to parse response - store empty array (graceful failure)
