@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
@@ -33,8 +33,31 @@ const { fetchTags, getTagById } = useTags()
 const { fetchTagsForTransactions, getTagIdsForTransaction, reset: resetTransactionTags } = useTransactionTags()
 
 // Pagination
-const PAGE_SIZE = 15
 const currentPage = ref(1)
+const pageSize = ref(10)
+
+const getResponsivePageSize = () => {
+  const height = window.innerHeight
+  const width = window.innerWidth
+
+  // Keep page sizes small enough that the footer (pagination + actions) stays visible.
+  let size = 10
+
+  if (height < 720) size = 5
+  else if (height < 820) size = 6
+  else if (height < 920) size = 8
+
+  if (width < 768) size = Math.min(size, 6)
+
+  return size
+}
+
+const syncPageSize = () => {
+  const nextSize = getResponsivePageSize()
+  if (nextSize !== pageSize.value) {
+    pageSize.value = nextSize
+  }
+}
 
 // Sorting
 const sortField = ref<SortField>('txn_date')
@@ -47,7 +70,7 @@ const DEFAULT_SORT_ORDERS: Record<SortField, SortOrder> = {
 
 const totalPages = computed(() => {
   if (totalCount.value === 0) return 1
-  return Math.ceil(totalCount.value / PAGE_SIZE)
+  return Math.ceil(totalCount.value / pageSize.value)
 })
 
 // Smart pagination with ellipsis
@@ -99,8 +122,8 @@ const visiblePages = computed<(number | null)[]>(() => {
 })
 
 const paginationInfo = computed(() => {
-  const startItem = (currentPage.value - 1) * PAGE_SIZE + 1
-  const endItem = Math.min(currentPage.value * PAGE_SIZE, totalCount.value)
+  const startItem = (currentPage.value - 1) * pageSize.value + 1
+  const endItem = Math.min(currentPage.value * pageSize.value, totalCount.value)
   return `${startItem}-${endItem} of ${totalCount.value}`
 })
 
@@ -127,11 +150,24 @@ const sortedTransactions = computed(() => {
   return txns
 })
 
+const placeholderRowCount = computed(() => {
+  return Math.max(0, pageSize.value - sortedTransactions.value.length)
+})
+
+const theadRef = ref<HTMLElement | null>(null)
+const tableHeaderHeight = ref(0)
+
+const syncHeaderHeight = () => {
+  if (!theadRef.value) return
+  tableHeaderHeight.value = Math.round(theadRef.value.getBoundingClientRect().height)
+}
+
 // Watch for modal open/close to fetch/reset transactions
 watch(
   () => props.visible,
   async (newVisible) => {
     if (newVisible && props.statement) {
+      syncPageSize()
       currentPage.value = 1
       sortField.value = 'txn_date'
       sortOrder.value = 'desc'
@@ -139,19 +175,52 @@ watch(
       // Fetch tags (uses cache if already fetched)
       await fetchTags()
 
-      // Fetch transactions
-      await fetchTransactions(props.statement.id, { skip: 0, limit: PAGE_SIZE })
+      // Fetch first page of transactions
+      await fetchCurrentPage()
 
-      // Fetch tag mappings for the transactions
-      const transactionIds = transactions.value.map((t) => t.id)
-      await fetchTagsForTransactions(transactionIds)
+      await nextTick()
+      syncHeaderHeight()
     } else if (!newVisible) {
       currentPage.value = 1
       reset()
       resetTransactionTags()
     }
-  }
+  },
+  { immediate: true }
 )
+
+let resizeTimeout: number | undefined
+const handleResize = () => {
+  window.clearTimeout(resizeTimeout)
+  resizeTimeout = window.setTimeout(async () => {
+    const previousSize = pageSize.value
+    syncPageSize()
+
+    if (props.visible && props.statement && pageSize.value !== previousSize) {
+      currentPage.value = 1
+      await fetchCurrentPage()
+      await nextTick()
+      syncHeaderHeight()
+    }
+  }, 150)
+}
+
+let headerResizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  syncPageSize()
+  window.addEventListener('resize', handleResize, { passive: true })
+
+  if (typeof ResizeObserver !== 'undefined') {
+    headerResizeObserver = new ResizeObserver(() => syncHeaderHeight())
+    if (theadRef.value) headerResizeObserver.observe(theadRef.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  headerResizeObserver?.disconnect()
+})
 
 // Internal visible state that syncs with prop
 const internalVisible = computed({
@@ -210,14 +279,22 @@ const getTagsForTransaction = (transactionId: string): Tag[] => {
     .filter((tag): tag is Tag => tag !== undefined)
 }
 
+const fetchCurrentPage = async () => {
+  if (!props.statement) return
+
+  await fetchTransactions(props.statement.id, {
+    skip: (currentPage.value - 1) * pageSize.value,
+    limit: pageSize.value,
+  })
+
+  const transactionIds = transactions.value.map((t) => t.id)
+  await fetchTagsForTransactions(transactionIds)
+}
+
 const goToPage = async (page: number) => {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
-  await fetchTransactions(props.statement!.id, { skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
-
-  // Fetch tag mappings for new page's transactions
-  const transactionIds = transactions.value.map((t) => t.id)
-  await fetchTagsForTransactions(transactionIds)
+  await fetchCurrentPage()
 }
 
 const handleSort = (field: SortField) => {
@@ -250,9 +327,7 @@ const getSortIcon = (field: SortField): string => {
 }
 
 const handleRetry = () => {
-  if (props.statement) {
-    fetchTransactions(props.statement.id, { skip: (currentPage.value - 1) * PAGE_SIZE, limit: PAGE_SIZE })
-  }
+  fetchCurrentPage()
 }
 
 // Event handlers
@@ -323,28 +398,44 @@ const handlePay = () => {
         <h3 class="section-title">Transactions</h3>
 
         <!-- Loading State -->
-        <div v-if="isLoading" class="loading-state" role="status" aria-live="polite" aria-label="Loading transactions">
+        <div
+          v-if="isLoading && transactions.length === 0 && !error"
+          class="loading-state"
+          role="status"
+          aria-live="polite"
+          aria-label="Loading transactions"
+        >
           <div class="spinner"></div>
           <p>Loading transactions...</p>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="error" class="error-state" role="alert">
+        <div v-else-if="error && transactions.length === 0" class="error-state" role="alert">
           <i class="pi pi-exclamation-circle"></i>
           <p>Failed to load transactions</p>
           <Button label="Retry" size="small" severity="secondary" @click="handleRetry" />
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="transactions.length === 0" class="empty-state">
+        <div v-else-if="!isLoading && !error && transactions.length === 0" class="empty-state">
           <i class="pi pi-inbox"></i>
           <p>No transactions for this statement</p>
         </div>
 
         <!-- Transactions Table -->
-         <div v-else class="table-wrapper">
+        <div v-else :aria-busy="isLoading ? 'true' : 'false'">
+          <div v-if="error" class="inline-error" role="alert">
+            <i class="pi pi-exclamation-circle"></i>
+            <span>Failed to refresh transactions</span>
+            <Button label="Retry" size="small" severity="secondary" text @click="handleRetry" />
+          </div>
+
+          <div class="table-wrapper" :style="{ '--table-header-height': `${tableHeaderHeight}px` }">
+            <div v-if="isLoading" class="table-loading-overlay" aria-hidden="true">
+              <div class="spinner spinner--sm"></div>
+            </div>
           <table class="transactions-table">
-            <thead>
+            <thead ref="theadRef">
               <tr>
                 <th
                   class="sortable"
@@ -406,64 +497,80 @@ const handlePay = () => {
                  <template v-else>-</template>
                </td>
            </tr>
+            <tr
+              v-for="index in placeholderRowCount"
+              :key="`placeholder-${index}`"
+              class="placeholder-row"
+              aria-hidden="true"
+            >
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
          </tbody>
        </table>
-       </div>
-
-         <!-- Pagination -->
-         <div v-if="totalPages > 1" class="pagination">
-           <span class="pagination-info">{{ paginationInfo }}</span>
-           <div class="pagination-nav">
-             <Button
-               icon="pi pi-chevron-left"
-               severity="secondary"
-               text
-               :disabled="currentPage === 1"
-               @click="goToPage(currentPage - 1)"
-               aria-label="Previous page"
-             />
-             <template v-for="(page, index) in visiblePages" :key="page ?? `ellipsis-${index}`">
-               <Button
-                  v-if="page !== null"
-                  :label="page.toString()"
-                  severity="secondary"
-                  :outlined="page !== currentPage"
-                  @click="goToPage(page)"
-                  :aria-label="'Go to page ' + page"
-                  :aria-current="page === currentPage ? 'page' : undefined"
-                />
-                <span v-else class="pagination-ellipsis">...</span>
-             </template>
-             <Button
-               icon="pi pi-chevron-right"
-               severity="secondary"
-               text
-               :disabled="currentPage === totalPages"
-               @click="goToPage(currentPage + 1)"
-               aria-label="Next page"
-             />
-           </div>
-         </div>
+          </div>
+        </div>
       </section>
-
-      <!-- Action Buttons -->
-      <div class="modal-actions">
-        <Button
-          label="Pay"
-          icon="pi pi-credit-card"
-          :disabled="statement.is_fully_paid"
-          @click="handlePay"
-          severity="primary"
-        />
-        <Button
-          label="Close"
-          icon="pi pi-times"
-          @click="handleClose"
-          severity="secondary"
-          outlined
-        />
-      </div>
     </div>
+
+    <template #footer>
+      <div v-if="statement" class="modal-footer">
+        <div v-if="totalPages > 1" class="pagination">
+          <span class="pagination-info">{{ paginationInfo }}</span>
+          <div class="pagination-nav">
+            <Button
+              icon="pi pi-chevron-left"
+              severity="secondary"
+              text
+              :disabled="currentPage === 1"
+              @click="goToPage(currentPage - 1)"
+              aria-label="Previous page"
+            />
+            <template v-for="(page, index) in visiblePages" :key="page ?? `ellipsis-${index}`">
+              <Button
+                v-if="page !== null"
+                :label="page.toString()"
+                severity="secondary"
+                :outlined="page !== currentPage"
+                @click="goToPage(page)"
+                :aria-label="'Go to page ' + page"
+                :aria-current="page === currentPage ? 'page' : undefined"
+              />
+              <span v-else class="pagination-ellipsis">...</span>
+            </template>
+            <Button
+              icon="pi pi-chevron-right"
+              severity="secondary"
+              text
+              :disabled="currentPage === totalPages"
+              @click="goToPage(currentPage + 1)"
+              aria-label="Next page"
+            />
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <Button
+            label="Pay"
+            icon="pi pi-credit-card"
+            :disabled="statement.is_fully_paid"
+            @click="handlePay"
+            severity="primary"
+          />
+          <Button
+            label="Close"
+            icon="pi pi-times"
+            @click="handleClose"
+            severity="secondary"
+            outlined
+          />
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -639,6 +746,42 @@ const handlePay = () => {
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.table-loading-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: var(--table-header-height, 0px);
+  background: color-mix(in srgb, var(--surface-0) 65%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.spinner--sm {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+}
+
+.inline-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--red-200);
+  background: var(--red-50);
+  color: var(--red-700);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.inline-error i {
+  color: var(--red-500);
 }
 
 .transactions-table {
@@ -664,6 +807,11 @@ const handlePay = () => {
 
 .transactions-table tr:last-child td {
   border-bottom: none;
+}
+
+.placeholder-row td {
+  color: transparent;
+  pointer-events: none;
 }
 
 .transactions-table .amount--negative {
@@ -721,11 +869,10 @@ const handlePay = () => {
 /* Pagination */
 .pagination {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--surface-border);
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .pagination-info {
@@ -765,11 +912,19 @@ const handlePay = () => {
   max-width: 200px;
 }
 
-.modal-actions {
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.footer-actions {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
-  margin-top: 0.5rem;
+  flex-shrink: 0;
 }
 
 /* Responsive design */
@@ -790,11 +945,20 @@ const handlePay = () => {
     gap: 0.5rem;
   }
 
-  .modal-actions {
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination {
+    justify-content: center;
+  }
+
+  .footer-actions {
     flex-direction: column;
   }
 
-  .modal-actions .p-button {
+  .footer-actions .p-button {
     width: 100%;
   }
 }

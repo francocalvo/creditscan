@@ -49,7 +49,7 @@ export function useTags() {
     try {
       const token =
         typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
-      const url = `${OpenAPI.BASE}/api/v1/tags`
+      const url = `${OpenAPI.BASE}/api/v1/tags/`
 
       const response = await fetch(url, {
         headers: {
