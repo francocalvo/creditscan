@@ -778,3 +778,139 @@ def test_apply_rules_response_format(
     assert isinstance(rule_match.rule_name, str)
     assert isinstance(rule_match.tags_applied, list)
     assert isinstance(rule_match.tags_applied[0], uuid.UUID)
+
+
+# ============================================================================
+# Auto-Apply Rules on Transaction Creation Tests
+# ============================================================================
+
+
+def test_create_transaction_auto_applies_rules(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that creating a transaction automatically applies matching rules."""
+    # Setup: Create user, card, statement, tag, and rule
+    user = get_authenticated_user(db)
+    card = create_test_credit_card(db, user.id)
+    statement = create_test_statement(db, card.id)
+
+    # Create a tag and rule for "amazon" payee
+    tag = create_test_tag(db, user.id)
+    create_test_rule_with_condition(db, user.id, tag.tag_id, value="amazon")
+
+    # Create a transaction with payee "Amazon Purchase"
+    transaction_data = {
+        "statement_id": str(statement.id),
+        "payee": "Amazon Purchase",
+        "description": "Buy from Amazon",
+        "amount": "100.00",
+        "currency": "USD",
+        "txn_date": "2024-06-15",
+    }
+    r = client.post(
+        f"{settings.API_V1_STR}/transactions/",
+        headers=normal_user_token_headers,
+        json=transaction_data,
+    )
+
+    # Verify transaction was created
+    assert r.status_code == 201
+    transaction_response = r.json()
+    assert transaction_response["payee"] == "Amazon Purchase"
+
+    # Verify tag was automatically applied
+    r = client.get(
+        f"{settings.API_V1_STR}/transaction-tags/transaction/{transaction_response['id']}",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 200
+    tags = r.json()
+    assert len(tags) == 1
+    assert tags[0]["tag_id"] == str(tag.tag_id)
+
+
+def test_create_transaction_succeeds_when_no_rules(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that creating a transaction succeeds when no rules exist."""
+    user = get_authenticated_user(db)
+    card = create_test_credit_card(db, user.id)
+    statement = create_test_statement(db, card.id)
+
+    # Create a transaction without any rules
+    transaction_data = {
+        "statement_id": str(statement.id),
+        "payee": "Test Merchant",
+        "description": "Test transaction",
+        "amount": "50.00",
+        "currency": "USD",
+        "txn_date": "2024-06-15",
+    }
+    r = client.post(
+        f"{settings.API_V1_STR}/transactions/",
+        headers=normal_user_token_headers,
+        json=transaction_data,
+    )
+
+    # Verify transaction was created successfully
+    assert r.status_code == 201
+    transaction_response = r.json()
+    assert transaction_response["payee"] == "Test Merchant"
+
+
+def test_create_transaction_succeeds_when_rule_fails(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """Test that creating a transaction succeeds even when rule application fails.
+
+    Rule application failures should be silently ignored and not prevent transaction creation.
+    """
+    user = get_authenticated_user(db)
+    card = create_test_credit_card(db, user.id)
+    statement = create_test_statement(db, card.id)
+
+    # Create a tag and rule, then soft-delete the tag
+    # This will cause the rule to fail when trying to apply the deleted tag
+    tag = create_test_tag(db, user.id)
+    create_test_rule_with_condition(db, user.id, tag.tag_id, value="amazon")
+
+    # Soft-delete the tag
+    tag_repo = TagRepository(db)
+    tag_repo.delete(tag.tag_id)
+    db.commit()
+
+    # Create a transaction with payee "Amazon Purchase"
+    # Rule application will fail silently, but transaction should still be created
+    transaction_data = {
+        "statement_id": str(statement.id),
+        "payee": "Amazon Purchase",
+        "description": "Buy from Amazon",
+        "amount": "100.00",
+        "currency": "USD",
+        "txn_date": "2024-06-15",
+    }
+    r = client.post(
+        f"{settings.API_V1_STR}/transactions/",
+        headers=normal_user_token_headers,
+        json=transaction_data,
+    )
+
+    # Verify transaction was created successfully despite rule failure
+    assert r.status_code == 201
+    transaction_response = r.json()
+    assert transaction_response["payee"] == "Amazon Purchase"
+
+    # Verify no tags were applied (soft-deleted tag was skipped)
+    r = client.get(
+        f"{settings.API_V1_STR}/transaction-tags/transaction/{transaction_response['id']}",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 200
+    tags = r.json()
+    assert len(tags) == 0

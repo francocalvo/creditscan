@@ -63,6 +63,33 @@ class TransactionTagRepository:
         self.db_session.delete(transaction_tag)
         self.db_session.commit()
 
+    def create_or_ignore(
+        self, transaction_tag_data: TransactionTagCreate
+    ) -> TransactionTag | None:
+        """Create a transaction tag relationship, ignoring duplicates.
+
+        If the relationship already exists (IntegrityError), silently ignore it
+        and return None. This provides idempotency for the apply rules usecase.
+
+        Args:
+            transaction_tag_data: The transaction tag data to create.
+
+        Returns:
+            The created TransactionTag if successful, None if it already exists.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        transaction_tag = TransactionTag.model_validate(transaction_tag_data)
+        self.db_session.add(transaction_tag)
+        try:
+            self.db_session.commit()
+            self.db_session.refresh(transaction_tag)
+            return transaction_tag
+        except IntegrityError:
+            # Duplicate relationship - rollback and ignore
+            self.db_session.rollback()
+            return None
+
 
 def provide(session: Session) -> TransactionTagRepository:
     """Provide an instance of TransactionTagRepository.
