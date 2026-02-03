@@ -29,6 +29,7 @@ class Tag(TagBase, table=True):
 
     tag_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = Field(default=None)
 
 
 # Public API response model

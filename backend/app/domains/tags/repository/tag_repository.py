@@ -1,6 +1,7 @@
 """Tag repository implementation."""
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -24,10 +25,23 @@ class TagRepository:
         self.db_session.refresh(tag)
         return tag
 
-    def get_by_id(self, tag_id: uuid.UUID) -> Tag:
-        """Get a tag by ID."""
+    def get_by_id(self, tag_id: uuid.UUID, include_deleted: bool = False) -> Tag:
+        """Get a tag by ID.
+
+        Args:
+            tag_id: The ID of the tag to retrieve.
+            include_deleted: If True, include soft-deleted tags. Defaults to False.
+
+        Returns:
+            The tag with the specified ID.
+
+        Raises:
+            TagNotFoundError: If the tag is not found or if it's deleted and include_deleted is False.
+        """
         tag = self.db_session.get(Tag, tag_id)
         if not tag:
+            raise TagNotFoundError(f"Tag with ID {tag_id} not found")
+        if tag.deleted_at is not None and not include_deleted:
             raise TagNotFoundError(f"Tag with ID {tag_id} not found")
         return tag
 
@@ -35,7 +49,7 @@ class TagRepository:
         self, skip: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
     ) -> list[Tag]:
         """List tags with pagination and filtering."""
-        query = select(Tag)
+        query = select(Tag).where(Tag.deleted_at.is_(None))
 
         if filters:
             for field, value in filters.items():
@@ -47,7 +61,7 @@ class TagRepository:
 
     def count(self, filters: dict[str, Any] | None = None) -> int:
         """Count tags with optional filtering."""
-        query = select(Tag)
+        query = select(Tag).where(Tag.deleted_at.is_(None))
 
         if filters:
             for field, value in filters.items():
@@ -79,9 +93,10 @@ class TagRepository:
         return tag
 
     def delete(self, tag_id: uuid.UUID) -> None:
-        """Delete a tag."""
+        """Soft delete a tag by setting deleted_at timestamp."""
         tag = self.get_by_id(tag_id)
-        self.db_session.delete(tag)
+        tag.deleted_at = datetime.utcnow()
+        self.db_session.add(tag)
         self.db_session.commit()
 
 
