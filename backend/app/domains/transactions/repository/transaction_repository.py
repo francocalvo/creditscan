@@ -1,5 +1,6 @@
 """Transaction repository implementation."""
 
+import builtins
 import uuid
 from typing import Any
 
@@ -37,11 +38,75 @@ class TransactionRepository:
             )
         return transaction
 
+    def get_by_id_for_user(
+        self, transaction_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Transaction | None:
+        """Get a transaction by ID, verifying it belongs to the user.
+
+        Args:
+            transaction_id: The ID of the transaction to fetch.
+            user_id: The ID of the user who should own the transaction.
+
+        Returns:
+            The transaction if it exists and belongs to the user, None otherwise.
+        """
+        # Join: Transaction → CardStatement → CreditCard → user_id
+        from app.domains.card_statements.domain.models import CardStatement
+        from app.domains.credit_cards.domain.models import CreditCard
+
+        query = (
+            select(Transaction)
+            .join(CardStatement, Transaction.statement_id == CardStatement.id)
+            .join(CreditCard, CardStatement.card_id == CreditCard.id)
+            .where(Transaction.id == transaction_id)
+            .where(CreditCard.user_id == user_id)
+        )
+
+        result = self.db_session.exec(query).first()
+        return result
+
     def list(
         self, skip: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
     ) -> list[Transaction]:
         """List transactions with pagination and filtering."""
         query = select(Transaction)
+
+        if filters:
+            for field, value in filters.items():
+                if hasattr(Transaction, field):
+                    query = query.where(getattr(Transaction, field) == value)
+
+        result = self.db_session.exec(query.offset(skip).limit(limit))
+        return list(result)
+
+    def list_for_user(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        filters: dict[str, Any] | None = None,
+    ) -> builtins.list[Transaction]:
+        """List transactions belonging to a specific user.
+
+        Args:
+            user_id: The ID of the user to fetch transactions for.
+            skip: Number of records to skip (for pagination).
+            limit: Maximum number of records to return.
+            filters: Additional filters to apply (e.g., statement_id).
+
+        Returns:
+            List of transactions belonging to the user.
+        """
+        # Join: Transaction → CardStatement → CreditCard → user_id
+        from app.domains.card_statements.domain.models import CardStatement
+        from app.domains.credit_cards.domain.models import CreditCard
+
+        query = (
+            select(Transaction)
+            .join(CardStatement, Transaction.statement_id == CardStatement.id)
+            .join(CreditCard, CardStatement.card_id == CreditCard.id)
+            .where(CreditCard.user_id == user_id)
+        )
 
         if filters:
             for field, value in filters.items():

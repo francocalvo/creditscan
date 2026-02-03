@@ -41,6 +41,30 @@ from app.domains.payments.domain.models import (  # noqa
     PaymentUpdate,
 )
 
+# Rules domain models (table=True: Rule)
+from app.domains.rules.domain.models import (  # noqa
+    ActionType,
+    ApplyRulesRequest,
+    ApplyRulesResponse,
+    ConditionField,
+    ConditionOperator,
+    LogicalOperator,
+    Rule,
+    RuleAction,
+    RuleActionCreate,
+    RuleActionPublic,
+    RuleBase,
+    RuleCondition,
+    RuleConditionCreate,
+    RuleConditionPublic,
+    RuleCreate,
+    RuleMatch,
+    RulePublic,
+    RulesPublic,
+    RuleUpdate,
+    TransactionMatch,
+)
+
 # Tag models (table=True: Tag)
 from app.domains.tags.domain.models import (  # noqa
     Tag,
@@ -131,6 +155,26 @@ __all__ = [
     "PaymentPublic",
     "PaymentsPublic",
     "PaymentUpdate",
+    "ActionType",
+    "ApplyRulesRequest",
+    "ApplyRulesResponse",
+    "ConditionField",
+    "ConditionOperator",
+    "LogicalOperator",
+    "Rule",
+    "RuleAction",
+    "RuleActionCreate",
+    "RuleActionPublic",
+    "RuleBase",
+    "RuleCondition",
+    "RuleConditionCreate",
+    "RuleConditionPublic",
+    "RuleCreate",
+    "RuleMatch",
+    "RulePublic",
+    "RulesPublic",
+    "RuleUpdate",
+    "TransactionMatch",
 ]
 
 

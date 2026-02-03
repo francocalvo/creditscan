@@ -6,6 +6,7 @@ from app.api.routes import (
     login,
     payments,
     private,
+    rules,
     tags,
     transaction_tags,
     transactions,
@@ -23,6 +24,7 @@ api_router.include_router(payments.router)
 api_router.include_router(transactions.router)
 api_router.include_router(tags.router)
 api_router.include_router(transaction_tags.router)
+api_router.include_router(rules.router)
 api_router.include_router(utils.router)
 
 if settings.ENVIRONMENT == "local":
