@@ -13,6 +13,7 @@ from app.domains.credit_cards.usecases.get_card import provide as provide_get_ca
 from app.domains.upload_jobs.domain.errors import DuplicateFileError
 from app.domains.upload_jobs.domain.models import UploadJobCreate, UploadJobPublic
 from app.domains.upload_jobs.service import provide as provide_upload_job_service
+from app.domains.upload_jobs.usecases.process_upload import process_upload_job
 from app.pkgs.storage import provide as provide_storage
 
 logger = logging.getLogger(__name__)
@@ -20,28 +21,6 @@ logger = logging.getLogger(__name__)
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
 
 router = APIRouter()
-
-
-async def process_upload_job(
-    job_id: uuid.UUID,
-    pdf_bytes: bytes,
-    card_id: uuid.UUID,
-    user_id: uuid.UUID,
-) -> None:
-    """Process an uploaded PDF statement (placeholder for Step 7).
-
-    Args:
-        job_id: Upload job ID
-        pdf_bytes: PDF file contents
-        card_id: Credit card ID
-        user_id: User ID who uploaded the file
-    """
-    # Placeholder: will be implemented in Step 7
-    # Use _pdf_bytes prefix to avoid unused argument warning
-    _ = pdf_bytes
-    logger.info(
-        f"Placeholder: Background task for job {job_id}, card {card_id}, user {user_id}"
-    )
 
 
 @router.post("/upload", response_model=UploadJobPublic, status_code=202)
@@ -130,7 +109,7 @@ def upload_statement(
         job_id=job.id,
         pdf_bytes=contents,
         card_id=card_id,
-        user_id=current_user.id,
+        file_path=file_path,
     )
 
     return job
