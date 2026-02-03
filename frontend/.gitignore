@@ -29,3 +29,11 @@ coverage
 
 *.tsbuildinfo
 prompt.md
+
+# AI Stuff 
+.codex/*
+.claude/*
+.opencode/*
+.agents/*
+.ralph/*
+specs/*
