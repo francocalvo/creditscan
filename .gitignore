@@ -1,10 +1,16 @@
+package.json
+package-lock.json
+
+# AI Stuff
+INITIAL.md
+**/.codex/*
+**/.claude/*
 **/.ralph
 specs
 ralph.yml
 PROMPT.md
-INITIAL.md
-llm/*
-package.json
-package-lock.json
-
-
+**/.opencode/*
+**/.agents/*
+**/.ralph/*
+**/specs/*
+**/llm/*
