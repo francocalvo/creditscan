@@ -224,6 +224,57 @@ export function useStatements() {
     }
   }
 
+  const updateStatement = async (
+    statementId: string,
+    updateData: Partial<{
+      due_date: string | null
+      close_date: string | null
+      period_start: string | null
+      period_end: string | null
+      previous_balance: number | null
+      current_balance: number | null
+      minimum_payment: number | null
+      is_fully_paid: boolean
+    }>
+  ) => {
+    error.value = null
+
+    try {
+      const token =
+        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+
+      const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to update statement: ${response.statusText}`)
+      }
+
+      const updatedStatement = await response.json()
+
+      // Update local statements array
+      const index = statements.value.findIndex((s) => s.id === statementId)
+      if (index !== -1) {
+        statements.value[index] = { ...statements.value[index], ...updatedStatement }
+      }
+
+      return updatedStatement
+    } catch (e) {
+      error.value = e instanceof Error ? e : new Error('Failed to update statement')
+      console.error('Error updating statement:', e)
+      throw error.value
+    }
+  }
+
   return {
     statements,
     statementsWithCard,
@@ -235,6 +286,7 @@ export function useStatements() {
     fetchStatements,
     fetchBalance,
     createPayment,
+    updateStatement,
     formatCurrency,
     formatDate,
     formatPeriod,
