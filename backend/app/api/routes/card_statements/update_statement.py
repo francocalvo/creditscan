@@ -20,6 +20,8 @@ from app.domains.card_statements.usecases.get_statement import (
 from app.domains.card_statements.usecases.update_statement import (
     provide as provide_update_statement,
 )
+from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
+from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 
 router = APIRouter()
 
@@ -41,10 +43,10 @@ def update_card_statement(
         get_usecase = provide_get_statement(session)
         existing_statement = get_usecase.execute(statement_id)
 
-        if (
-            existing_statement.user_id != current_user.id
-            and not current_user.is_superuser
-        ):
+        get_card_usecase = provide_get_card(session)
+        card = get_card_usecase.execute(existing_statement.card_id)
+
+        if card.user_id != current_user.id and not current_user.is_superuser:
             raise HTTPException(
                 status_code=403,
                 detail="You don't have permission to update this statement",
@@ -55,5 +57,7 @@ def update_card_statement(
         return update_usecase.execute(statement_id, statement_in)
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")
+    except CreditCardNotFoundError:
+        raise HTTPException(status_code=404, detail="Credit card not found")
     except InvalidCardStatementDataError as e:
         raise HTTPException(status_code=400, detail=str(e))

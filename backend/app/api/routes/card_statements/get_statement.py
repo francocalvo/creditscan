@@ -11,6 +11,8 @@ from app.domains.card_statements.domain.models import CardStatementPublic
 from app.domains.card_statements.usecases.get_statement import (
     provide as provide_get_statement,
 )
+from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
+from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 
 router = APIRouter()
 
@@ -28,8 +30,11 @@ def get_card_statement(
         usecase = provide_get_statement(session)
         statement = usecase.execute(statement_id)
 
-        # Allow users to see their own statements, or superusers to see any statement
-        if statement.user_id == current_user.id or current_user.is_superuser:
+        # Allow users to see statements for credit cards they own, or superusers to see any
+        get_card_usecase = provide_get_card(session)
+        card = get_card_usecase.execute(statement.card_id)
+
+        if card.user_id == current_user.id or current_user.is_superuser:
             return statement
 
         raise HTTPException(
@@ -38,3 +43,5 @@ def get_card_statement(
         )
     except CardStatementNotFoundError:
         raise HTTPException(status_code=404, detail="Card statement not found")
+    except CreditCardNotFoundError:
+        raise HTTPException(status_code=404, detail="Credit card not found")
