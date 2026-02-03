@@ -2,3 +2,9 @@
 specs
 ralph.yml
 PROMPT.md
+INITIAL.md
+llm/*
+package.json
+package-lock.json
+
+
