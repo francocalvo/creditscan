@@ -462,7 +462,10 @@ class TestUploadStatement:
         assert call_args.kwargs["job_id"] == mock_upload_job.id
         assert call_args.kwargs["pdf_bytes"] == content
         assert call_args.kwargs["card_id"] == mock_card.id
-        assert call_args.kwargs["user_id"] == mock_current_user.id
+        assert (
+            call_args.kwargs["file_path"]
+            == mock_storage.store_statement_pdf.return_value
+        )
 
     @patch("app.api.routes.card_statements.upload_statement.provide_storage")
     @patch("app.api.routes.card_statements.upload_statement.provide_upload_job_service")

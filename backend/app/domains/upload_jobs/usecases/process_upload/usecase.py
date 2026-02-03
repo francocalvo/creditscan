@@ -21,11 +21,17 @@ from app.domains.card_statements.service import provide as provide_statement_ser
 from app.domains.credit_cards.domain.models import CreditCardPublic
 from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 from app.domains.credit_cards.usecases.get_card.usecase import GetCreditCardUseCase
+from app.domains.rules.domain.models import ApplyRulesRequest
+from app.domains.rules.usecases.apply_rules import provide as provide_apply_rules
 from app.domains.transactions.domain.models import (
     TransactionCreate,
     TransactionPublic,
 )
 from app.domains.transactions.service import provide as provide_transaction_service
+from app.domains.upload_jobs.domain.errors import (
+    CurrencyConversionError,
+    ExtractionError,
+)
 from app.domains.upload_jobs.domain.models import UploadJobStatus
 from app.domains.upload_jobs.service import provide as provide_upload_job_service
 from app.pkgs.currency import provide as provide_currency
@@ -299,6 +305,35 @@ def _extract_installment(installment_data: object, field: str) -> int | None:
     return None
 
 
+def _apply_rules_to_statement(
+    session: Session,
+    user_id: uuid.UUID,
+    statement_id: uuid.UUID,
+) -> None:
+    """Apply rules to transactions in a statement (non-blocking).
+
+    This function applies user-defined rules to auto-tag transactions.
+    Failures are logged but do not affect the overall job status.
+
+    Args:
+        session: Database session
+        user_id: User ID who owns the rules
+        statement_id: Statement ID containing transactions to process
+    """
+    try:
+        apply_rules_usecase = provide_apply_rules(session)
+        request = ApplyRulesRequest(statement_id=statement_id)
+        result = apply_rules_usecase.execute(user_id, request)
+        logger.info(
+            f"Rules applied to statement {statement_id}: "
+            f"{result.transactions_processed} transactions processed, "
+            f"{result.tags_applied} tags applied"
+        )
+    except Exception as e:
+        # Rules application is non-blocking - log and continue
+        logger.warning(f"Failed to apply rules to statement {statement_id}: {e}")
+
+
 async def process_upload_job(
     job_id: uuid.UUID,
     pdf_bytes: bytes,
@@ -313,13 +348,13 @@ async def process_upload_job(
     3. Retries with fallback model on failure
     4. Converts multi-currency balances to card's default currency
     5. Creates CardStatement and Transaction records
-    6. Updates job to final status (COMPLETED, PARTIAL, or FAILED)
+    6. Applies rules to auto-tag transactions (non-blocking)
+    7. Updates job to final status (COMPLETED, PARTIAL, or FAILED)
 
     Args:
         job_id: Upload job ID
         pdf_bytes: PDF file contents
         card_id: Credit card ID
-        user_id: User ID who uploaded the file
         file_path: S3 key where PDF is stored
     """
     session = get_db_session()
@@ -332,9 +367,10 @@ async def process_upload_job(
         logger.info(f"Starting processing for job {job_id}")
         job_service.update_status(job_id, UploadJobStatus.PROCESSING)
 
-        # Get card for default currency
+        # Get card for default currency and user_id
         card: CreditCardPublic = get_card_usecase.execute(card_id)
         target_currency = card.default_currency
+        user_id = card.user_id
 
         # Extract statement with primary model
         extraction_result: ExtractionResult = (
@@ -364,6 +400,9 @@ async def process_upload_job(
                 source_file_path=file_path,
             )
 
+            # Apply rules to new transactions (non-blocking)
+            _apply_rules_to_statement(session, user_id, statement.id)
+
             job_service.update_status(
                 job_id,
                 UploadJobStatus.COMPLETED,
@@ -383,6 +422,9 @@ async def process_upload_job(
                 source_file_path=file_path,
             )
 
+            # Apply rules to new transactions (non-blocking)
+            _apply_rules_to_statement(session, user_id, statement.id)
+
             job_service.update_status(
                 job_id,
                 UploadJobStatus.PARTIAL,
@@ -396,16 +438,25 @@ async def process_upload_job(
             # Complete failure
             error_msg = extraction_result.error or "Unknown extraction failure"
             logger.error(f"Extraction failed for job {job_id}: {error_msg}")
-            job_service.update_status(
-                job_id,
-                UploadJobStatus.FAILED,
-                error_message=error_msg,
-                completed_at=datetime.now(timezone.utc),
-            )
+            raise ExtractionError(error_msg, model_used=extraction_result.model_used)
 
-        # TODO: Apply rules to new transactions (Step 9)
-        # This is a placeholder for Step 9: Integrate rules engine
-        # The actual integration will be added when Step 9 is implemented
+    except ExtractionError as e:
+        logger.error(f"Extraction error for job {job_id}: {e}")
+        job_service.update_status(
+            job_id,
+            UploadJobStatus.FAILED,
+            error_message=f"Extraction failed: {str(e)}",
+            completed_at=datetime.now(timezone.utc),
+        )
+
+    except CurrencyConversionError as e:
+        logger.error(f"Currency conversion error for job {job_id}: {e}")
+        job_service.update_status(
+            job_id,
+            UploadJobStatus.FAILED,
+            error_message=f"Currency conversion failed: {str(e)}",
+            completed_at=datetime.now(timezone.utc),
+        )
 
     except Exception as e:
         logger.exception(f"Unexpected error processing job {job_id}: {e}")
@@ -413,7 +464,7 @@ async def process_upload_job(
             job_id,
             UploadJobStatus.FAILED,
             error_message=f"Processing error: {str(e)}",
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(timezone.utc),
         )
 
     finally:

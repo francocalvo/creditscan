@@ -14,7 +14,16 @@ from app.domains.upload_jobs.repository.upload_job_repository import (
 router = APIRouter()
 
 
-@router.get("/{job_id}", response_model=UploadJobPublic)
+@router.get(
+    "/{job_id}",
+    response_model=UploadJobPublic,
+    summary="Get upload job status",
+    description="Poll this endpoint to check processing status. Returns statement_id when completed.",
+    responses={
+        200: {"description": "Job found"},
+        404: {"description": "Job not found or belongs to another user"},
+    },
+)
 def get_upload_job(
     session: SessionDep, current_user: CurrentUser, job_id: uuid.UUID
 ) -> UploadJobPublic:

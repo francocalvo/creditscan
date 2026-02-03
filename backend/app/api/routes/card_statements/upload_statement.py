@@ -23,7 +23,19 @@ MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
 router = APIRouter()
 
 
-@router.post("/upload", response_model=UploadJobPublic, status_code=202)
+@router.post(
+    "/upload",
+    response_model=UploadJobPublic,
+    status_code=202,
+    summary="Upload a credit card statement PDF",
+    description="Accepts a PDF file and starts async extraction. Returns job ID for status polling.",
+    responses={
+        202: {"description": "Upload accepted, processing started"},
+        400: {"description": "Invalid file (not PDF, too large, or duplicate)"},
+        403: {"description": "Card doesn't belong to user"},
+        404: {"description": "Credit card not found"},
+    },
+)
 def upload_statement(
     session: SessionDep,
     current_user: CurrentUser,

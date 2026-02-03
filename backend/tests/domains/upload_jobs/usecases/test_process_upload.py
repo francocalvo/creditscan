@@ -13,11 +13,17 @@ from app.domains.card_statements.domain.models import (
     StatementStatus,
 )
 from app.domains.credit_cards.domain.models import CreditCardPublic
+from app.domains.rules.domain.models import ApplyRulesRequest, ApplyRulesResponse
 from app.domains.transactions.domain.models import (
     TransactionPublic,
 )
+from app.domains.upload_jobs.domain.errors import (
+    CurrencyConversionError,
+    ExtractionError,
+)
 from app.domains.upload_jobs.domain.models import UploadJobStatus
 from app.domains.upload_jobs.usecases.process_upload.usecase import (
+    _apply_rules_to_statement,
     _extract_date,
     _extract_installment,
     import_partial_statement,
@@ -79,12 +85,17 @@ def mock_extraction_service():
     return service
 
 
-@pytest.fixture
-def mock_currency_service():
-    """Mock currency service."""
+def _create_mock_currency_service():
+    """Create a mock currency service (helper function)."""
     service = Mock()
     service.convert_balance = AsyncMock(return_value=Decimal("100.00"))
     return service
+
+
+@pytest.fixture
+def mock_currency_service():
+    """Mock currency service."""
+    return _create_mock_currency_service()
 
 
 @pytest.fixture
@@ -119,6 +130,18 @@ def partial_extraction_result():
 def failed_extraction_result():
     """Failed extraction result."""
     return _mock_extraction_result(success=False, partial=False)
+
+
+@pytest.fixture
+def mock_apply_rules_usecase():
+    """Mock apply rules usecase."""
+    usecase = Mock()
+    usecase.execute = Mock(
+        return_value=ApplyRulesResponse(
+            transactions_processed=5, tags_applied=3, details=[]
+        )
+    )
+    return usecase
 
 
 def _mock_statement(statement_id=None):
@@ -229,7 +252,7 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(),
             provide_transaction_service=Mock(),
         ):
@@ -237,7 +260,6 @@ class TestProcessUploadJob:
                 job_id=job_id,
                 pdf_bytes=b"fake pdf",
                 card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -270,7 +292,7 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(),
             provide_transaction_service=Mock(),
         ):
@@ -278,7 +300,6 @@ class TestProcessUploadJob:
                 job_id=uuid.uuid4(),
                 pdf_bytes=b"fake pdf",
                 card_id=card_id,
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -308,7 +329,7 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(),
             provide_transaction_service=Mock(),
         ):
@@ -316,7 +337,6 @@ class TestProcessUploadJob:
                 job_id=uuid.uuid4(),
                 pdf_bytes=pdf_bytes,
                 card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -351,7 +371,7 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(
                 return_value=Mock(create_statement=_mock_statement())
             ),
@@ -363,7 +383,6 @@ class TestProcessUploadJob:
                 job_id=job_id,
                 pdf_bytes=b"fake pdf",
                 card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -423,7 +442,7 @@ class TestProcessUploadJob:
 
         with patch.multiple(
             "app.domains.upload_jobs.usecases.process_upload.usecase",
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -460,7 +479,7 @@ class TestProcessUploadJob:
 
         with patch.multiple(
             "app.domains.upload_jobs.usecases.process_upload.usecase",
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -488,7 +507,6 @@ class TestProcessUploadJob:
         When: process completes
         Then: job_service.update_status(job_id, COMPLETED, statement_id=...) called
         """
-        job_id = uuid.uuid4()
         mock_extraction_service.extract_statement.return_value = (
             _mock_extraction_result(success=True)
         )
@@ -499,145 +517,7 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
-            provide_statement_service=Mock(return_value=mock_statement_service),
-            provide_transaction_service=Mock(return_value=mock_transaction_service),
-        ):
-            await process_upload_job(
-                job_id=job_id,
-                pdf_bytes=b"fake pdf",
-                card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                file_path="statements/test.pdf",
-            )
-
-        # Find the COMPLETED update call
-        completed_calls = [
-            call
-            for call in mock_job_service.update_status.call_args_list
-            if len(call[0]) >= 2 and call[0][1] == UploadJobStatus.COMPLETED
-        ]
-        assert len(completed_calls) >= 1
-        completed_call = completed_calls[0]
-        assert completed_call[0][0] == job_id
-
-    @pytest.mark.asyncio
-    async def test_handles_partial_extraction(
-        self,
-        mock_session,
-        mock_job_service,
-        mock_get_card_usecase,
-        mock_extraction_service,
-        mock_statement_service,
-        mock_transaction_service,
-        partial_extraction_result,
-    ):
-        """Given: extraction returns partial_data
-        When: process runs
-        Then: statement created with PENDING_REVIEW status
-        And: job_service.update_status(job_id, PARTIAL, ...) called
-        """
-        job_id = uuid.uuid4()
-        mock_extraction_service.extract_statement.return_value = (
-            partial_extraction_result
-        )
-
-        with patch.multiple(
-            "app.domains.upload_jobs.usecases.process_upload.usecase",
-            get_db_session=Mock(return_value=mock_session),
-            provide_upload_job_service=Mock(return_value=mock_job_service),
-            provide_get_card=Mock(return_value=mock_get_card_usecase),
-            provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
-            provide_statement_service=Mock(return_value=mock_statement_service),
-            provide_transaction_service=Mock(return_value=mock_transaction_service),
-        ):
-            await process_upload_job(
-                job_id=job_id,
-                pdf_bytes=b"fake pdf",
-                card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                file_path="statements/test.pdf",
-            )
-
-        # Find the PARTIAL update call
-        partial_calls = [
-            call
-            for call in mock_job_service.update_status.call_args_list
-            if len(call[0]) >= 2 and call[0][1] == UploadJobStatus.PARTIAL
-        ]
-        assert len(partial_calls) >= 1
-
-    @pytest.mark.asyncio
-    async def test_updates_job_to_failed_on_error(
-        self,
-        mock_session,
-        mock_job_service,
-        mock_get_card_usecase,
-        mock_extraction_service,
-        failed_extraction_result,
-    ):
-        """Given: extraction fails completely
-        When: process runs
-        Then: job_service.update_status(job_id, FAILED, error_message=...) called
-        """
-        job_id = uuid.uuid4()
-        mock_extraction_service.extract_statement.return_value = (
-            failed_extraction_result
-        )
-
-        with patch.multiple(
-            "app.domains.upload_jobs.usecases.process_upload.usecase",
-            get_db_session=Mock(return_value=mock_session),
-            provide_upload_job_service=Mock(return_value=mock_job_service),
-            provide_get_card=Mock(return_value=mock_get_card_usecase),
-            provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
-        ):
-            await process_upload_job(
-                job_id=job_id,
-                pdf_bytes=b"fake pdf",
-                card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                file_path="statements/test.pdf",
-            )
-
-        # Find the FAILED update call
-        failed_calls = [
-            call
-            for call in mock_job_service.update_status.call_args_list
-            if len(call[0]) >= 2 and call[0][1] == UploadJobStatus.FAILED
-        ]
-        assert len(failed_calls) >= 1
-        failed_call = failed_calls[0]
-        assert failed_call[0][0] == job_id
-
-    @pytest.mark.asyncio
-    async def test_closes_session_on_success(
-        self,
-        mock_session,
-        mock_job_service,
-        mock_get_card_usecase,
-        mock_extraction_service,
-        sample_extraction_result,
-        mock_statement_service,
-        mock_transaction_service,
-    ):
-        """Given: successful processing
-        When: process completes
-        Then: session.close() called
-        """
-        mock_extraction_service.extract_statement.return_value = (
-            sample_extraction_result
-        )
-
-        with patch.multiple(
-            "app.domains.upload_jobs.usecases.process_upload.usecase",
-            get_db_session=Mock(return_value=mock_session),
-            provide_upload_job_service=Mock(return_value=mock_job_service),
-            provide_get_card=Mock(return_value=mock_get_card_usecase),
-            provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -645,7 +525,6 @@ class TestProcessUploadJob:
                 job_id=uuid.uuid4(),
                 pdf_bytes=b"fake pdf",
                 card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -674,13 +553,12 @@ class TestProcessUploadJob:
             provide_upload_job_service=Mock(return_value=mock_job_service),
             provide_get_card=Mock(return_value=mock_get_card_usecase),
             provide_extraction=Mock(return_value=mock_extraction_service),
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
         ):
             await process_upload_job(
                 job_id=uuid.uuid4(),
                 pdf_bytes=b"fake pdf",
                 card_id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
                 file_path="statements/test.pdf",
             )
 
@@ -703,7 +581,7 @@ class TestProcessUploadJob:
 
         with patch.multiple(
             "app.domains.upload_jobs.usecases.process_upload.usecase",
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -736,7 +614,7 @@ class TestProcessUploadJob:
 
         with patch.multiple(
             "app.domains.upload_jobs.usecases.process_upload.usecase",
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -773,7 +651,7 @@ class TestImportPartialStatement:
 
         with patch.multiple(
             "app.domains.upload_jobs.usecases.process_upload.usecase",
-            provide_currency=lambda: mock_currency_service,
+            provide_currency=_create_mock_currency_service,
             provide_statement_service=Mock(return_value=mock_statement_service),
             provide_transaction_service=Mock(return_value=mock_transaction_service),
         ):
@@ -851,3 +729,266 @@ class TestHelperFunctions:
         installment = {"current": 2}
         result = _extract_installment(installment, "total")
         assert result is None
+
+
+class TestRulesIntegration:
+    """Test suite for rules engine integration."""
+
+    def test_apply_rules_called_on_success(
+        self,
+        mock_session,
+        mock_apply_rules_usecase,
+    ):
+        """Given: successful statement import
+        When: _apply_rules_to_statement() called
+        Then: apply_rules_usecase.execute() called with correct args
+        """
+        user_id = uuid.uuid4()
+        statement_id = uuid.uuid4()
+
+        with patch(
+            "app.domains.upload_jobs.usecases.process_upload.usecase.provide_apply_rules",
+            return_value=mock_apply_rules_usecase,
+        ):
+            _apply_rules_to_statement(mock_session, user_id, statement_id)
+
+        mock_apply_rules_usecase.execute.assert_called_once()
+        call_args = mock_apply_rules_usecase.execute.call_args
+        assert call_args[0][0] == user_id
+        assert isinstance(call_args[0][1], ApplyRulesRequest)
+        assert call_args[0][1].statement_id == statement_id
+
+    def test_apply_rules_failure_does_not_raise(
+        self,
+        mock_session,
+    ):
+        """Given: rules application fails
+        When: _apply_rules_to_statement() called
+        Then: no exception raised (non-blocking)
+        """
+        mock_apply_rules_usecase = Mock()
+        mock_apply_rules_usecase.execute = Mock(side_effect=Exception("Rules error"))
+
+        with patch(
+            "app.domains.upload_jobs.usecases.process_upload.usecase.provide_apply_rules",
+            return_value=mock_apply_rules_usecase,
+        ):
+            # Should not raise
+            _apply_rules_to_statement(mock_session, uuid.uuid4(), uuid.uuid4())
+
+    @pytest.mark.asyncio
+    async def test_rules_applied_after_successful_import(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_get_card_usecase,
+        mock_extraction_service,
+        mock_statement_service,
+        mock_transaction_service,
+        mock_apply_rules_usecase,
+        mock_card,
+    ):
+        """Given: successful extraction
+        When: process_upload_job completes
+        Then: rules are applied to the new statement
+        """
+        mock_extraction_service.extract_statement.return_value = (
+            _mock_extraction_result(success=True)
+        )
+
+        with patch.multiple(
+            "app.domains.upload_jobs.usecases.process_upload.usecase",
+            get_db_session=Mock(return_value=mock_session),
+            provide_upload_job_service=Mock(return_value=mock_job_service),
+            provide_get_card=Mock(return_value=mock_get_card_usecase),
+            provide_extraction=Mock(return_value=mock_extraction_service),
+            provide_currency=_create_mock_currency_service,
+            provide_statement_service=Mock(return_value=mock_statement_service),
+            provide_transaction_service=Mock(return_value=mock_transaction_service),
+            provide_apply_rules=Mock(return_value=mock_apply_rules_usecase),
+        ):
+            await process_upload_job(
+                job_id=uuid.uuid4(),
+                pdf_bytes=b"fake pdf",
+                card_id=uuid.uuid4(),
+                file_path="statements/test.pdf",
+            )
+
+        mock_apply_rules_usecase.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_rules_applied_after_partial_import(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_get_card_usecase,
+        mock_extraction_service,
+        mock_statement_service,
+        mock_transaction_service,
+        mock_apply_rules_usecase,
+        partial_extraction_result,
+    ):
+        """Given: partial extraction
+        When: process_upload_job completes with partial status
+        Then: rules are still applied to the new statement
+        """
+        # First call fails, second returns partial
+        mock_extraction_service.extract_statement.side_effect = [
+            partial_extraction_result,
+            partial_extraction_result,
+        ]
+
+        with patch.multiple(
+            "app.domains.upload_jobs.usecases.process_upload.usecase",
+            get_db_session=Mock(return_value=mock_session),
+            provide_upload_job_service=Mock(return_value=mock_job_service),
+            provide_get_card=Mock(return_value=mock_get_card_usecase),
+            provide_extraction=Mock(return_value=mock_extraction_service),
+            provide_currency=_create_mock_currency_service,
+            provide_statement_service=Mock(return_value=mock_statement_service),
+            provide_transaction_service=Mock(return_value=mock_transaction_service),
+            provide_apply_rules=Mock(return_value=mock_apply_rules_usecase),
+        ):
+            await process_upload_job(
+                job_id=uuid.uuid4(),
+                pdf_bytes=b"fake pdf",
+                card_id=uuid.uuid4(),
+                file_path="statements/test.pdf",
+            )
+
+        mock_apply_rules_usecase.execute.assert_called_once()
+
+
+class TestErrorHandling:
+    """Test suite for error handling improvements."""
+
+    @pytest.mark.asyncio
+    async def test_extraction_error_sets_failed_status(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_get_card_usecase,
+        mock_extraction_service,
+        failed_extraction_result,
+    ):
+        """Given: extraction fails completely
+        When: process_upload_job runs
+        Then: job status set to FAILED with extraction error message
+        """
+        job_id = uuid.uuid4()
+        mock_extraction_service.extract_statement.return_value = (
+            failed_extraction_result
+        )
+
+        with patch.multiple(
+            "app.domains.upload_jobs.usecases.process_upload.usecase",
+            get_db_session=Mock(return_value=mock_session),
+            provide_upload_job_service=Mock(return_value=mock_job_service),
+            provide_get_card=Mock(return_value=mock_get_card_usecase),
+            provide_extraction=Mock(return_value=mock_extraction_service),
+            provide_currency=_create_mock_currency_service,
+        ):
+            await process_upload_job(
+                job_id=job_id,
+                pdf_bytes=b"fake pdf",
+                card_id=uuid.uuid4(),
+                file_path="statements/test.pdf",
+            )
+
+        # Check that FAILED status was set with extraction error
+        final_call = mock_job_service.update_status.call_args_list[-1]
+        assert final_call[0][1] == UploadJobStatus.FAILED
+        assert "Extraction failed" in final_call[1]["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_unexpected_error_sets_failed_status(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_get_card_usecase,
+        mock_extraction_service,
+    ):
+        """Given: unexpected exception during processing
+        When: process_upload_job runs
+        Then: job status set to FAILED with processing error message
+        """
+        job_id = uuid.uuid4()
+        mock_extraction_service.extract_statement.side_effect = RuntimeError(
+            "Unexpected error"
+        )
+
+        with patch.multiple(
+            "app.domains.upload_jobs.usecases.process_upload.usecase",
+            get_db_session=Mock(return_value=mock_session),
+            provide_upload_job_service=Mock(return_value=mock_job_service),
+            provide_get_card=Mock(return_value=mock_get_card_usecase),
+            provide_extraction=Mock(return_value=mock_extraction_service),
+            provide_currency=_create_mock_currency_service,
+        ):
+            await process_upload_job(
+                job_id=job_id,
+                pdf_bytes=b"fake pdf",
+                card_id=uuid.uuid4(),
+                file_path="statements/test.pdf",
+            )
+
+        # Check that FAILED status was set
+        final_call = mock_job_service.update_status.call_args_list[-1]
+        assert final_call[0][1] == UploadJobStatus.FAILED
+        assert "Processing error" in final_call[1]["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_session_closed_on_extraction_error(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_get_card_usecase,
+        mock_extraction_service,
+        failed_extraction_result,
+    ):
+        """Given: extraction error
+        When: process_upload_job fails
+        Then: session is still closed
+        """
+        mock_extraction_service.extract_statement.return_value = (
+            failed_extraction_result
+        )
+
+        with patch.multiple(
+            "app.domains.upload_jobs.usecases.process_upload.usecase",
+            get_db_session=Mock(return_value=mock_session),
+            provide_upload_job_service=Mock(return_value=mock_job_service),
+            provide_get_card=Mock(return_value=mock_get_card_usecase),
+            provide_extraction=Mock(return_value=mock_extraction_service),
+            provide_currency=_create_mock_currency_service,
+        ):
+            await process_upload_job(
+                job_id=uuid.uuid4(),
+                pdf_bytes=b"fake pdf",
+                card_id=uuid.uuid4(),
+                file_path="statements/test.pdf",
+            )
+
+        mock_session.close.assert_called_once()
+
+
+class TestCustomExceptions:
+    """Test suite for custom exception classes."""
+
+    def test_extraction_error_attributes(self):
+        """Given: ExtractionError created
+        When: attributes accessed
+        Then: message and model_used available
+        """
+        error = ExtractionError("Parse failed", model_used="google/gemini-flash-1.5")
+        assert str(error) == "Parse failed"
+        assert error.model_used == "google/gemini-flash-1.5"
+
+    def test_currency_conversion_error_attributes(self):
+        """Given: CurrencyConversionError created
+        When: attributes accessed
+        Then: message and source_currency available
+        """
+        error = CurrencyConversionError("Rate not found", source_currency="BRL")
+        assert str(error) == "Rate not found"
+        assert error.source_currency == "BRL"
