@@ -62,6 +62,14 @@ watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
 })
 
+watch(statementsWithCard, (updatedStatements) => {
+  if (!selectedStatement.value) return
+  const latest = updatedStatements.find((s) => s.id === selectedStatement.value?.id)
+  if (latest && latest !== selectedStatement.value) {
+    selectedStatement.value = latest
+  }
+})
+
 const tabs = [
   { id: 'statements', label: 'Statements' },
   { id: 'cards', label: 'Cards' },

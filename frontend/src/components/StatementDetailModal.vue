@@ -5,7 +5,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import Calendar from 'primevue/calendar'
+import DatePicker from 'primevue/datepicker'
 import Checkbox from 'primevue/checkbox'
 import Dropdown from 'primevue/dropdown'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
@@ -169,6 +169,13 @@ const isFormValid = computed(() => {
   return !hasStatementErrors && !hasTransactionErrors
 })
 
+const toDateOnlyString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Get validation error for a specific field of a new transaction
 const getTransactionFieldError = (tempId: string, field: string): string | undefined => {
   return transactionValidationErrors.value[tempId]?.[field]
@@ -185,7 +192,7 @@ const dueDateModel = computed({
   get: () => editedStatement.value?.due_date ? new Date(editedStatement.value.due_date) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
-      editedStatement.value.due_date = value ? value.toISOString().split('T')[0] : null
+      editedStatement.value.due_date = value ? toDateOnlyString(value) : null
     }
   }
 })
@@ -194,7 +201,7 @@ const closeDateModel = computed({
   get: () => editedStatement.value?.close_date ? new Date(editedStatement.value.close_date) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
-      editedStatement.value.close_date = value ? value.toISOString().split('T')[0] : null
+      editedStatement.value.close_date = value ? toDateOnlyString(value) : null
     }
   }
 })
@@ -203,7 +210,7 @@ const periodStartModel = computed({
   get: () => editedStatement.value?.period_start ? new Date(editedStatement.value.period_start) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
-      editedStatement.value.period_start = value ? value.toISOString().split('T')[0] : null
+      editedStatement.value.period_start = value ? toDateOnlyString(value) : null
     }
   }
 })
@@ -212,7 +219,7 @@ const periodEndModel = computed({
   get: () => editedStatement.value?.period_end ? new Date(editedStatement.value.period_end) : null,
   set: (value: Date | null) => {
     if (editedStatement.value) {
-      editedStatement.value.period_end = value ? value.toISOString().split('T')[0] : null
+      editedStatement.value.period_end = value ? toDateOnlyString(value) : null
     }
   }
 })
@@ -254,7 +261,7 @@ const getTransactionDateModel = (txn: StatementTransaction) => {
       return dateValue ? new Date(dateValue) : null
     },
     set: (value: Date | null) => {
-      setTransactionValue(txn.id, 'txn_date', value ? value.toISOString().split('T')[0] : null)
+      setTransactionValue(txn.id, 'txn_date', value ? toDateOnlyString(value) : null)
     }
   })
 }
@@ -267,9 +274,9 @@ const handleTextUpdate = (txnId: string, field: 'payee' | 'description', value: 
 }
 
 // Helper to handle date updates
-const handleDateUpdate = (txnId: string, value: Date | Date[] | null | undefined) => {
+const handleDateUpdate = (txnId: string, value: Date | Date[] | (Date | null)[] | null | undefined) => {
   if (value && !Array.isArray(value)) {
-    setTransactionValue(txnId, 'txn_date', value.toISOString().split('T')[0])
+    setTransactionValue(txnId, 'txn_date', toDateOnlyString(value))
   } else {
     setTransactionValue(txnId, 'txn_date', null)
   }
@@ -279,7 +286,7 @@ const handleDateUpdate = (txnId: string, value: Date | Date[] | null | undefined
 const addNewTransaction = () => {
   const newTxn: NewTransaction = {
     _tempId: crypto.randomUUID(),
-    txn_date: new Date().toISOString().split('T')[0], // Today's date
+    txn_date: toDateOnlyString(new Date()), // Today's date
     payee: '',
     description: '',
     amount: 0,
@@ -313,7 +320,7 @@ const getNewTransactionDateModel = (tempId: string) => {
       return txn?.txn_date ? new Date(txn.txn_date) : null
     },
     set: (value: Date | null) => {
-      updateNewTransactionValue(tempId, 'txn_date', value ? value.toISOString().split('T')[0] : null)
+      updateNewTransactionValue(tempId, 'txn_date', value ? toDateOnlyString(value) : null)
     },
   })
 }
@@ -324,9 +331,9 @@ const isNewTransaction = (item: StatementTransaction | NewTransaction): item is 
 }
 
 // Helper to handle new transaction date updates
-const handleNewTransactionDateUpdate = (tempId: string, value: Date | Date[] | null | undefined) => {
+const handleNewTransactionDateUpdate = (tempId: string, value: Date | Date[] | (Date | null)[] | null | undefined) => {
   if (value && !Array.isArray(value)) {
-    updateNewTransactionValue(tempId, 'txn_date', value.toISOString().split('T')[0])
+    updateNewTransactionValue(tempId, 'txn_date', toDateOnlyString(value))
   } else {
     updateNewTransactionValue(tempId, 'txn_date', null)
   }
@@ -847,7 +854,7 @@ const handleCancel = () => {
           <div class="summary-item">
             <p class="summary-label">Due Date</p>
             <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.due_date) }}</p>
-            <Calendar
+            <DatePicker
               v-else
               v-model="dueDateModel"
               dateFormat="yy-mm-dd"
@@ -863,7 +870,7 @@ const handleCancel = () => {
           <div class="summary-item">
             <p class="summary-label">Close Date</p>
             <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.close_date) }}</p>
-            <Calendar
+            <DatePicker
               v-else
               v-model="closeDateModel"
               dateFormat="yy-mm-dd"
@@ -877,7 +884,7 @@ const handleCancel = () => {
           <div class="summary-item">
             <p class="summary-label">Period Start</p>
             <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.period_start) }}</p>
-            <Calendar
+            <DatePicker
               v-else
               v-model="periodStartModel"
               dateFormat="yy-mm-dd"
@@ -891,7 +898,7 @@ const handleCancel = () => {
           <div class="summary-item">
             <p class="summary-label">Period End</p>
             <p v-if="!isEditMode" class="summary-value">{{ formatDate(statement.period_end) }}</p>
-            <Calendar
+            <DatePicker
               v-else
               v-model="periodEndModel"
               dateFormat="yy-mm-dd"
@@ -1009,9 +1016,9 @@ const handleCancel = () => {
                   <td v-if="!isEditMode">{{ formatTransactionDate(item.txn_date) }}</td>
                   <td v-else-if="isNewTransaction(item)">
                     <div class="table-input-wrapper">
-                      <Calendar
+                      <DatePicker
                         :model-value="getNewTransactionDateModel(item._tempId).value"
-                        @update:model-value="(value: Date | Date[] | null | undefined) => handleNewTransactionDateUpdate(item._tempId, value)"
+                        @update:model-value="(value: Date | Date[] | (Date | null)[] | null | undefined) => handleNewTransactionDateUpdate(item._tempId, value)"
                         dateFormat="yy-mm-dd"
                         showIcon
                         :disabled="isSaving"
@@ -1022,9 +1029,9 @@ const handleCancel = () => {
                     </div>
                   </td>
                  <td v-else>
-                   <Calendar
+                   <DatePicker
                      :model-value="getTransactionDateModel(item).value"
-                     @update:model-value="(value: Date | Date[] | null | undefined) => handleDateUpdate(item.id, value)"
+                     @update:model-value="(value: Date | Date[] | (Date | null)[] | null | undefined) => handleDateUpdate(item.id, value)"
                      dateFormat="yy-mm-dd"
                      showIcon
                      :disabled="isSaving || isTransactionDeleted(item.id)"

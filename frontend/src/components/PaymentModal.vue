@@ -4,7 +4,7 @@ import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
-import Calendar from 'primevue/calendar'
+import DatePicker from 'primevue/datepicker'
 import Message from 'primevue/message'
 
 interface Props {
@@ -74,6 +74,13 @@ const isFormValid = computed(() => {
          paymentDate.value !== null
 })
 
+const toDateOnlyString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const handleSubmit = () => {
   error.value = null
 
@@ -95,7 +102,7 @@ const handleSubmit = () => {
   const paymentData: PaymentData = {
     statement_id: props.statementId,
     amount: paymentAmount.value,
-    payment_date: paymentDate.value.toISOString().split('T')[0],
+    payment_date: toDateOnlyString(paymentDate.value),
     currency: currency.value
   }
 
@@ -172,7 +179,7 @@ const formatCurrency = (amount: number | null): string => {
         <label for="paymentDate" class="field-label">
           Payment Date <span class="required">*</span>
         </label>
-        <Calendar
+        <DatePicker
           id="paymentDate"
           v-model="paymentDate"
           dateFormat="yy-mm-dd"
