@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import { type StatementWithCard } from '@/composables/useStatements'
 import { getCardWithLast4 } from '@/composables/useCreditCards'
+import { useStatementTransactions } from '@/composables/useStatementTransactions'
 
 interface Props {
   visible: boolean
@@ -18,6 +19,21 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Transactions composable
+const { transactions, isLoading, error, fetchTransactions, reset } = useStatementTransactions()
+
+// Watch for modal open/close to fetch/reset transactions
+watch(
+  () => props.visible,
+  (newVisible) => {
+    if (newVisible && props.statement) {
+      fetchTransactions(props.statement.id)
+    } else if (!newVisible) {
+      reset()
+    }
+  }
+)
 
 // Internal visible state that syncs with prop
 const internalVisible = computed({
@@ -55,6 +71,24 @@ const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return 'N/A'
   const date = new Date(dateStr)
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+const formatTransactionDate = (dateStr: string): string => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const formatInstallments = (cur: number | null, tot: number | null): string => {
+  if (cur !== null && tot !== null) {
+    return `${cur}/${tot}`
+  }
+  return '-'
+}
+
+const handleRetry = () => {
+  if (props.statement) {
+    fetchTransactions(props.statement.id)
+  }
 }
 
 // Event handlers
@@ -119,12 +153,54 @@ const handlePay = () => {
         </div>
       </section>
 
-      <!-- Transactions Placeholder -->
+      <!-- Transactions Section -->
       <section class="transactions-section">
         <h3 class="section-title">Transactions</h3>
-        <div class="transactions-placeholder">
-          <p>Transactions section will be added in Step 5</p>
+
+        <!-- Loading State -->
+        <div v-if="isLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading transactions...</p>
         </div>
+
+        <!-- Error State -->
+        <div v-else-if="error" class="error-state">
+          <i class="pi pi-exclamation-circle"></i>
+          <p>Failed to load transactions</p>
+          <Button label="Retry" size="small" severity="secondary" @click="handleRetry" />
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="transactions.length === 0" class="empty-state">
+          <i class="pi pi-inbox"></i>
+          <p>No transactions for this statement</p>
+        </div>
+
+        <!-- Transactions Table -->
+        <table v-else class="transactions-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Payee</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Installments</th>
+              <th>Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="txn in transactions" :key="txn.id">
+              <td>{{ formatTransactionDate(txn.txn_date) }}</td>
+              <td>{{ txn.payee }}</td>
+              <td>{{ txn.description }}</td>
+              <td :class="txn.amount < 0 ? 'amount--negative' : 'amount--positive'">
+                {{ formatCurrency(txn.amount) }}
+              </td>
+              <td class="installments">{{ formatInstallments(txn.installment_cur, txn.installment_tot) }}</td>
+              <td class="tags">-</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <!-- Action Buttons -->
@@ -241,18 +317,122 @@ const handlePay = () => {
   gap: 1rem;
 }
 
-.transactions-placeholder {
-  padding: 2rem;
-  text-align: center;
-  background: var(--surface-50);
-  border-radius: 8px;
-  border: 1px dashed var(--surface-border);
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.25rem;
+  gap: 1rem;
   color: var(--text-color-secondary);
 }
 
-.transactions-placeholder p {
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--surface-border);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state p {
   margin: 0;
   font-size: 0.938rem;
+}
+
+/* Error State */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.error-state i {
+  font-size: 2rem;
+  color: var(--red-500);
+}
+
+.error-state p {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: 0.938rem;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  text-align: center;
+}
+
+.empty-state i {
+  font-size: 2rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: 0.938rem;
+}
+
+/* Transactions Table */
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.938rem;
+}
+
+.transactions-table th {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 2px solid var(--surface-border);
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.transactions-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--surface-border);
+  color: var(--text-color);
+}
+
+.transactions-table tr:last-child td {
+  border-bottom: none;
+}
+
+.transactions-table .amount--negative {
+  color: var(--red-500);
+  font-weight: 500;
+}
+
+.transactions-table .amount--positive {
+  color: var(--green-500);
+  font-weight: 500;
+}
+
+.transactions-table .installments {
+  text-align: center;
+}
+
+.transactions-table .tags {
+  color: var(--text-color-secondary);
 }
 
 .modal-actions {
