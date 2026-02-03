@@ -98,6 +98,19 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
 
+    # S3/Garage storage configuration
+    S3_ENDPOINT_URL: str = "http://localhost:3900"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET: str = "statements"
+    S3_REGION: str = "us-east-1"
+
+    # OpenRouter API configuration
+    OPENROUTER_API_KEY: str = ""
+
+    # Exchange rate API configuration
+    EXCHANGE_RATE_API_KEY: str = ""
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (

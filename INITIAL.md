@@ -1,56 +1,54 @@
-# Create modal of statement details
+# Implement upload statement workflow
 
-**Status:** Not started
-**Agent:** frontend
+**Status:** In progress
+**Agent:** backend
 
 ## User Story
 
 **As a** user,
-**I want to** click on a statement and see its full details in a modal,
-**So that** I can review all transactions and information without leaving the dashboard.
+**I want to** upload a PDF credit card statement,
+**So that** the system automatically extracts and stores all my transactions without manual data entry.
 
 ## Repo Notes
 
-- The Statements table already renders a "View Details" button in `frontend/src/views/StatementsView.vue`, but no modal exists yet.
-- Backend endpoints needed for this modal already exist:
-  - `GET /api/v1/card-statements/{statement_id}`
-  - `GET /api/v1/transactions?statement_id={statement_id}`
-  - Optional tags per transaction: `GET /api/v1/transaction-tags/transaction/{transaction_id}`
+- Backend already has JSON CRUD endpoints for statements + transactions:
+  - `POST /api/v1/card-statements/`
+  - `POST /api/v1/transactions/`
+- There is currently **no** PDF upload endpoint.
+- Tagging infrastructure exists (`tags` + `transaction_tags` domains), but automatic rules do not yet exist.
 
-## Modal Content
+## Proposed Backend API
 
-### Header
+- `POST /api/v1/card-statements/upload`
+  - Accept `multipart/form-data` with `card_id` and `file` (PDF)
+  - Create a `CardStatement` and associated `Transaction` rows
+  - Apply rules (once rules engine exists) by creating `TransactionTag` rows
+  - Return created statement + transaction count
 
-- Card info (bank, brand, last4) derived from existing card list in `useStatements`.
-- Statement period (start - end)
-- Status badge (Paid/Pending/Overdue) using current frontend status logic.
+## Extraction Requirements
 
-### Summary
+- Extract statement metadata:
+  - period start/end, close date, due date
+  - previous/current balance, minimum payment
+- Extract transactions:
+  - txn_date, payee, description, amount, currency
+  - installments (`installment_cur`/`installment_tot`) when present
 
-- Previous balance, current balance, minimum payment
-- Due date, close date
+## Implementation Notes
 
-### Transactions
+- Start with one supported PDF format (define a "supported" bank/brand) and return a clear 400/422 for unsupported PDFs.
+- Prefer a single DB transaction for statement + transactions creation.
+- Add structured error handling and logging.
 
-- Table showing: Date, Payee, Description, Amount, Installments (if present)
-- (Optional) Tags as chips (can be lazy-loaded per transaction)
+## Dependencies
 
-### Actions
-
-- Pay: open existing `frontend/src/components/PaymentModal.vue`
-- Edit: enter edit mode (depends on the "edit from modal" task)
-- Close: X / backdrop click
-
-## Technical Implementation
-
-1. Create `frontend/src/components/StatementDetailModal.vue` using PrimeVue `Dialog`.
-2. Add selection state in `frontend/src/views/StatementsView.vue` (selected statement id + modal visible).
-3. Fetch statement details and statement transactions using the endpoints above.
-4. Enrich with card info from `cards` already loaded.
+- Depends on backend rules engine for auto-tagging after upload.
 
 ## Acceptance Criteria
 
-- [ ] Modal opens from "View Details" and closes reliably
-- [ ] Statement details are displayed
-- [ ] Transactions are listed for the statement
-- [ ] Pay action works via Payment modal
+- [ ] PDF upload endpoint exists and accepts a PDF
+- [ ] Statement metadata extracted and stored
+- [ ] Transactions created with correct dates/amounts
+- [ ] Installments stored when present
+- [ ] (When rules exist) tags auto-applied
+- [ ] Clear errors for unsupported formats

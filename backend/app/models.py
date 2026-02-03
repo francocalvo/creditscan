@@ -92,6 +92,14 @@ from app.domains.transactions.domain.models import (  # noqa
     TransactionUpdate,
 )
 
+# Upload job models (table=True: UploadJob)
+from app.domains.upload_jobs.domain.models import (  # noqa
+    UploadJob,
+    UploadJobCreate,
+    UploadJobPublic,
+    UploadJobStatus,
+)
+
 # Import all domain table models here to register them with SQLModel metadata
 # User models (table=True: User)
 from app.domains.users.domain.models import (  # noqa
@@ -140,6 +148,10 @@ __all__ = [
     "TransactionPublic",
     "TransactionsPublic",
     "TransactionUpdate",
+    "UploadJob",
+    "UploadJobCreate",
+    "UploadJobPublic",
+    "UploadJobStatus",
     "Tag",
     "TagBase",
     "TagCreate",

@@ -3,9 +3,17 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from enum import Enum
 
 from sqlalchemy import DECIMAL, Column
 from sqlmodel import Field, SQLModel
+
+
+class StatementStatus(str, Enum):
+    """Status of a card statement."""
+
+    COMPLETE = "complete"
+    PENDING_REVIEW = "pending_review"
 
 
 # Base model with shared properties
@@ -27,6 +35,9 @@ class CardStatementBase(SQLModel):
         default=None, sa_column=Column(DECIMAL(32, 2))
     )
     is_fully_paid: bool = Field(default=False)
+    currency: str = Field(default="ARS", max_length=3)
+    status: StatementStatus = Field(default=StatementStatus.COMPLETE)
+    source_file_path: str | None = Field(default=None, max_length=500)
 
 
 # For creating new records
@@ -73,6 +84,9 @@ class CardStatementUpdate(SQLModel):
         default=None, sa_column=Column(DECIMAL(32, 2))
     )
     is_fully_paid: bool | None = None
+    currency: str | None = Field(default=None, max_length=3)
+    status: StatementStatus | None = None
+    source_file_path: str | None = Field(default=None, max_length=500)
 
 
 # For paginated lists

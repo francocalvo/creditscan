@@ -24,6 +24,7 @@ class CreditCardBase(SQLModel):
     bank: str = Field(max_length=100)
     brand: CardBrand
     last4: str = Field(max_length=4)
+    default_currency: str = Field(default="ARS", max_length=3)
 
 
 # For creating new records
@@ -56,6 +57,7 @@ class CreditCardUpdate(SQLModel):
     bank: str | None = Field(default=None, max_length=100)
     brand: CardBrand | None = None
     last4: str | None = Field(default=None, max_length=4)
+    default_currency: str | None = Field(default=None, max_length=3)
 
 
 # For paginated lists
