@@ -31,3 +31,11 @@ if settings.all_cors_origins:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Run startup tasks including job resumption."""
+    from app.domains.upload_jobs.service.job_resumption import resume_pending_jobs
+
+    await resume_pending_jobs()
