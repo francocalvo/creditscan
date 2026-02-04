@@ -84,6 +84,22 @@ export function useAnalytics() {
     const targetCurrency = ref('ARS')
 
     /**
+     * Validates that a string is a valid ISO 4217 currency code.
+     * Uses Intl.NumberFormat to test if the currency code is recognized.
+     *
+     * @param currency - The currency code to validate
+     * @returns True if the currency code is valid, false otherwise
+     */
+    const isValidCurrency = (currency: string): boolean => {
+        try {
+            new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(0)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /**
      * Filtered transactions based on current date filter preset.
      * Placeholder implementation - returns all transactions for now.
      * Full implementation in Step 6.
@@ -155,20 +171,25 @@ export function useAnalytics() {
             // Fetch current user and set target currency from preferences
             const userResponse = await UsersService.readUserMe()
             const user = userResponse as UserPublicWithCurrency
-            targetCurrency.value = user.preferred_currency ?? 'ARS'
+
+            // Validate and set target currency, falling back to 'ARS' if invalid
+            const currencyFromProfile = user.preferred_currency ?? 'ARS'
+            targetCurrency.value = isValidCurrency(currencyFromProfile)
+                ? currencyFromProfile
+                : 'ARS'
 
             // Fetch all transactions with pagination
             const allTransactions: Transaction[] = []
             const limit = 100
             let skip = 0
-            let totalCount = 0
+            let totalCount: number | null = null
 
             while (true) {
                 const response = await TransactionsService.listTransactions(skip, limit)
                 const { data, count } = response
 
-                // Update total count from first response
-                if (totalCount === 0) {
+                // Update total count from first response (null sentinel)
+                if (totalCount === null) {
                     totalCount = count
                 }
 
@@ -178,7 +199,8 @@ export function useAnalytics() {
                 // Termination conditions:
                 // 1. We've fetched all known transactions (accumulated length == total count)
                 // 2. Empty page returned (safety guard)
-                if (allTransactions.length >= totalCount || data.length === 0) {
+                // 3. Null total count with empty response (edge case)
+                if ((totalCount !== null && allTransactions.length >= totalCount) || data.length === 0) {
                     break
                 }
 
@@ -216,6 +238,7 @@ export function useAnalytics() {
 
     /**
      * Format an amount as currency using the target currency setting.
+     * Falls back to USD if target currency is invalid.
      *
      * @param amount - The numeric amount to format
      * @returns A formatted currency string (e.g., "$1,234.56")
@@ -226,9 +249,13 @@ export function useAnalytics() {
      * ```
      */
     const formatCurrency = (amount: number) => {
+        const currency = isValidCurrency(targetCurrency.value)
+            ? targetCurrency.value
+            : 'USD'
+
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: targetCurrency.value,
+            currency,
         }).format(amount)
     }
 
