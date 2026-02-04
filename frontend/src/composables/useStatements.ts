@@ -1,7 +1,20 @@
 import { ref, computed } from 'vue'
-import { OpenAPI } from '@/api'
+import { OpenAPI, UsersService } from '@/api'
 import { useCreditCards, type CreditCard } from './useCreditCards'
 import { parseDateString } from '@/utils/date'
+
+/**
+ * Extended user type with preferred_currency field.
+ * Used as a workaround until SDK types are regenerated.
+ */
+type UserPublicWithCurrency = {
+  email: string
+  is_active?: boolean
+  is_superuser?: boolean
+  full_name?: string | null
+  id: string
+  preferred_currency?: string | null
+}
 
 export interface CardStatement {
   id: string
@@ -43,6 +56,45 @@ export function useStatements() {
 
   const { cards, fetchCards: fetchCreditCards } = useCreditCards()
 
+  const targetCurrency = ref('ARS')
+  let preferredCurrencyFetchInFlight: Promise<void> | null = null
+  let preferredCurrencyLoaded = false
+
+  const normalizeCurrencyCode = (currency: string) => currency.trim().toUpperCase()
+
+  const isValidCurrency = (currency: string): boolean => {
+    try {
+      new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(0)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const fetchPreferredCurrency = async () => {
+    if (preferredCurrencyLoaded) return
+    if (preferredCurrencyFetchInFlight) return preferredCurrencyFetchInFlight
+
+    preferredCurrencyFetchInFlight = (async () => {
+      try {
+        const userResponse = await UsersService.readUserMe()
+        const user = userResponse as UserPublicWithCurrency
+
+        const currencyFromProfile = normalizeCurrencyCode(user.preferred_currency ?? 'ARS')
+        targetCurrency.value = isValidCurrency(currencyFromProfile) ? currencyFromProfile : 'ARS'
+      } catch (err) {
+        console.warn('Failed to load preferred currency; falling back to ARS.', err)
+        targetCurrency.value = 'ARS'
+      } finally {
+        preferredCurrencyLoaded = true
+      }
+    })().finally(() => {
+      preferredCurrencyFetchInFlight = null
+    })
+
+    return preferredCurrencyFetchInFlight
+  }
+
   const getStatementStatus = (statement: CardStatement): StatementStatus => {
     // Check if the statement is marked as fully paid in the API
     if (statement.is_fully_paid || statement.current_balance == 0.0) {
@@ -68,14 +120,31 @@ export function useStatements() {
   }
 
   const statementsWithCard = computed<StatementWithCard[]>(() => {
-    return statements.value.map((statement) => {
-      const card = cards.value.find((c) => c.id === statement.card_id)
-      return {
-        ...statement,
-        status: getStatementStatus(statement),
-        card,
-      }
-    })
+    const statusRank: Record<StatementStatus, number> = {
+      overdue: 0,
+      pending: 1,
+      paid: 2,
+    }
+
+    return statements.value
+      .map((statement) => {
+        const card = cards.value.find((c) => c.id === statement.card_id)
+        return {
+          ...statement,
+          status: getStatementStatus(statement),
+          card,
+        }
+      })
+      .sort((a, b) => {
+        const statusDiff = statusRank[a.status] - statusRank[b.status]
+        if (statusDiff !== 0) return statusDiff
+
+        const aDueTime = a.due_date ? parseDateString(a.due_date).getTime() : Number.NEGATIVE_INFINITY
+        const bDueTime = b.due_date ? parseDateString(b.due_date).getTime() : Number.NEGATIVE_INFINITY
+        if (aDueTime !== bDueTime) return bDueTime - aDueTime
+
+        return a.id.localeCompare(b.id)
+      })
   })
 
   const fetchStatements = async (params?: { skip?: number; limit?: number; card_id?: string }) => {
@@ -83,6 +152,7 @@ export function useStatements() {
     error.value = null
 
     try {
+      await fetchPreferredCurrency()
       // First fetch credit cards so we can display card information
       await fetchCreditCards()
 
@@ -120,8 +190,26 @@ export function useStatements() {
   }
 
   const formatCurrency = (amount: number | null): string => {
-    if (amount === null) return '$0.00'
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const currency = isValidCurrency(targetCurrency.value) ? targetCurrency.value : 'USD'
+    const safeAmount = amount === null ? 0 : Number.isFinite(amount) ? amount : 0
+    const absAmount = Math.abs(safeAmount)
+
+    const baseFractionDigits = currency === 'ARS' ? 0 : 2
+
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: baseFractionDigits,
+      maximumFractionDigits: baseFractionDigits,
+      ...(absAmount >= 1_000_000
+        ? {
+            notation: 'compact' as const,
+            compactDisplay: 'short' as const,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1,
+          }
+        : {}),
+    }).format(safeAmount)
   }
 
   const formatDate = (dateStr: string | null): string => {
@@ -147,6 +235,7 @@ export function useStatements() {
     error.value = null
 
     try {
+      await fetchPreferredCurrency()
       const token =
         typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
       const url = `${OpenAPI.BASE}/api/v1/users/me/balance`

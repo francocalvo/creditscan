@@ -351,8 +351,8 @@ const pendingStatements = computed(() => {
 })
 
 const creditUtilization = computed(() => {
-  // Mock calculation - in real app would use credit limits
-  return '23%'
+  // We don't have credit limit data yet, so we can't compute utilization.
+  return 'N/A'
 })
 
 // Filter statements based on search and status
@@ -520,7 +520,7 @@ const handlePaymentSubmit = async (paymentData: {
       <MetricCard
         title="Credit Utilization"
         :value="creditUtilization"
-        subtitle="Excellent utilization rate"
+        subtitle="Requires credit limits"
         icon="pi pi-trending-up"
       />
     </div>
