@@ -55,9 +55,8 @@ export interface SpendingByTag {
  */
 export interface TopMerchant {
     payee: string
-    amount: number
-    count: number
-    rank: number
+    totalAmount: number
+    transactionCount: number
 }
 
 /**
@@ -358,11 +357,48 @@ export function useAnalytics() {
 
     /**
      * Top merchants ranking data.
-     * Placeholder - returns empty array for now.
-     * Full implementation in Step 14.
+     *
+     * Aggregates spending by payee from filtered transactions and returns
+     * the top 5 merchants by total amount. Transactions without a payee
+     * are grouped under "Unknown".
+     *
+     * Reactive to date filter changes through filteredTransactions dependency.
      */
     const topMerchants = computed<TopMerchant[]>(() => {
-        return []
+        const txns = filteredTransactions.value
+
+        if (txns.length === 0) {
+            return []
+        }
+
+        // Build spending by payee map
+        const payeeTotals = new Map<string, { totalAmount: number; transactionCount: number }>()
+
+        for (const txn of txns) {
+            // Normalize payee: use trimmed value or "Unknown" for empty/null
+            const payee = txn.payee?.trim() || 'Unknown'
+
+            // Get or create entry for this payee
+            const entry = payeeTotals.get(payee) || { totalAmount: 0, transactionCount: 0 }
+
+            // Accumulate totals
+            entry.totalAmount += txn.amount
+            entry.transactionCount += 1
+
+            payeeTotals.set(payee, entry)
+        }
+
+        // Convert map to array and sort by totalAmount descending
+        const sortedMerchants = Array.from(payeeTotals.entries())
+            .map(([payee, data]) => ({
+                payee,
+                totalAmount: data.totalAmount,
+                transactionCount: data.transactionCount,
+            }))
+            .sort((a, b) => b.totalAmount - a.totalAmount)
+
+        // Return top 5 merchants
+        return sortedMerchants.slice(0, 5)
     })
 
     /**

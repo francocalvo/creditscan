@@ -48,6 +48,7 @@ const {
   summaryMetrics,
   spendingByMonth,
   spendingByTag,
+  topMerchants,
   formatCurrency: formatAnalyticsCurrency
 } = useAnalytics()
 
@@ -774,9 +775,32 @@ const handlePaymentSubmit = async (paymentData: {
           </div>
 
           <!-- Top Merchants List (Step 15) -->
-          <div class="chart-placeholder">
-            <h4>Top Merchants</h4>
-            <p>Coming soon</p>
+          <div class="chart-card">
+            <div v-if="topMerchants.length === 0" class="chart-empty-state">
+              <i class="pi pi-store" style="font-size: 2rem; color: #9ca3af"></i>
+              <p>No merchant data for selected period</p>
+            </div>
+            <div v-else class="chart-container">
+              <h4>Top Merchants</h4>
+              <div class="merchants-list">
+                <div
+                  v-for="(merchant, index) in topMerchants"
+                  :key="merchant.payee"
+                  class="merchant-item"
+                >
+                  <div class="merchant-rank">{{ index + 1 }}</div>
+                  <div class="merchant-info">
+                    <div class="merchant-name">{{ merchant.payee }}</div>
+                    <div class="merchant-count">
+                      {{ merchant.transactionCount }} {{ merchant.transactionCount === 1 ? 'transaction' : 'transactions' }}
+                    </div>
+                  </div>
+                  <div class="merchant-amount">
+                    {{ formatAnalyticsCurrency(merchant.totalAmount) }}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1427,6 +1451,66 @@ const handlePaymentSubmit = async (paymentData: {
   margin: 0;
   font-size: 14px;
   color: #6b7280;
+}
+
+/* Merchants List Styles */
+.merchants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.merchant-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.merchant-item:hover {
+  background: #f3f4f6;
+}
+
+.merchant-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.merchant-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.merchant-name {
+  font-weight: 500;
+  color: #111827;
+  font-size: 14px;
+}
+
+.merchant-count {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.merchant-amount {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+  text-align: right;
 }
 
 .error-icon {
