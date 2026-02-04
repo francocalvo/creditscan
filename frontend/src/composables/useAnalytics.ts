@@ -100,12 +100,63 @@ export function useAnalytics() {
     }
 
     /**
+     * Get the date threshold for a given filter preset.
+     * Returns null for 'all' preset (no filtering), otherwise returns the
+     * threshold date (inclusive) for the specified time window.
+     *
+     * @param preset - The date filter preset to get threshold for
+     * @returns The threshold Date object, or null for 'all' preset
+     */
+    const getDateThreshold = (preset: DateFilterPreset): Date | null => {
+        // 'all' preset means no filtering
+        if (preset === 'all') {
+            return null
+        }
+
+        // Calculate days to subtract based on preset
+        const daysMap: Record<Exclude<DateFilterPreset, 'all'>, number> = {
+            week: 7,
+            month: 30,
+            '3months': 90,
+            '6months': 180,
+            year: 365,
+        }
+
+        const days = daysMap[preset as Exclude<DateFilterPreset, 'all'>]
+        const threshold = new Date()
+        threshold.setDate(threshold.getDate() - days)
+
+        return threshold
+    }
+
+    /**
      * Filtered transactions based on current date filter preset.
-     * Placeholder implementation - returns all transactions for now.
-     * Full implementation in Step 6.
+     *
+     * Uses the getDateThreshold helper to calculate the cutoff date.
+     * Transactions with invalid txn_date values are excluded from results.
+     *
+     * Filtering is inclusive: transactions on or after the threshold are included.
      */
     const filteredTransactions = computed(() => {
-        return transactions.value
+        const threshold = getDateThreshold(dateFilter.value)
+
+        // 'all' preset: return all transactions as-is (preserves stable references)
+        if (threshold === null) {
+            return transactions.value
+        }
+
+        // Filter transactions by date, excluding invalid txn_date values
+        return transactions.value.filter((txn) => {
+            const txnDate = new Date(txn.txn_date)
+
+            // Exclude transactions with invalid dates
+            if (isNaN(txnDate.getTime())) {
+                return false
+            }
+
+            // Include transactions on or after threshold date
+            return txnDate >= threshold
+        })
     })
 
     /**
