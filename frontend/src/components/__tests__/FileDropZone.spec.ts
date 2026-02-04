@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import FileDropZone from '../FileDropZone.vue'
 
@@ -203,8 +203,7 @@ describe('FileDropZone', () => {
       await clearButton.trigger('click')
 
       // The file input click should NOT be called because stopPropagation
-      // Note: Due to how Vue Test Utils handles events, we verify the emit happened
-      // but need to verify stopPropagation differently
+      expect(clickSpy).not.toHaveBeenCalled()
       expect(wrapper.emitted('update:modelValue')).toBeTruthy()
       expect(wrapper.emitted('update:modelValue')![0]).toEqual([null])
     })
