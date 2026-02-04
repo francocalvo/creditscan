@@ -6,6 +6,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
+import AddCardModal from '@/components/AddCardModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
@@ -281,6 +282,9 @@ const selectedStatement = ref<(typeof statementsWithCard.value)[0] | null>(null)
 const isProcessingPayment = ref(false)
 const isTransitioningModals = ref(false)
 
+// Add Card modal state
+const showAddCardModal = ref(false)
+
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
 })
@@ -501,10 +505,23 @@ const handlePaymentSubmit = async (paymentData: {
   }
 }
 
-// Handler for opening add card modal (stubbed for Step04, modal implemented in Step06)
+// Handler for opening add card modal
 const openAddCardModal = () => {
-  // TODO: Open AddCardModal in Step06
-  console.log('Open add card modal')
+  showAddCardModal.value = true
+}
+
+// Handler for card creation success
+const handleCardCreated = (card: { bank: string; last4: string }) => {
+  // Show success toast
+  toast.add({
+    severity: 'success',
+    summary: 'Card Added',
+    detail: `${card.bank} card ending in ${card.last4} has been added`,
+    life: 3000,
+  })
+  // Refresh statements and cards list
+  fetchStatements()
+  fetchBalance()
 }
 </script>
 
@@ -936,6 +953,13 @@ const openAddCardModal = () => {
       :start-in-edit-mode="detailStartInEditMode"
       @pay="handlePayFromDetail"
       @statement-updated="handleStatementUpdated"
+    />
+
+    <!-- Add Card Modal -->
+    <AddCardModal
+      v-model:visible="showAddCardModal"
+      :existing-cards="cards"
+      @card-created="handleCardCreated"
     />
 
     <!-- Toast notifications -->

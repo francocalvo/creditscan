@@ -16,6 +16,14 @@ export interface CreditCard {
   bank: string
   brand: CardBrand
   last4: string
+  alias?: string
+}
+
+export interface CreditCardCreate {
+  bank: string
+  brand: CardBrand
+  last4: string
+  alias?: string
 }
 
 export interface CreditCardsResponse {
@@ -74,12 +82,77 @@ export function useCreditCards() {
     return cards.value.find((card) => card.id === cardId)
   }
 
+  /**
+   * Create a new credit card for the current user and refresh the local cards list.
+   */
+  const createCard = async (cardData: CreditCardCreate): Promise<CreditCard> => {
+    error.value = null
+
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      const authError = new Error('Not authenticated')
+      error.value = authError
+      throw authError
+    }
+
+    const url = `${OpenAPI.BASE}/api/v1/credit-cards/`
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cardData),
+      })
+
+      if (!response.ok) {
+        let message = 'Failed to create credit card'
+        try {
+          const body: unknown = await response.json()
+          if (typeof body === 'object' && body !== null && 'detail' in body) {
+            const detail = (body as { detail?: unknown }).detail
+            if (typeof detail === 'string' && detail.trim()) {
+              message = detail
+            } else if (Array.isArray(detail)) {
+              const firstMessage = detail
+                .map((item) => {
+                  if (typeof item === 'string') return item
+                  if (typeof item === 'object' && item !== null && 'msg' in item) {
+                    const msg = (item as { msg?: unknown }).msg
+                    return typeof msg === 'string' ? msg : ''
+                  }
+                  return ''
+                })
+                .find((msg) => msg.trim())
+              if (firstMessage) message = firstMessage
+            }
+          }
+        } catch {
+          // ignore JSON parsing errors and fall back to default message
+        }
+
+        throw new Error(message)
+      }
+
+      const createdCard: CreditCard = await response.json()
+      await fetchCards()
+      return createdCard
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error('Failed to create credit card')
+      error.value = err
+      throw err
+    }
+  }
+
   return {
     cards,
     isLoading,
     error,
     fetchCards,
     getCardById,
+    createCard,
   }
 }
 
