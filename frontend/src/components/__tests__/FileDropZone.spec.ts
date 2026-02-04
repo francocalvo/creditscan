@@ -291,4 +291,127 @@ describe('FileDropZone', () => {
       expect(validationErrors![0]).toEqual(['Please select a PDF file'])
     })
   })
+
+  describe('accessibility', () => {
+    it('has role="button" attribute', () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+
+      expect(dropZone.attributes('role')).toBe('button')
+    })
+
+    it('has tabindex="0" when enabled', () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+
+      expect(dropZone.attributes('tabindex')).toBe('0')
+    })
+
+    it('has tabindex="-1" when disabled', () => {
+      const wrapper = createWrapper({ disabled: true })
+      const dropZone = wrapper.find('.drop-zone')
+
+      expect(dropZone.attributes('tabindex')).toBe('-1')
+    })
+
+    it('has aria-label attribute', () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+
+      const ariaLabel = dropZone.attributes('aria-label')
+      expect(ariaLabel).toBeTruthy()
+      expect(ariaLabel).toContain('Drop zone for PDF upload')
+    })
+
+    it('updates aria-label when file is selected', () => {
+      const file = createFile('statement.pdf', 'application/pdf')
+      const wrapper = createWrapper({ modelValue: file })
+      const dropZone = wrapper.find('.drop-zone')
+
+      const ariaLabel = dropZone.attributes('aria-label')
+      expect(ariaLabel).toContain('Selected file:')
+      expect(ariaLabel).toContain('statement.pdf')
+    })
+
+    it('has aria-disabled="false" when enabled', () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+
+      expect(dropZone.attributes('aria-disabled')).toBe('false')
+    })
+
+    it('has aria-disabled="true" when disabled', () => {
+      const wrapper = createWrapper({ disabled: true })
+      const dropZone = wrapper.find('.drop-zone')
+
+      expect(dropZone.attributes('aria-disabled')).toBe('true')
+    })
+
+    it('Enter key opens file picker', async () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+
+      const clickSpy = vi.fn()
+      fileInput.click = clickSpy
+
+      await dropZone.trigger('keydown', { key: 'Enter' })
+
+      expect(clickSpy).toHaveBeenCalled()
+    })
+
+    it('Space key opens file picker', async () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+
+      const clickSpy = vi.fn()
+      fileInput.click = clickSpy
+
+      await dropZone.trigger('keydown', { key: ' ' })
+
+      expect(clickSpy).toHaveBeenCalled()
+    })
+
+    it('Enter key is prevented default', async () => {
+      const wrapper = createWrapper()
+      const dropZone = wrapper.find('.drop-zone')
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+
+      const clickSpy = vi.fn()
+      fileInput.click = clickSpy
+
+      const event = { key: 'Enter', preventDefault: vi.fn() }
+      await dropZone.trigger('keydown', event)
+
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(clickSpy).toHaveBeenCalled()
+    })
+
+    it('disabled state ignores Enter key', async () => {
+      const wrapper = createWrapper({ disabled: true })
+      const dropZone = wrapper.find('.drop-zone')
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+
+      const clickSpy = vi.fn()
+      fileInput.click = clickSpy
+
+      await dropZone.trigger('keydown', { key: 'Enter' })
+
+      expect(clickSpy).not.toHaveBeenCalled()
+    })
+
+    it('disabled state ignores Space key', async () => {
+      const wrapper = createWrapper({ disabled: true })
+      const dropZone = wrapper.find('.drop-zone')
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+
+      const clickSpy = vi.fn()
+      fileInput.click = clickSpy
+
+      await dropZone.trigger('keydown', { key: ' ' })
+
+      expect(clickSpy).not.toHaveBeenCalled()
+    })
+  })
 })

@@ -27,6 +27,7 @@ vi.mock('@/composables/useCreditCards', () => ({
 
 // Mock useStatementUpload composable
 const mockIsUploading = ref(false)
+const mockJobId = ref<string | null>(null)
 const mockJobStatus = ref<string | null>(null)
 const mockStatementId = ref<string | null>(null)
 const mockUploadErrorMessage = ref<string | null>(null)
@@ -34,11 +35,14 @@ const mockDuplicateJobId = ref<string | null>(null)
 const mockUploadStatement = vi.fn()
 const mockPollJobStatus = vi.fn()
 const mockStartBackgroundPolling = vi.fn()
+const mockStopPolling = vi.fn()
 const mockResetUpload = vi.fn()
+const mockToastAdd = vi.fn()
 
 vi.mock('@/composables/useStatementUpload', () => ({
   useStatementUpload: () => ({
     isUploading: mockIsUploading,
+    jobId: mockJobId,
     jobStatus: mockJobStatus,
     errorMessage: mockUploadErrorMessage,
     statementId: mockStatementId,
@@ -46,7 +50,15 @@ vi.mock('@/composables/useStatementUpload', () => ({
     uploadStatement: mockUploadStatement,
     pollJobStatus: mockPollJobStatus,
     startBackgroundPolling: mockStartBackgroundPolling,
+    stopPolling: mockStopPolling,
     reset: mockResetUpload,
+  })
+}))
+
+// Mock useToast
+vi.mock('primevue/usetoast', () => ({
+  useToast: () => ({
+    add: mockToastAdd
   })
 }))
 
@@ -57,7 +69,7 @@ const DialogStub = {
     <div v-if="visible" class="p-dialog">
       <div class="p-dialog-header">
         <span>{{ header }}</span>
-        <button class="p-dialog-header-close" @click="$emit('update:visible', false)">X</button>
+        <button v-if="closable" class="p-dialog-header-close" @click="$emit('update:visible', false)">X</button>
       </div>
       <div class="p-dialog-content">
         <slot />
@@ -112,6 +124,7 @@ describe('UploadStatementModal', () => {
     mockCards.value = []
     mockIsLoading.value = false
     mockIsUploading.value = false
+    mockJobId.value = null
     mockJobStatus.value = null
     mockStatementId.value = null
     mockUploadErrorMessage.value = null
@@ -565,6 +578,83 @@ describe('UploadStatementModal', () => {
       expect(wrapper.text()).toContain('close this modal. We\'ll notify you when it\'s done.')
     })
 
+    it('closing via dialog X during processing switches to background completion polling', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToProcessingStep(wrapper)
+
+      // Simulate the composable having a jobId set (real uploadStatement does this).
+      mockJobId.value = 'job-1'
+
+      await wrapper.find('.p-dialog-header-close').trigger('click')
+
+      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      expect(mockStartBackgroundPolling).toHaveBeenCalledTimes(2)
+
+      const [foregroundJobId, foregroundCb] = mockStartBackgroundPolling.mock.calls[0]
+      const [backgroundJobId, backgroundCb] = mockStartBackgroundPolling.mock.calls[1]
+
+      expect(foregroundJobId).toBe('job-1')
+      expect(backgroundJobId).toBe('job-1')
+      expect(typeof foregroundCb).toBe('function')
+      expect(typeof backgroundCb).toBe('function')
+      expect(backgroundCb).not.toBe(foregroundCb)
+    })
+
+    it('shows a toast when a background job completes while modal is closed', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToProcessingStep(wrapper)
+
+      mockJobId.value = 'job-1'
+
+      await wrapper.find('.p-dialog-header-close').trigger('click')
+      await wrapper.setProps({ visible: false })
+
+      expect(mockStartBackgroundPolling).toHaveBeenCalledTimes(2)
+
+      const onComplete = mockStartBackgroundPolling.mock.calls[1][1] as unknown as (
+        job: { status: string; statement_id: string | null; error_message: string | null }
+      ) => void
+
+      onComplete({ status: 'completed', statement_id: 'statement-123', error_message: null })
+
+      expect(mockToastAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          summary: 'Statement Uploaded',
+          group: 'upload-complete',
+          data: { statementId: 'statement-123' }
+        })
+      )
+    })
+
+    it('shows an error toast when a background job fails while modal is closed', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToProcessingStep(wrapper)
+
+      mockJobId.value = 'job-1'
+
+      await wrapper.find('.p-dialog-header-close').trigger('click')
+      await wrapper.setProps({ visible: false })
+
+      const onComplete = mockStartBackgroundPolling.mock.calls[1][1] as unknown as (
+        job: { status: string; statement_id: string | null; error_message: string | null }
+      ) => void
+
+      onComplete({ status: 'failed', statement_id: null, error_message: 'Bad PDF' })
+
+      expect(mockToastAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Upload Failed',
+          detail: 'Bad PDF',
+          group: 'upload-complete'
+        })
+      )
+    })
+
     it('Job completion (completed) transitions to success step', async () => {
       const wrapper = createWrapper()
 
@@ -670,6 +760,78 @@ describe('UploadStatementModal', () => {
 
       // Should transition to error step
       expect(wrapper.find('.error-step').exists()).toBe(true)
+    })
+
+    it('network error shows friendly message', async () => {
+      const wrapper = createWrapper()
+
+      // Navigate to upload step
+      const dropdown = wrapper.find('select')
+      await dropdown.setValue('card-1')
+      const nextButton = wrapper.findAll('button').find((b) => b.text() === 'Next')
+      await nextButton!.trigger('click')
+
+      // Select a file
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+      await fileDropZone.vm.$emit('update:modelValue', mockFile)
+
+      // Mock uploadStatement to throw a TypeError (network error)
+      mockUploadStatement.mockRejectedValue(new TypeError('Failed to fetch'))
+
+      // Click Upload
+      const uploadButton = wrapper.findAll('button').find((b) => b.text() === 'Upload')
+      await uploadButton!.trigger('click')
+      await flushPromises()
+
+      // Should show friendly network error message
+      expect(wrapper.find('.error-step').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Network error. Please check your connection and try again.')
+    })
+
+    it('modal is closable when not uploading', () => {
+      const wrapper = createWrapper()
+      mockIsUploading.value = false
+      const dialog = wrapper.findComponent({ name: 'Dialog' })
+
+      // canClose should be true when not uploading
+      expect(dialog.props('closable')).toBe(true)
+    })
+
+    it('modal is not closable during initial upload', async () => {
+      mockIsUploading.value = true
+      const wrapper = createWrapper()
+      await wrapper.vm.$nextTick()
+      const dialog = wrapper.findComponent({ name: 'Dialog' })
+
+      // canClose should be false when uploading
+      expect(dialog.props('closable')).toBe(false)
+    })
+
+    it('modal is closable during processing (after job is accepted)', async () => {
+      const wrapper = createWrapper()
+
+      // Navigate to processing step
+      const dropdown = wrapper.find('select')
+      await dropdown.setValue('card-1')
+      const nextButton = wrapper.findAll('button').find((b) => b.text() === 'Next')
+      await nextButton!.trigger('click')
+
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+      await fileDropZone.vm.$emit('update:modelValue', mockFile)
+
+      // Click Upload to start processing
+      const uploadButton = wrapper.findAll('button').find((b) => b.text() === 'Upload')
+      await uploadButton!.trigger('click')
+      await flushPromises()
+
+      // After processing starts (job accepted), isUploading is false, so modal should be closable
+      mockIsUploading.value = false
+      await wrapper.vm.$nextTick()
+
+      const dialog = wrapper.findComponent({ name: 'Dialog' })
+      expect(dialog.props('closable')).toBe(true)
     })
   })
 
@@ -848,9 +1010,12 @@ describe('UploadStatementModal', () => {
 
     it('shows fallback error message when none provided', async () => {
       const wrapper = createWrapper()
-      mockUploadErrorMessage.value = null
 
       await navigateToErrorStep(wrapper)
+
+      // After navigating, explicitly clear the error message to force fallback
+      mockUploadErrorMessage.value = null
+      await wrapper.vm.$nextTick()
 
       expect(wrapper.find('.error-text').exists()).toBe(true)
       expect(wrapper.text()).toContain('An error occurred while uploading')

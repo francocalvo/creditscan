@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, type Ref } from 'vue'
+import { ref, type Ref, computed } from 'vue'
 import Button from 'primevue/button'
 
 interface Props {
@@ -21,6 +21,12 @@ const emit = defineEmits<Emits>()
 
 const isDragging = ref(false)
 const fileInput: Ref<HTMLInputElement | null> = ref(null)
+
+/**
+ * Determine drop zone tabindex.
+ * Disabled drop zones should not be focusable.
+ */
+const tabIndex = computed(() => (props.disabled ? -1 : 0))
 
 /**
  * Parse accepted extensions from the accept prop.
@@ -112,11 +118,30 @@ function onDrop(event: DragEvent): void {
 }
 
 /**
- * Open the native file picker.
+ * Open native file picker.
  */
 function openFilePicker(): void {
   if (props.disabled) return
   fileInput.value?.click()
+}
+
+/**
+ * Handle keyboard events.
+ * Enter or Space triggers file picker.
+ */
+function onKeydown(event: KeyboardEvent): void {
+  if (props.disabled) return
+
+  // Enter key opens file picker
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    openFilePicker()
+  }
+  // Space key opens file picker and prevents scrolling
+  else if (event.key === ' ') {
+    event.preventDefault()
+    openFilePicker()
+  }
 }
 
 /**
@@ -157,10 +182,15 @@ function clearFile(event: MouseEvent): void {
       'drop-zone--active': isDragging,
       'drop-zone--disabled': disabled
     }"
+    :tabindex="tabIndex"
+    role="button"
+    :aria-label="modelValue ? `Selected file: ${modelValue.name}` : 'Drop zone for PDF upload. Press Enter or Space to browse files.'"
+    :aria-disabled="disabled"
     @dragover.prevent="onDragOver"
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
     @click="openFilePicker"
+    @keydown="onKeydown"
   >
     <input
       ref="fileInput"
@@ -214,6 +244,11 @@ function clearFile(event: MouseEvent): void {
 .drop-zone:hover {
   border-color: var(--primary-color);
   background-color: var(--surface-50);
+}
+
+.drop-zone:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
 .drop-zone--active {

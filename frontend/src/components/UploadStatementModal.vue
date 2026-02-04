@@ -88,6 +88,15 @@ const cardOptions = computed(() =>
 const isNextDisabled = computed(() => selectedCardId.value === null)
 
 /**
+ * Determine if modal can be closed.
+ * Blocks close only during initial upload request (before job is accepted).
+ * Allows close during processing (background polling handles completion).
+ */
+const canClose = computed(() => {
+  return !isUploading.value
+})
+
+/**
  * Processing status message based on job status.
  */
 const processingStatusMessage = computed(() => {
@@ -195,7 +204,17 @@ async function handleUpload(): Promise<void> {
 
     // Start background polling for job status updates
     startBackgroundPolling(job.id, handleJobComplete)
-  } catch {
+  } catch (error) {
+    // Detect network errors (TypeError from fetch usually indicates network failure)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      uploadErrorMessage.value = 'Network error. Please check your connection and try again.'
+    } else if (duplicateJobId.value) {
+      // Duplicate already handled by composable
+      uploadErrorMessage.value = uploadErrorMessage.value || 'This file was already uploaded.'
+    } else {
+      // Use existing error message from composable for non-network errors
+      uploadErrorMessage.value = uploadErrorMessage.value || 'Upload failed'
+    }
     // Transition to error step to show the user something went wrong
     currentStep.value = 'error'
   }
@@ -328,7 +347,7 @@ onUnmounted(() => {
     modal
     header="Upload Statement"
     :style="{ width: '500px' }"
-    :closable="true"
+    :closable="canClose"
     :draggable="false"
   >
     <div class="upload-modal-content">
