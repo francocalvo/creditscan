@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     card_statements,
     credit_cards,
+    currency,
     login,
     payments,
     private,
@@ -23,6 +24,7 @@ api_router.include_router(credit_cards.router)
 api_router.include_router(card_statements.router)
 api_router.include_router(payments.router)
 api_router.include_router(transactions.router)
+api_router.include_router(currency.router)
 api_router.include_router(upload_jobs.router)
 api_router.include_router(tags.router)
 api_router.include_router(transaction_tags.router)

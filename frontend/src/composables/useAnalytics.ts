@@ -134,7 +134,7 @@ export function useAnalytics() {
      * Placeholder implementation - currently a no-op beyond state management.
      * Full implementation in Step 5.
      */
-     const fetchAnalytics = async () => {
+    const fetchAnalytics = async () => {
         isLoading.value = true
         error.value = null
         try {
@@ -163,7 +163,7 @@ export function useAnalytics() {
      * Full implementation in Step 18.
      */
     const refresh = () => {
-        fetchAnalytics()
+        return fetchAnalytics()
     }
 
     /**

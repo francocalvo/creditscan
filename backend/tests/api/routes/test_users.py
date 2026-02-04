@@ -32,6 +32,7 @@ def test_get_users_normal_user_me(
     assert current_user["is_active"] is True
     assert current_user["is_superuser"] is False
     assert current_user["email"] == settings.EMAIL_TEST_USER
+    assert "preferred_currency" in current_user
 
 
 def test_create_user_new_email(
@@ -196,6 +197,55 @@ def test_update_user_me(
     assert user_db
     assert user_db.email == email
     assert user_db.full_name == full_name
+
+
+def test_update_user_me_preferred_currency(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test that users can update their preferred currency."""
+    data = {"preferred_currency": "USD"}
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me",
+        headers=normal_user_token_headers,
+        json=data,
+    )
+    assert r.status_code == 200
+    updated_user = r.json()
+    assert updated_user["preferred_currency"] == "USD"
+
+    # Verify the change persists in the database
+    r = client.get(
+        f"{settings.API_V1_STR}/users/me",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 200
+    user_data = r.json()
+    assert user_data["preferred_currency"] == "USD"
+
+
+def test_update_user_me_clear_preferred_currency(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Test that users can clear their preferred currency by setting it to null."""
+    # First set a currency
+    data = {"preferred_currency": "EUR"}
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me",
+        headers=normal_user_token_headers,
+        json=data,
+    )
+    assert r.status_code == 200
+
+    # Then clear it
+    data = {"preferred_currency": None}
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me",
+        headers=normal_user_token_headers,
+        json=data,
+    )
+    assert r.status_code == 200
+    updated_user = r.json()
+    assert updated_user["preferred_currency"] is None
 
 
 def test_update_password_me(
