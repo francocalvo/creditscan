@@ -50,7 +50,9 @@ const {
   jobStatus,
   errorMessage: uploadErrorMessage,
   statementId,
+  duplicateJobId,
   uploadStatement,
+  pollJobStatus,
   startBackgroundPolling,
   reset: resetUpload,
 } = useStatementUpload()
@@ -137,10 +139,9 @@ async function handleUpload(): Promise<void> {
 
     // Start background polling for job status updates
     startBackgroundPolling(job.id, handleJobComplete)
-  } catch (error) {
+  } catch {
     // Transition to error step to show the user something went wrong
     currentStep.value = 'error'
-    console.error('Upload failed:', error)
   }
 }
 
@@ -174,6 +175,47 @@ function resetModal(): void {
   selectedFile.value = null
   validationError.value = null
   resetUpload()
+}
+
+/**
+ * Emit upload completion and close the modal.
+ */
+function viewStatement(): void {
+  if (!statementId.value) {
+    return
+  }
+
+  emit('upload-complete', statementId.value)
+  closeModal()
+}
+
+/**
+ * View existing duplicate statement.
+ * Fetches job details for the duplicate job ID and navigates to it.
+ */
+async function viewDuplicateStatement(): Promise<void> {
+  if (!duplicateJobId.value) {
+    return
+  }
+
+  try {
+    const job = await pollJobStatus(duplicateJobId.value)
+    if (job.statement_id) {
+      emit('upload-complete', job.statement_id)
+      closeModal()
+    }
+  } catch {
+    // If we can't fetch the duplicate job, update error message
+    uploadErrorMessage.value = 'Unable to retrieve existing statement'
+  }
+}
+
+/**
+ * Retry upload after error - clears file and returns to upload step.
+ */
+function retryUpload(): void {
+  selectedFile.value = null
+  goToUploadStep()
 }
 
 // Watch for job status changes to transition steps (when modal is open and in processing step)
@@ -314,12 +356,41 @@ onMounted(() => {
 
       <!-- Success step (placeholder - implemented in Step 6) -->
       <div v-else-if="currentStep === 'success'" class="success-step">
-        <p>Success step coming in Step 6...</p>
+        <div class="success-message">
+          <i class="pi pi-check-circle success-icon" aria-hidden="true"></i>
+          <h3 class="success-title">Statement Uploaded</h3>
+
+          <Message v-if="jobStatus === 'partial'" severity="warn" :closable="false">
+            Statement imported with partial data. Please review.
+          </Message>
+        </div>
+
+        <div class="button-group button-group--center">
+          <Button label="Upload Another" text @click="resetModal" />
+          <Button label="View Statement" :disabled="!statementId" @click="viewStatement" />
+        </div>
       </div>
 
-      <!-- Error step (placeholder - implemented in Step 6) -->
+      <!-- Error step -->
       <div v-else-if="currentStep === 'error'" class="error-step">
-        <p>Error step coming in Step 6...</p>
+        <div class="error-message">
+          <i class="pi pi-times-circle error-icon" aria-hidden="true"></i>
+          <h3 class="error-title">Upload Failed</h3>
+          <p class="error-text">{{ uploadErrorMessage || 'An error occurred while uploading' }}</p>
+
+          <div v-if="duplicateJobId" class="duplicate-link">
+            <p>This file was already uploaded.</p>
+            <Button
+              label="View Existing Statement"
+              link
+              @click="viewDuplicateStatement"
+            />
+          </div>
+        </div>
+
+        <div class="button-group button-group--center">
+          <Button label="Try Again" @click="retryUpload" />
+        </div>
       </div>
     </div>
   </Dialog>
@@ -394,6 +465,10 @@ onMounted(() => {
   margin-top: 0.5rem;
 }
 
+.button-group--center {
+  justify-content: center;
+}
+
 .w-full {
   width: 100%;
 }
@@ -436,5 +511,56 @@ onMounted(() => {
   font-size: 0.875rem;
   color: var(--text-color-secondary);
   margin: 0;
+}
+
+.success-message {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+}
+
+.success-icon {
+  font-size: 3rem;
+  color: #10b981;
+}
+
+.success-title {
+  margin: 1rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.error-message {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+}
+
+.error-icon {
+  font-size: 3rem;
+  color: #ef4444;
+}
+
+.error-title {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.error-text {
+  margin: 0.5rem 0;
+  color: var(--text-color-secondary);
+}
+
+.duplicate-link {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.duplicate-link p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
 }
 </style>

@@ -30,7 +30,9 @@ const mockIsUploading = ref(false)
 const mockJobStatus = ref<string | null>(null)
 const mockStatementId = ref<string | null>(null)
 const mockUploadErrorMessage = ref<string | null>(null)
+const mockDuplicateJobId = ref<string | null>(null)
 const mockUploadStatement = vi.fn()
+const mockPollJobStatus = vi.fn()
 const mockStartBackgroundPolling = vi.fn()
 const mockResetUpload = vi.fn()
 
@@ -40,7 +42,9 @@ vi.mock('@/composables/useStatementUpload', () => ({
     jobStatus: mockJobStatus,
     errorMessage: mockUploadErrorMessage,
     statementId: mockStatementId,
+    duplicateJobId: mockDuplicateJobId,
     uploadStatement: mockUploadStatement,
+    pollJobStatus: mockPollJobStatus,
     startBackgroundPolling: mockStartBackgroundPolling,
     reset: mockResetUpload,
   })
@@ -74,7 +78,7 @@ const DropdownStub = {
 const ButtonStub = {
   name: 'Button',
   template: '<button :disabled="disabled || loading" @click="$emit(\'click\', $event)">{{ loading ? \'Loading...\' : label }}</button>',
-  props: ['label', 'severity', 'outlined', 'disabled', 'loading', 'icon', 'iconPos'],
+  props: ['label', 'severity', 'outlined', 'disabled', 'loading', 'icon', 'iconPos', 'text'],
   emits: ['click']
 }
 
@@ -111,6 +115,7 @@ describe('UploadStatementModal', () => {
     mockJobStatus.value = null
     mockStatementId.value = null
     mockUploadErrorMessage.value = null
+    mockDuplicateJobId.value = null
     // Default mock for uploadStatement to resolve with a job
     mockUploadStatement.mockResolvedValue({
       id: 'job-1',
@@ -120,6 +125,16 @@ describe('UploadStatementModal', () => {
       created_at: '2024-01-01',
       updated_at: null,
       completed_at: null,
+    })
+    // Default mock for pollJobStatus to resolve with a job
+    mockPollJobStatus.mockResolvedValue({
+      id: 'job-1',
+      status: 'completed',
+      statement_id: 'statement-123',
+      error_message: null,
+      created_at: '2024-01-01',
+      updated_at: '2024-01-01',
+      completed_at: '2024-01-01',
     })
   })
 
@@ -560,6 +575,8 @@ describe('UploadStatementModal', () => {
       await wrapper.vm.$nextTick()
 
       expect(wrapper.find('.success-step').exists()).toBe(true)
+      expect(wrapper.find('.success-icon').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Statement Uploaded')
     })
 
     it('Job completion (partial) transitions to success step', async () => {
@@ -572,6 +589,49 @@ describe('UploadStatementModal', () => {
       await wrapper.vm.$nextTick()
 
       expect(wrapper.find('.success-step').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Statement imported with partial data. Please review.')
+    })
+
+    it('View Statement emits upload-complete with statement ID and closes modal', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToProcessingStep(wrapper)
+
+      mockStatementId.value = 'statement-123'
+      mockJobStatus.value = 'completed'
+      await wrapper.vm.$nextTick()
+
+      const viewButton = wrapper.findAll('button').find((b) => b.text() === 'View Statement')
+      expect(viewButton).toBeTruthy()
+
+      await viewButton!.trigger('click')
+
+      expect(wrapper.emitted('upload-complete')).toBeTruthy()
+      expect(wrapper.emitted('upload-complete')![0]).toEqual(['statement-123'])
+      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      expect(wrapper.emitted('update:visible')![0]).toEqual([false])
+    })
+
+    it('Upload Another resets state and returns to card selection', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToProcessingStep(wrapper)
+
+      mockStatementId.value = 'statement-123'
+      mockJobStatus.value = 'completed'
+      await wrapper.vm.$nextTick()
+
+      const uploadAnotherButton = wrapper.findAll('button').find((b) => b.text() === 'Upload Another')
+      expect(uploadAnotherButton).toBeTruthy()
+
+      await uploadAnotherButton!.trigger('click')
+
+      expect(mockResetUpload).toHaveBeenCalled()
+      expect(wrapper.find('.card-selection').exists()).toBe(true)
+
+      const nextButton = wrapper.findAll('button').find((b) => b.text() === 'Next')
+      expect(nextButton).toBeTruthy()
+      expect(nextButton!.attributes('disabled')).toBeDefined()
     })
 
     it('Job failure transitions to error step', async () => {
@@ -651,6 +711,149 @@ describe('UploadStatementModal', () => {
       await flushPromises()
 
       expect(mockResetUpload).toHaveBeenCalled()
+    })
+  })
+
+  describe('error state', () => {
+    beforeEach(() => {
+      mockCards.value = [{ id: 'card-1', bank: 'Chase', brand: 'visa', last4: '1234' }]
+      mockUploadStatement.mockResolvedValue({ id: 'job-1', status: 'pending', statement_id: null, error_message: null, created_at: '2024-01-01', updated_at: null, completed_at: null })
+    })
+
+    async function navigateToErrorStep(wrapper: ReturnType<typeof createWrapper>) {
+      // Select a card
+      const dropdown = wrapper.find('select')
+      await dropdown.setValue('card-1')
+      const nextButton = wrapper.findAll('button').find((b) => b.text() === 'Next')
+      await nextButton!.trigger('click')
+
+      // Select a file
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+      await fileDropZone.vm.$emit('update:modelValue', mockFile)
+
+      // Mock uploadStatement to throw an error
+      mockUploadStatement.mockRejectedValue(new Error('Upload failed'))
+
+      // Click Upload
+      const uploadButton = wrapper.findAll('button').find((b) => b.text() === 'Upload')
+      await uploadButton!.trigger('click')
+      await flushPromises()
+    }
+
+    it('error state shows on failed status', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.error-step').exists()).toBe(true)
+      expect(wrapper.find('.error-icon').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Upload Failed')
+    })
+
+    it('error message is displayed', async () => {
+      const wrapper = createWrapper()
+      mockUploadErrorMessage.value = 'File too large'
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.error-text').exists()).toBe(true)
+      expect(wrapper.text()).toContain('File too large')
+    })
+
+    it('duplicate error shows link', async () => {
+      const wrapper = createWrapper()
+      mockDuplicateJobId.value = 'duplicate-job-123'
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.duplicate-link').exists()).toBe(true)
+      expect(wrapper.text()).toContain('This file was already uploaded.')
+
+      const viewExistingButton = wrapper.findAll('button').find((b) => b.text() === 'View Existing Statement')
+      expect(viewExistingButton).toBeTruthy()
+    })
+
+    it('View Existing Statement fetches job', async () => {
+      const wrapper = createWrapper()
+      mockDuplicateJobId.value = 'duplicate-job-123'
+
+      await navigateToErrorStep(wrapper)
+
+      const viewExistingButton = wrapper.findAll('button').find((b) => b.text() === 'View Existing Statement')
+      await viewExistingButton!.trigger('click')
+
+      expect(mockPollJobStatus).toHaveBeenCalledWith('duplicate-job-123')
+    })
+
+    it('View Existing Statement navigates to statement', async () => {
+      const wrapper = createWrapper()
+      mockDuplicateJobId.value = 'duplicate-job-123'
+
+      await navigateToErrorStep(wrapper)
+
+      const viewExistingButton = wrapper.findAll('button').find((b) => b.text() === 'View Existing Statement')
+      await viewExistingButton!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.emitted('upload-complete')).toBeTruthy()
+      expect(wrapper.emitted('upload-complete')![0]).toEqual(['statement-123'])
+      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      expect(wrapper.emitted('update:visible')![0]).toEqual([false])
+    })
+
+    it('Try Again returns to upload step', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToErrorStep(wrapper)
+
+      const tryAgainButton = wrapper.findAll('button').find((b) => b.text() === 'Try Again')
+      await tryAgainButton!.trigger('click')
+
+      expect(wrapper.find('.upload-step').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="file-drop-zone"]').exists()).toBe(true)
+    })
+
+    it('Try Again clears selected file', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToErrorStep(wrapper)
+
+      const tryAgainButton = wrapper.findAll('button').find((b) => b.text() === 'Try Again')
+      await tryAgainButton!.trigger('click')
+
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      expect(fileDropZone.props('modelValue')).toBeNull()
+    })
+
+    it('error icon uses pi-times-circle', async () => {
+      const wrapper = createWrapper()
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.error-icon.pi-times-circle').exists()).toBe(true)
+    })
+
+    it('non-duplicate errors do not show link', async () => {
+      const wrapper = createWrapper()
+      mockDuplicateJobId.value = null
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.duplicate-link').exists()).toBe(false)
+
+      const viewExistingButton = wrapper.findAll('button').find((b) => b.text() === 'View Existing Statement')
+      expect(viewExistingButton).toBeFalsy()
+    })
+
+    it('shows fallback error message when none provided', async () => {
+      const wrapper = createWrapper()
+      mockUploadErrorMessage.value = null
+
+      await navigateToErrorStep(wrapper)
+
+      expect(wrapper.find('.error-text').exists()).toBe(true)
+      expect(wrapper.text()).toContain('An error occurred while uploading')
     })
   })
 })
