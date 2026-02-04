@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import Dialog from 'primevue/dialog'
-import Dropdown from 'primevue/dropdown'
-import Button from 'primevue/button'
-import ProgressSpinner from 'primevue/progressspinner'
-import Message from 'primevue/message'
-import { useCreditCards } from '@/composables/useCreditCards'
-import { useStatementUpload } from '@/composables/useStatementUpload'
-import FileDropZone from '@/components/FileDropZone.vue'
+ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { useToast } from 'primevue/usetoast'
+ import type { ToastMessageOptions } from 'primevue/toast'
+ import Dialog from 'primevue/dialog'
+ import Dropdown from 'primevue/dropdown'
+ import Button from 'primevue/button'
+ import ProgressSpinner from 'primevue/progressspinner'
+ import Message from 'primevue/message'
+ import { useCreditCards } from '@/composables/useCreditCards'
+ import { useStatementUpload } from '@/composables/useStatementUpload'
+ import FileDropZone from '@/components/FileDropZone.vue'
 
-interface Props {
-  visible: boolean
+// PrimeVue type definitions don't include 'data' property, but it's supported at runtime
+interface ExtendedToastMessageOptions extends ToastMessageOptions {
+  data?: { statementId?: string }
 }
+
+ interface Props {
+   visible: boolean
+ }
 
 interface Emits {
   (e: 'update:visible', value: boolean): void
@@ -22,16 +29,9 @@ interface Emits {
 type ModalStep = 'select-card' | 'upload-file' | 'processing' | 'success' | 'error'
 
 const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+ const emit = defineEmits<Emits>()
 const router = useRouter()
-
-// Internal visible state that syncs with prop
-const internalVisible = computed({
-  get: () => props.visible,
-  set: (value: boolean) => {
-    emit('update:visible', value)
-  }
-})
+ const toast = useToast()
 
 // Step management
 const currentStep = ref<ModalStep>('select-card')
@@ -47,6 +47,7 @@ const { cards, isLoading: isLoadingCards, fetchCards } = useCreditCards()
 // Upload state from composable
 const {
   isUploading,
+  jobId,
   jobStatus,
   errorMessage: uploadErrorMessage,
   statementId,
@@ -54,8 +55,26 @@ const {
   uploadStatement,
   pollJobStatus,
   startBackgroundPolling,
+  stopPolling,
   reset: resetUpload,
 } = useStatementUpload()
+
+/**
+ * Update modal visibility, ensuring close actions run through one path.
+ * When closing during processing, switches polling to the background completion handler.
+ */
+function setVisible(value: boolean): void {
+  if (!value && props.visible && currentStep.value === 'processing' && jobId.value) {
+    startBackgroundPolling(jobId.value, handleBackgroundComplete)
+  }
+  emit('update:visible', value)
+}
+
+// Internal visible state that syncs with prop
+const internalVisible = computed({
+  get: () => props.visible,
+  set: setVisible
+})
 
 // Dropdown options computed from cards
 const cardOptions = computed(() =>
@@ -83,10 +102,47 @@ const processingStatusMessage = computed(() => {
 })
 
 /**
- * Close the modal.
+ * Close modal. Starts background polling if closing during processing.
  */
 function closeModal(): void {
-  emit('update:visible', false)
+  setVisible(false)
+}
+
+/**
+ * Handle background job completion with toast notification.
+ * Only shows toast when modal is closed to avoid duplicate notifications.
+ */
+function handleBackgroundComplete(job: {
+  status: string
+  statement_id: string | null
+  error_message: string | null
+}): void {
+  // Only show toast if modal is actually closed (user didn't just open it again)
+  if (props.visible) {
+    return
+  }
+
+  if (job.status === 'completed' || job.status === 'partial') {
+    toast.add({
+      severity: job.status === 'completed' ? 'success' : 'warn',
+      summary: 'Statement Uploaded',
+      detail:
+        job.status === 'partial'
+          ? 'Statement imported with partial data'
+          : 'Your statement is ready to view',
+      life: 5000,
+      group: 'upload-complete',
+      data: { statementId: job.statement_id }
+    } as ExtendedToastMessageOptions)
+  } else if (job.status === 'failed') {
+    toast.add({
+      severity: 'error',
+      summary: 'Upload Failed',
+      detail: job.error_message || 'Failed to process statement',
+      life: 8000,
+      group: 'upload-complete'
+    })
+  }
 }
 
 /**
@@ -201,8 +257,16 @@ async function viewDuplicateStatement(): Promise<void> {
   try {
     const job = await pollJobStatus(duplicateJobId.value)
     if (job.statement_id) {
+      // Job is complete, navigate to the statement
       emit('upload-complete', job.statement_id)
       closeModal()
+    } else {
+      // Job is still processing, show feedback
+      if (job.status === 'processing' || job.status === 'pending') {
+        uploadErrorMessage.value = 'The duplicate statement is still being processed. Please try again in a few moments.'
+      } else {
+        uploadErrorMessage.value = 'Unable to view the existing statement'
+      }
     }
   } catch {
     // If we can't fetch the duplicate job, update error message
@@ -250,6 +314,11 @@ onMounted(() => {
   if (props.visible) {
     fetchCards()
   }
+})
+
+// Cleanup polling on unmount
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
