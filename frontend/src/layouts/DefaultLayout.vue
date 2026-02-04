@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import type { MenuItem } from 'primevue/menuitem'
-import Button from 'primevue/button'
-import Avatar from 'primevue/avatar'
-import Menu from 'primevue/menu'
+ import { ref, computed, onMounted, onUnmounted } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { useAuthStore } from '@/stores/auth'
+ import type { MenuItem } from 'primevue/menuitem'
+ import Button from 'primevue/button'
+ import Avatar from 'primevue/avatar'
+ import Menu from 'primevue/menu'
+ import Toast from 'primevue/toast'
 
-import logoLight from '@/assets/logo.svg'
-import logoDark from '@/assets/logo-dark.svg'
-import UploadStatementModal from '@/components/UploadStatementModal.vue'
+ import logoLight from '@/assets/logo.svg'
+ import logoDark from '@/assets/logo-dark.svg'
+ import UploadStatementModal from '@/components/UploadStatementModal.vue'
 
 // Default layout for authenticated users
 const router = useRouter()
@@ -93,6 +94,11 @@ const handleUploadComplete = (statementId: string) => {
   router.push(`/statements/${statementId}`)
 }
 
+// Navigate to statement from toast
+const navigateToStatement = (statementId: string) => {
+  router.push(`/statements/${statementId}`)
+}
+
 // Dark mode toggle
 const toggleDarkMode = () => {
   document.documentElement.classList.toggle('my-app-dark')
@@ -141,6 +147,39 @@ const toggleDarkMode = () => {
     <main class="content">
       <router-view></router-view>
     </main>
+
+    <!-- Custom toast for upload completion -->
+    <Toast group="upload-complete" position="top-right">
+      <template #message="slotProps">
+        <div class="upload-toast">
+          <div class="upload-toast__content">
+            <i
+              :class="
+                slotProps.message.severity === 'success'
+                  ? 'pi pi-check-circle'
+                  : slotProps.message.severity === 'warn'
+                    ? 'pi pi-exclamation-triangle'
+                    : 'pi pi-times-circle'
+              "
+            ></i>
+            <div>
+              <div class="upload-toast__summary">
+                {{ slotProps.message.summary }}
+              </div>
+              <div class="upload-toast__detail">
+                {{ slotProps.message.detail }}
+              </div>
+            </div>
+          </div>
+          <Button
+            v-if="slotProps.message.data?.statementId"
+            label="View"
+            size="small"
+            @click="navigateToStatement(slotProps.message.data.statementId)"
+          />
+        </div>
+      </template>
+    </Toast>
 
     <!-- Upload Statement Modal -->
     <UploadStatementModal
@@ -236,6 +275,27 @@ const toggleDarkMode = () => {
   flex-grow: 1;
   padding: 2rem;
   max-width: 100%;
+}
+
+.upload-toast {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload-toast__content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.upload-toast__summary {
+  font-weight: 600;
+}
+
+.upload-toast__detail {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
 }
 
 /* Responsive design */

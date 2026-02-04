@@ -190,9 +190,9 @@ export function useStatementUpload() {
           stopPolling()
           errorMessage.value = 'Processing is taking longer than expected'
         }
-      } catch (error) {
+      } catch {
         // Silently continue polling on network errors
-        console.error('Polling error:', error)
+        // Transient errors are expected and shouldn't interrupt polling
 
         if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
           stopPolling()
