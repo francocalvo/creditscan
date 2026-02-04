@@ -84,7 +84,9 @@ const userInitials = computed(() => {
 const showUploadModal = ref(false)
 
 // Upload statement action - open modal instead of navigating
-const handleUploadStatement = () => {
+const handleUploadStatement = (event?: MouseEvent) => {
+  event?.preventDefault()
+  event?.stopPropagation()
   showUploadModal.value = true
 }
 
@@ -120,6 +122,7 @@ const toggleDarkMode = () => {
           <Button
             label="Upload Statement"
             icon="pi pi-upload"
+            type="button"
             @click="handleUploadStatement"
             class="upload-button"
           />

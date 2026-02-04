@@ -89,12 +89,9 @@ const isNextDisabled = computed(() => selectedCardId.value === null)
 
 /**
  * Determine if modal can be closed.
- * Blocks close only during initial upload request (before job is accepted).
- * Allows close during processing (background polling handles completion).
+ * This modal should remain dismissible (X button + backdrop) during processing.
  */
-const canClose = computed(() => {
-  return !isUploading.value
-})
+const canClose = computed(() => true)
 
 /**
  * Processing status message based on job status.
@@ -202,8 +199,10 @@ async function handleUpload(): Promise<void> {
   try {
     const job = await uploadStatement(selectedCardId.value, selectedFile.value)
 
-    // Start background polling for job status updates
-    startBackgroundPolling(job.id, handleJobComplete)
+    // Start polling for job status updates.
+    // If the user already closed the modal while the upload request was in-flight,
+    // keep polling in the background and notify via toast on completion.
+    startBackgroundPolling(job.id, props.visible ? handleJobComplete : handleBackgroundComplete)
   } catch (error) {
     // Detect network errors (TypeError from fetch usually indicates network failure)
     if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -348,6 +347,7 @@ onUnmounted(() => {
     header="Upload Statement"
     :style="{ width: '500px' }"
     :closable="canClose"
+    :dismissableMask="canClose"
     :draggable="false"
   >
     <div class="upload-modal-content">

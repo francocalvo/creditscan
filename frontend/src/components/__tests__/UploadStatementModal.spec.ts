@@ -66,17 +66,20 @@ vi.mock('primevue/usetoast', () => ({
 const DialogStub = {
   name: 'Dialog',
   template: `
-    <div v-if="visible" class="p-dialog">
-      <div class="p-dialog-header">
-        <span>{{ header }}</span>
-        <button v-if="closable" class="p-dialog-header-close" @click="$emit('update:visible', false)">X</button>
-      </div>
-      <div class="p-dialog-content">
-        <slot />
+    <div v-if="visible">
+      <div class="p-dialog-mask" @click="dismissableMask && $emit('update:visible', false)"></div>
+      <div class="p-dialog">
+        <div class="p-dialog-header">
+          <span>{{ header }}</span>
+          <button v-if="closable" class="p-dialog-header-close" @click="$emit('update:visible', false)">X</button>
+        </div>
+        <div class="p-dialog-content">
+          <slot />
+        </div>
       </div>
     </div>
   `,
-  props: ['visible', 'modal', 'header', 'closable', 'draggable'],
+  props: ['visible', 'modal', 'header', 'closable', 'dismissableMask', 'draggable'],
   emits: ['update:visible']
 }
 
@@ -184,6 +187,15 @@ describe('UploadStatementModal', () => {
       const wrapper = createWrapper({ visible: true })
 
       await wrapper.find('.p-dialog-header-close').trigger('click')
+
+      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      expect(wrapper.emitted('update:visible')![0]).toEqual([false])
+    })
+
+    it('modal closes when backdrop clicked', async () => {
+      const wrapper = createWrapper({ visible: true })
+
+      await wrapper.find('.p-dialog-mask').trigger('click')
 
       expect(wrapper.emitted('update:visible')).toBeTruthy()
       expect(wrapper.emitted('update:visible')![0]).toEqual([false])
@@ -444,6 +456,30 @@ describe('UploadStatementModal', () => {
 
       // Should advance to processing step
       expect(wrapper.find('.processing-step').exists()).toBe(true)
+    })
+
+    it('processing step is dismissible (X + backdrop) while upload request is in-flight', async () => {
+      const wrapper = createWrapper()
+      await navigateToUploadStep(wrapper)
+
+      const fileDropZone = wrapper.findComponent({ name: 'FileDropZone' })
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+      await fileDropZone.vm.$emit('update:modelValue', mockFile)
+
+      // Keep the upload request pending so we can assert UI state immediately after switching to "processing"
+      mockUploadStatement.mockImplementation(() => new Promise(() => {}))
+
+      const uploadButton = wrapper.findAll('button').find((b) => b.text() === 'Upload')
+      await uploadButton!.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.processing-step').exists()).toBe(true)
+      expect(wrapper.find('.p-dialog-header-close').exists()).toBe(true)
+
+      await wrapper.find('.p-dialog-mask').trigger('click')
+
+      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      expect(wrapper.emitted('update:visible')![0]).toEqual([false])
     })
 
     it('selected file persists when going back and forward', async () => {
@@ -798,14 +834,13 @@ describe('UploadStatementModal', () => {
       expect(dialog.props('closable')).toBe(true)
     })
 
-    it('modal is not closable during initial upload', async () => {
+    it('modal is closable during initial upload request', async () => {
       mockIsUploading.value = true
       const wrapper = createWrapper()
       await wrapper.vm.$nextTick()
       const dialog = wrapper.findComponent({ name: 'Dialog' })
 
-      // canClose should be false when uploading
-      expect(dialog.props('closable')).toBe(false)
+      expect(dialog.props('closable')).toBe(true)
     })
 
     it('modal is closable during processing (after job is accepted)', async () => {
