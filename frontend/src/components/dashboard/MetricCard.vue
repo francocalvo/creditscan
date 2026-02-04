@@ -8,7 +8,7 @@ interface Props {
   subtitle?: string
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 </script>
 
 <template>
@@ -17,9 +17,9 @@ const props = defineProps<Props>()
       <span class="metric-title">{{ title }}</span>
       <i v-if="icon" :class="['metric-icon', icon]"></i>
     </div>
-    
+
     <div class="metric-value">{{ value }}</div>
-    
+
     <div v-if="change || subtitle" class="metric-footer">
       <span v-if="change" :class="['metric-change', `change-${changeType}`]">
         {{ change }}
@@ -97,4 +97,3 @@ const props = defineProps<Props>()
   color: #6b7280;
 }
 </style>
-

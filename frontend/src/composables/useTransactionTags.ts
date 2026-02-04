@@ -7,6 +7,7 @@
  */
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
+import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 export interface TransactionTagMapping {
   transaction_id: string
@@ -36,7 +37,12 @@ export function useTransactionTags() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'GET',
+              url: '/api/v1/transaction-tags',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       // Create fetch promises for each transaction ID
       // Each promise returns both the transaction ID and the response for proper mapping

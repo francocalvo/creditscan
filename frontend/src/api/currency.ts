@@ -7,15 +7,16 @@
  */
 
 import { OpenAPI } from './core/OpenAPI'
+import type { ApiRequestOptions } from './core/ApiRequestOptions'
 
 /**
  * Request model for converting an amount from one currency to another.
  */
 export interface CurrencyConversionRequest {
-    amount: number | string
-    from_currency: string
-    to_currency: string
-    date?: string
+  amount: number | string
+  from_currency: string
+  to_currency: string
+  date?: string
 }
 
 /**
@@ -25,25 +26,25 @@ export interface CurrencyConversionRequest {
  * and should be parsed to numbers for frontend use.
  */
 export interface CurrencyConversionResponse {
-    original_amount: number | string
-    converted_amount: number | string
-    from_currency: string
-    to_currency: string
-    rate: number | string
+  original_amount: number | string
+  converted_amount: number | string
+  from_currency: string
+  to_currency: string
+  rate: number | string
 }
 
 /**
  * Request model for converting multiple amounts.
  */
 export interface BatchCurrencyConversionRequest {
-    conversions: CurrencyConversionRequest[]
+  conversions: CurrencyConversionRequest[]
 }
 
 /**
  * Response model for batch currency conversion.
  */
 export interface BatchCurrencyConversionResponse {
-    results: CurrencyConversionResponse[]
+  results: CurrencyConversionResponse[]
 }
 
 /**
@@ -64,11 +65,11 @@ export interface BatchCurrencyConversionResponse {
  * ```
  */
 export function parseDecimal(value: number | string): number {
-    if (typeof value === 'number') {
-        return value
-    }
-    const parsed = parseFloat(value)
-    return isNaN(parsed) ? 0 : parsed
+  if (typeof value === 'number') {
+    return value
+  }
+  const parsed = parseFloat(value)
+  return isNaN(parsed) ? 0 : parsed
 }
 
 /**
@@ -92,38 +93,42 @@ export function parseDecimal(value: number | string): number {
  * ```
  */
 export async function convertCurrency(
-    request: CurrencyConversionRequest
+  request: CurrencyConversionRequest,
 ): Promise<CurrencyConversionResponse> {
-    const token =
-        typeof OpenAPI.TOKEN === 'function'
-            ? await OpenAPI.TOKEN({} as any)
-            : OpenAPI.TOKEN || ''
-    const url = `${OpenAPI.BASE}/api/v1/currency/convert`
+  const token =
+    typeof OpenAPI.TOKEN === 'function'
+      ? await OpenAPI.TOKEN({
+          method: 'POST',
+          url: '/api/v1/currency/convert',
+          body: request,
+        } as ApiRequestOptions<string>)
+      : OpenAPI.TOKEN || ''
+  const url = `${OpenAPI.BASE}/api/v1/currency/convert`
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-    })
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
 
-    if (!response.ok) {
-        let errorMessage = `Failed to convert currency: ${response.statusText}`
-        try {
-            const errorData = await response.json()
-            if (errorData.detail) {
-                errorMessage = errorData.detail
-            }
-        } catch {
-            // JSON parsing failed, use default error message
-        }
-        throw new Error(errorMessage)
+  if (!response.ok) {
+    let errorMessage = `Failed to convert currency: ${response.statusText}`
+    try {
+      const errorData = await response.json()
+      if (errorData.detail) {
+        errorMessage = errorData.detail
+      }
+    } catch {
+      // JSON parsing failed, use default error message
     }
+    throw new Error(errorMessage)
+  }
 
-    const data: CurrencyConversionResponse = await response.json()
-    return data
+  const data: CurrencyConversionResponse = await response.json()
+  return data
 }
 
 /**
@@ -151,36 +156,40 @@ export async function convertCurrency(
  * ```
  */
 export async function convertCurrencyBatch(
-    request: BatchCurrencyConversionRequest
+  request: BatchCurrencyConversionRequest,
 ): Promise<BatchCurrencyConversionResponse> {
-    const token =
-        typeof OpenAPI.TOKEN === 'function'
-            ? await OpenAPI.TOKEN({} as any)
-            : OpenAPI.TOKEN || ''
-    const url = `${OpenAPI.BASE}/api/v1/currency/convert/batch`
+  const token =
+    typeof OpenAPI.TOKEN === 'function'
+      ? await OpenAPI.TOKEN({
+          method: 'POST',
+          url: '/api/v1/currency/convert/batch',
+          body: request,
+        } as ApiRequestOptions<string>)
+      : OpenAPI.TOKEN || ''
+  const url = `${OpenAPI.BASE}/api/v1/currency/convert/batch`
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-    })
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
 
-    if (!response.ok) {
-        let errorMessage = `Failed to batch convert currency: ${response.statusText}`
-        try {
-            const errorData = await response.json()
-            if (errorData.detail) {
-                errorMessage = errorData.detail
-            }
-        } catch {
-            // JSON parsing failed, use default error message
-        }
-        throw new Error(errorMessage)
+  if (!response.ok) {
+    let errorMessage = `Failed to batch convert currency: ${response.statusText}`
+    try {
+      const errorData = await response.json()
+      if (errorData.detail) {
+        errorMessage = errorData.detail
+      }
+    } catch {
+      // JSON parsing failed, use default error message
     }
+    throw new Error(errorMessage)
+  }
 
-    const data: BatchCurrencyConversionResponse = await response.json()
-    return data
+  const data: BatchCurrencyConversionResponse = await response.json()
+  return data
 }

@@ -6,6 +6,7 @@
  */
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
+import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 export interface StatementTransaction {
   id: string
@@ -62,14 +63,19 @@ export function useStatementTransactions() {
    */
   const fetchTransactions = async (
     statementId: string,
-    options?: { skip?: number; limit?: number }
+    options?: { skip?: number; limit?: number },
   ) => {
     isLoading.value = true
     error.value = null
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'GET',
+              url: '/api/v1/transactions',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       const queryParams = new URLSearchParams()
       queryParams.append('statement_id', statementId)
@@ -127,7 +133,12 @@ export function useStatementTransactions() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'PATCH',
+              url: `/api/v1/transactions/${transactionId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/${transactionId}`
 
@@ -172,7 +183,12 @@ export function useStatementTransactions() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'POST',
+              url: '/api/v1/transactions/',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/`
 
@@ -214,7 +230,12 @@ export function useStatementTransactions() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'DELETE',
+              url: `/api/v1/transactions/${transactionId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/${transactionId}`
 

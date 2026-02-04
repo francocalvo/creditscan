@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { OpenAPI, UsersService } from '@/api'
 import { useCreditCards, type CreditCard } from './useCreditCards'
 import { parseDateString } from '@/utils/date'
+import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 /**
  * Extended user type with preferred_currency field.
@@ -139,8 +140,12 @@ export function useStatements() {
         const statusDiff = statusRank[a.status] - statusRank[b.status]
         if (statusDiff !== 0) return statusDiff
 
-        const aDueTime = a.due_date ? parseDateString(a.due_date).getTime() : Number.NEGATIVE_INFINITY
-        const bDueTime = b.due_date ? parseDateString(b.due_date).getTime() : Number.NEGATIVE_INFINITY
+        const aDueTime = a.due_date
+          ? parseDateString(a.due_date).getTime()
+          : Number.NEGATIVE_INFINITY
+        const bDueTime = b.due_date
+          ? parseDateString(b.due_date).getTime()
+          : Number.NEGATIVE_INFINITY
         if (aDueTime !== bDueTime) return bDueTime - aDueTime
 
         return a.id.localeCompare(b.id)
@@ -158,7 +163,12 @@ export function useStatements() {
 
       // Then fetch statements
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'GET',
+              url: '/api/v1/card-statements',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
       const queryParams = new URLSearchParams()
 
       if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString())
@@ -237,7 +247,12 @@ export function useStatements() {
     try {
       await fetchPreferredCurrency()
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'GET',
+              url: '/api/v1/users/me/balance',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
       const url = `${OpenAPI.BASE}/api/v1/users/me/balance`
 
       const response = await fetch(url, {
@@ -271,7 +286,12 @@ export function useStatements() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'POST',
+              url: '/api/v1/payments/',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
       const { useAuthStore } = await import('@/stores/auth')
       const authStore = useAuthStore()
 
@@ -325,13 +345,18 @@ export function useStatements() {
       current_balance: number | null
       minimum_payment: number | null
       is_fully_paid: boolean
-    }>
+    }>,
   ) => {
     error.value = null
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'PATCH',
+              url: `/api/v1/card-statements/${statementId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
 

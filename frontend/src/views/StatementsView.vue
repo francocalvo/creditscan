@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useStatements } from '@/composables/useStatements'
-import { getCardDisplayName } from '@/composables/useCreditCards'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
@@ -15,8 +14,8 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 
-const { 
-  statementsWithCard, 
+const {
+  statementsWithCard,
   cards,
   balance,
   isLoading,
@@ -24,9 +23,9 @@ const {
   fetchStatements,
   fetchBalance,
   createPayment,
-  formatCurrency, 
-  formatDate, 
-  formatPeriod 
+  formatCurrency,
+  formatDate,
+  formatPeriod,
 } = useStatements()
 
 const {
@@ -34,7 +33,7 @@ const {
   isLoading: isTransactionsLoading,
   fetchTransactions,
   formatCurrency: formatTransactionCurrency,
-  formatDate: formatTransactionDate
+  formatDate: formatTransactionDate,
 } = useTransactions()
 
 const {
@@ -49,16 +48,16 @@ const {
   spendingByMonth,
   spendingByTag,
   topMerchants,
-  formatCurrency: formatAnalyticsCurrency
+  formatCurrency: formatAnalyticsCurrency,
 } = useAnalytics()
 
 const enrichedTransactions = computed(() => {
-  return transactions.value.map(txn => {
-    const statement = statementsWithCard.value.find(s => s.id === txn.statement_id)
+  return transactions.value.map((txn) => {
+    const statement = statementsWithCard.value.find((s) => s.id === txn.statement_id)
     return {
       ...txn,
       card: statement?.card,
-      status: statement?.status || 'pending'
+      status: statement?.status || 'pending',
     }
   })
 })
@@ -71,16 +70,16 @@ const monthlyChartData = computed(() => {
   if (!spendingByMonth.value || spendingByMonth.value.length === 0) {
     return {
       labels: [],
-      datasets: []
+      datasets: [],
     }
   }
 
   return {
-    labels: spendingByMonth.value.map(item => item.month),
+    labels: spendingByMonth.value.map((item) => item.month),
     datasets: [
       {
         label: 'Monthly Spending',
-        data: spendingByMonth.value.map(item => item.amount),
+        data: spendingByMonth.value.map((item) => item.amount),
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
@@ -90,9 +89,9 @@ const monthlyChartData = computed(() => {
         pointHoverRadius: 6,
         pointBackgroundColor: '#3b82f6',
         pointBorderColor: '#ffffff',
-        pointBorderWidth: 2
-      }
-    ]
+        pointBorderWidth: 2,
+      },
+    ],
   }
 })
 
@@ -105,7 +104,7 @@ const monthlyChartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      display: false
+      display: false,
     },
     tooltip: {
       backgroundColor: '#1f2937',
@@ -115,40 +114,40 @@ const monthlyChartOptions = {
       cornerRadius: 8,
       displayColors: false,
       callbacks: {
-        label: (context: any) => {
+        label: (context: unknown) => {
           const value = context.parsed.y
           return ` ${formatAnalyticsCurrency(value)}`
-        }
-      }
-    }
+        },
+      },
+    },
   },
   scales: {
     x: {
       grid: {
-        display: false
+        display: false,
       },
       ticks: {
         color: '#6b7280',
         font: {
-          size: 12
-        }
-      }
+          size: 12,
+        },
+      },
     },
     y: {
       beginAtZero: true,
       grid: {
         color: '#f3f4f6',
-        borderDash: [5, 5]
+        borderDash: [5, 5],
       },
       ticks: {
         color: '#6b7280',
         font: {
-          size: 12
+          size: 12,
         },
-        callback: (value: any) => formatAnalyticsCurrency(value)
-      }
-    }
-  }
+        callback: (value: unknown) => formatAnalyticsCurrency(value),
+      },
+    },
+  },
 }
 
 /**
@@ -168,7 +167,7 @@ const tagChartColors = [
   '#6366f1', // indigo
   '#14b8a6', // teal
   '#eab308', // yellow
-  '#a855f7'  // purple
+  '#a855f7', // purple
 ]
 
 /**
@@ -180,22 +179,22 @@ const tagChartData = computed(() => {
   if (!spendingByTag.value || spendingByTag.value.length === 0) {
     return {
       labels: [],
-      datasets: []
+      datasets: [],
     }
   }
 
   return {
-    labels: spendingByTag.value.map(item => item.tag),
+    labels: spendingByTag.value.map((item) => item.tag),
     datasets: [
       {
-        data: spendingByTag.value.map(item => item.amount),
-        backgroundColor: spendingByTag.value.map((_, index) =>
-          tagChartColors[index % tagChartColors.length]
+        data: spendingByTag.value.map((item) => item.amount),
+        backgroundColor: spendingByTag.value.map(
+          (_, index) => tagChartColors[index % tagChartColors.length],
         ),
         borderWidth: 2,
-        borderColor: '#ffffff'
-      }
-    ]
+        borderColor: '#ffffff',
+      },
+    ],
   }
 })
 
@@ -213,12 +212,12 @@ const tagChartOptions = {
       labels: {
         color: '#374151',
         font: {
-          size: 12
+          size: 12,
         },
         padding: 15,
         usePointStyle: true,
-        pointStyle: 'circle'
-      }
+        pointStyle: 'circle',
+      },
     },
     tooltip: {
       backgroundColor: '#1f2937',
@@ -228,16 +227,16 @@ const tagChartOptions = {
       cornerRadius: 8,
       displayColors: true,
       callbacks: {
-        label: (context: any) => {
+        label: (context: unknown) => {
           const dataIndex = context.dataIndex
           const item = spendingByTag.value[dataIndex]
           if (!item) return ''
           const percentage = item.percentage.toFixed(1)
           return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 }
 
 // Computed options that respond to screen size
@@ -258,9 +257,13 @@ onMounted(() => {
 // Adjust pie chart legend position based on screen size
 // Note: We use type assertion here because Chart.js position types don't
 // allow dynamic switching between 'right' and 'bottom' at runtime
-watch(isMobile, (mobile) => {
-  tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as any
-}, { immediate: true })
+watch(
+  isMobile,
+  (mobile) => {
+    tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as 'bottom' | 'right'
+  },
+  { immediate: true },
+)
 
 const toast = useToast()
 
@@ -272,7 +275,7 @@ const filterStatus = ref('all')
 const showPaymentModal = ref(false)
 const showDetailModal = ref(false)
 const detailStartInEditMode = ref(false)
-const selectedStatement = ref<typeof statementsWithCard.value[0] | null>(null)
+const selectedStatement = ref<(typeof statementsWithCard.value)[0] | null>(null)
 const isProcessingPayment = ref(false)
 const isTransitioningModals = ref(false)
 
@@ -304,17 +307,21 @@ const handleAnalyticsRefresh = async () => {
   }
 }
 
-watch(activeTab, async (newTab) => {
-  if (newTab !== 'analytics') return
-  if (analyticsInitialized.value) return
-  if (isAnalyticsLoading.value) return
+watch(
+  activeTab,
+  async (newTab) => {
+    if (newTab !== 'analytics') return
+    if (analyticsInitialized.value) return
+    if (isAnalyticsLoading.value) return
 
-  try {
-    await fetchAnalytics()
-  } finally {
-    analyticsInitialized.value = true
-  }
-}, { immediate: true })
+    try {
+      await fetchAnalytics()
+    } finally {
+      analyticsInitialized.value = true
+    }
+  },
+  { immediate: true },
+)
 
 // Date filter presets for analytics
 const datePresets = [
@@ -323,14 +330,14 @@ const datePresets = [
   { label: 'Last 3 Months', value: '3months' },
   { label: 'Last 6 Months', value: '6months' },
   { label: 'Last Year', value: 'year' },
-  { label: 'All Time', value: 'all' }
+  { label: 'All Time', value: 'all' },
 ] as const
 
 const tabs = [
   { id: 'statements', label: 'Statements' },
   { id: 'cards', label: 'Cards' },
   { id: 'analytics', label: 'Analytics' },
-  { id: 'transactions', label: 'Transactions' }
+  { id: 'transactions', label: 'Transactions' },
 ]
 
 // Calculate metrics from statements and balance endpoint
@@ -347,7 +354,7 @@ const activeCards = computed(() => {
 })
 
 const pendingStatements = computed(() => {
-  return statementsWithCard.value.filter(s => s.status === 'pending').length
+  return statementsWithCard.value.filter((s) => s.status === 'pending').length
 })
 
 const creditUtilization = computed(() => {
@@ -361,10 +368,10 @@ const filteredStatements = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(s => {
+    filtered = filtered.filter((s) => {
       if (!s.card) return false
       return (
-        s.card.last4.includes(query) || 
+        s.card.last4.includes(query) ||
         s.card.bank.toLowerCase().includes(query) ||
         s.card.brand.toLowerCase().includes(query)
       )
@@ -372,7 +379,7 @@ const filteredStatements = computed(() => {
   }
 
   if (filterStatus.value !== 'all') {
-    filtered = filtered.filter(s => s.status === filterStatus.value)
+    filtered = filtered.filter((s) => s.status === filterStatus.value)
   }
 
   return filtered
@@ -384,7 +391,7 @@ onMounted(() => {
   fetchTransactions()
 })
 
-const getStatementCardDisplay = (statement: typeof statementsWithCard.value[0]) => {
+const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]) => {
   if (!statement.card) return 'Unknown Card'
   const brandName = statement.card.brand.charAt(0).toUpperCase() + statement.card.brand.slice(1)
   return `${statement.card.bank} ${brandName} ••${statement.card.last4}`
@@ -396,43 +403,43 @@ const getCardBrandIcon = (brand?: string): string => {
     mastercard: 'pi pi-credit-card',
     amex: 'pi pi-credit-card',
     discover: 'pi pi-credit-card',
-    other: 'pi pi-credit-card'
+    other: 'pi pi-credit-card',
   }
   return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
 // Get statements count per card
 const getCardStatementsCount = (cardId: string) => {
-  return statementsWithCard.value.filter(s => s.card_id === cardId).length
+  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
 }
 
 // Get latest balance for a card
 const getCardLatestBalance = (cardId: string) => {
   const cardStatements = statementsWithCard.value
-    .filter(s => s.card_id === cardId)
+    .filter((s) => s.card_id === cardId)
     .sort((a, b) => {
       if (!a.period_end || !b.period_end) return 0
       return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
-  
+
   return cardStatements.length > 0 ? cardStatements[0].current_balance : null
 }
 
 // Handle payment button click
-const handlePayClick = (statement: typeof statementsWithCard.value[0]) => {
+const handlePayClick = (statement: (typeof statementsWithCard.value)[0]) => {
   selectedStatement.value = statement
   showPaymentModal.value = true
 }
 
 // Handle View Details button click
-const handleViewDetails = (statement: typeof statementsWithCard.value[0]) => {
+const handleViewDetails = (statement: (typeof statementsWithCard.value)[0]) => {
   selectedStatement.value = statement
   detailStartInEditMode.value = false
   showDetailModal.value = true
 }
 
 // Handle Pay button click from detail modal
-const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
+const handlePayFromDetail = (statement: (typeof statementsWithCard.value)[0]) => {
   if (isTransitioningModals.value) return
   isTransitioningModals.value = true
   showDetailModal.value = false
@@ -475,7 +482,7 @@ const handlePaymentSubmit = async (paymentData: {
       severity: 'success',
       summary: 'Payment Successful',
       detail: `Payment of ${formatCurrency(paymentData.amount)} has been recorded.`,
-      life: 3000
+      life: 3000,
     })
     showPaymentModal.value = false
     selectedStatement.value = null
@@ -483,8 +490,9 @@ const handlePaymentSubmit = async (paymentData: {
     toast.add({
       severity: 'error',
       summary: 'Payment Failed',
-      detail: error instanceof Error ? error.message : 'An error occurred while processing the payment.',
-      life: 5000
+      detail:
+        error instanceof Error ? error.message : 'An error occurred while processing the payment.',
+      life: 5000,
     })
   } finally {
     isProcessingPayment.value = false
@@ -502,21 +510,21 @@ const handlePaymentSubmit = async (paymentData: {
         subtitle="All unpaid statements"
         icon="pi pi-dollar"
       />
-      
+
       <MetricCard
         title="Monthly Balance"
         :value="monthlyBalance"
         subtitle="Excluding future installments"
         icon="pi pi-chart-bar"
       />
-      
+
       <MetricCard
         title="Active Cards"
         :value="activeCards.toString()"
         :subtitle="`${pendingStatements} statements pending`"
         icon="pi pi-credit-card"
       />
-      
+
       <MetricCard
         title="Credit Utilization"
         :value="creditUtilization"
@@ -526,11 +534,7 @@ const handlePaymentSubmit = async (paymentData: {
     </div>
 
     <!-- Tab Navigation -->
-    <TabNavigation 
-      :tabs="tabs" 
-      :activeTab="activeTab"
-      @update:activeTab="activeTab = $event"
-    />
+    <TabNavigation :tabs="tabs" :activeTab="activeTab" @update:activeTab="activeTab = $event" />
 
     <!-- Statements Section -->
     <div v-if="activeTab === 'statements'" class="statements-section">
@@ -545,14 +549,14 @@ const handlePaymentSubmit = async (paymentData: {
       <div class="controls">
         <div class="search-box">
           <i class="pi pi-search search-icon"></i>
-          <input 
+          <input
             v-model="searchQuery"
-            type="text" 
+            type="text"
             placeholder="Search statements..."
             class="search-input"
           />
         </div>
-        
+
         <div class="filter-controls">
           <button class="filter-button">
             <i class="pi pi-cog"></i>
@@ -598,14 +602,16 @@ const handlePaymentSubmit = async (paymentData: {
               </td>
               <td>
                 <div class="action-buttons">
-                  <button 
-                    class="action-button" 
+                  <button
+                    class="action-button"
                     @click="handlePayClick(statement)"
                     :disabled="statement.is_fully_paid"
                   >
                     Pay
                   </button>
-                  <button class="action-button" @click="handleViewDetails(statement)">View Details</button>
+                  <button class="action-button" @click="handleViewDetails(statement)">
+                    View Details
+                  </button>
                 </div>
               </td>
             </tr>
@@ -633,17 +639,16 @@ const handlePaymentSubmit = async (paymentData: {
       </div>
 
       <div v-else-if="cards.length === 0" class="empty-state">
-        <i class="pi pi-credit-card" style="font-size: 64px; color: #d1d5db; margin-bottom: 16px;"></i>
-        <h3 style="margin: 0 0 8px 0;">No cards added yet</h3>
-        <p style="margin: 0; color: #6b7280;">Add your first credit card to get started</p>
+        <i
+          class="pi pi-credit-card"
+          style="font-size: 64px; color: #d1d5db; margin-bottom: 16px"
+        ></i>
+        <h3 style="margin: 0 0 8px 0">No cards added yet</h3>
+        <p style="margin: 0; color: #6b7280">Add your first credit card to get started</p>
       </div>
 
       <div v-else class="cards-grid">
-        <div 
-          v-for="card in cards" 
-          :key="card.id"
-          class="card-item-large"
-        >
+        <div v-for="card in cards" :key="card.id" class="card-item-large">
           <div class="card-header-section">
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
@@ -652,11 +657,9 @@ const handlePaymentSubmit = async (paymentData: {
               <i class="pi pi-ellipsis-v"></i>
             </div>
           </div>
-          
+
           <div class="card-body">
-            <div class="card-number">
-              •••• •••• •••• {{ card.last4 }}
-            </div>
+            <div class="card-number">•••• •••• •••• {{ card.last4 }}</div>
             <div class="card-details-row">
               <div class="card-detail">
                 <div class="detail-label">Bank</div>
@@ -785,11 +788,7 @@ const handlePaymentSubmit = async (paymentData: {
             <div v-else class="chart-container">
               <h4 class="chart-title">Monthly Spending</h4>
               <div class="chart-wrapper">
-                <Chart
-                  type="line"
-                  :data="monthlyChartData"
-                  :options="monthlyChartOptions"
-                />
+                <Chart type="line" :data="monthlyChartData" :options="monthlyChartOptions" />
               </div>
             </div>
           </div>
@@ -807,11 +806,7 @@ const handlePaymentSubmit = async (paymentData: {
             <div class="chart-container">
               <h4>Spending by Tag</h4>
               <div class="chart-wrapper">
-                <Chart
-                  type="pie"
-                  :data="tagChartData"
-                  :options="tagChartOptions"
-                />
+                <Chart type="pie" :data="tagChartData" :options="tagChartOptions" />
               </div>
             </div>
           </div>
@@ -834,7 +829,8 @@ const handlePaymentSubmit = async (paymentData: {
                   <div class="merchant-info">
                     <div class="merchant-name">{{ merchant.payee }}</div>
                     <div class="merchant-count">
-                      {{ merchant.transactionCount }} {{ merchant.transactionCount === 1 ? 'transaction' : 'transactions' }}
+                      {{ merchant.transactionCount }}
+                      {{ merchant.transactionCount === 1 ? 'transaction' : 'transactions' }}
                     </div>
                   </div>
                   <div class="merchant-amount">
@@ -894,7 +890,9 @@ const handlePaymentSubmit = async (paymentData: {
                 </span>
                 <span v-else>-</span>
               </td>
-              <td class="balance-cell">{{ formatTransactionCurrency(transaction.amount, transaction.currency) }}</td>
+              <td class="balance-cell">
+                {{ formatTransactionCurrency(transaction.amount, transaction.currency) }}
+              </td>
               <td>
                 <StatusBadge :status="transaction.status" />
               </td>
@@ -913,7 +911,11 @@ const handlePaymentSubmit = async (paymentData: {
       v-if="selectedStatement"
       v-model:visible="showPaymentModal"
       :statement-id="selectedStatement.id"
-      :current-balance="typeof selectedStatement.current_balance === 'string' ? parseFloat(selectedStatement.current_balance) : selectedStatement.current_balance"
+      :current-balance="
+        typeof selectedStatement.current_balance === 'string'
+          ? parseFloat(selectedStatement.current_balance)
+          : selectedStatement.current_balance
+      "
       :statement-card="getStatementCardDisplay(selectedStatement)"
       :is-submitting="isProcessingPayment"
       @submit="handlePaymentSubmit"
@@ -1166,7 +1168,9 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */
@@ -1193,7 +1197,9 @@ const handlePaymentSubmit = async (paymentData: {
   padding: 24px;
   color: white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   cursor: pointer;
   min-height: 240px;
   display: flex;
