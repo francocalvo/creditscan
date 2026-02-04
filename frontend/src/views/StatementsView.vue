@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useStatements } from '@/composables/useStatements'
 import { getCardDisplayName } from '@/composables/useCreditCards'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
@@ -202,6 +202,7 @@ const tagChartData = computed(() => {
 /**
  * Chart options for spending by tag pie chart.
  * Configured for responsive layout with legend on the right side.
+ * Legend moves to bottom on mobile screens for better space utilization.
  */
 const tagChartOptions = {
   responsive: true,
@@ -239,6 +240,28 @@ const tagChartOptions = {
   }
 }
 
+// Computed options that respond to screen size
+const isMobile = ref(false)
+
+// Check screen size on mount and resize
+onMounted(() => {
+  const checkScreenSize = () => {
+    isMobile.value = window.innerWidth <= 768
+  }
+  checkScreenSize()
+  window.addEventListener('resize', checkScreenSize)
+  onUnmounted(() => {
+    window.removeEventListener('resize', checkScreenSize)
+  })
+})
+
+// Adjust pie chart legend position based on screen size
+// Note: We use type assertion here because Chart.js position types don't
+// allow dynamic switching between 'right' and 'bottom' at runtime
+watch(isMobile, (mobile) => {
+  tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as any
+}, { immediate: true })
+
 const toast = useToast()
 
 const activeTab = ref('statements')
@@ -266,15 +289,30 @@ watch(statementsWithCard, (updatedStatements) => {
 })
 
 // Analytics composable
-const hasFetchedAnalytics = ref(false)
+const analyticsInitialized = ref(false)
 
 // Check if there are no transactions for the current filter
 const hasNoTransactions = computed(() => filteredTransactions.value.length === 0)
 
-watch(activeTab, (newTab) => {
-  if (newTab === 'analytics' && !hasFetchedAnalytics.value) {
-    fetchAnalytics()
-    hasFetchedAnalytics.value = true
+const handleAnalyticsRefresh = async () => {
+  if (isAnalyticsLoading.value) return
+
+  try {
+    await refreshAnalytics()
+  } finally {
+    analyticsInitialized.value = true
+  }
+}
+
+watch(activeTab, async (newTab) => {
+  if (newTab !== 'analytics') return
+  if (analyticsInitialized.value) return
+  if (isAnalyticsLoading.value) return
+
+  try {
+    await fetchAnalytics()
+  } finally {
+    analyticsInitialized.value = true
   }
 }, { immediate: true })
 
@@ -647,8 +685,40 @@ const handlePaymentSubmit = async (paymentData: {
 
     <!-- Analytics Section -->
     <div v-else-if="activeTab === 'analytics'" class="analytics-section">
+      <div class="section-header">
+        <div class="header-left">
+          <h2 class="section-title">Analytics</h2>
+          <p class="section-subtitle">View insights into your spending patterns</p>
+        </div>
+        <div class="header-right">
+          <Button
+            icon="pi pi-refresh"
+            @click="handleAnalyticsRefresh"
+            :loading="isAnalyticsLoading"
+            :disabled="isAnalyticsLoading"
+            outlined
+            aria-label="Refresh analytics"
+          />
+        </div>
+      </div>
+
+      <!-- Date Filter Toolbar -->
+      <div class="analytics-toolbar">
+        <div class="date-filters" role="group" aria-label="Date filter options">
+          <Button
+            v-for="preset in datePresets"
+            :key="preset.value"
+            :label="preset.label"
+            :outlined="dateFilter !== preset.value"
+            @click="setDateFilter(preset.value)"
+            size="small"
+            :aria-pressed="dateFilter === preset.value"
+          />
+        </div>
+      </div>
+
       <!-- Loading State -->
-      <div v-if="isAnalyticsLoading" class="loading-state">
+      <div v-if="isAnalyticsLoading || !analyticsInitialized" class="loading-state">
         <div class="spinner"></div>
         <p>Loading analytics...</p>
       </div>
@@ -661,13 +731,15 @@ const handlePaymentSubmit = async (paymentData: {
         <Button
           label="Retry"
           icon="pi pi-refresh"
-          @click="refreshAnalytics"
+          @click="handleAnalyticsRefresh"
+          :loading="isAnalyticsLoading"
+          :disabled="isAnalyticsLoading"
           outlined
         />
       </div>
 
       <!-- Empty State (no transactions) -->
-      <div v-else-if="hasNoTransactions && !analyticsError && !isAnalyticsLoading" class="empty-state">
+      <div v-else-if="hasNoTransactions" class="empty-state">
         <i class="pi pi-inbox empty-icon"></i>
         <h3>No Transactions Found</h3>
         <p>There are no transactions to analyze yet.</p>
@@ -675,36 +747,6 @@ const handlePaymentSubmit = async (paymentData: {
 
       <!-- Analytics Content -->
       <div v-else>
-        <div class="section-header">
-          <div class="header-left">
-            <h2 class="section-title">Analytics</h2>
-            <p class="section-subtitle">View insights into your spending patterns</p>
-          </div>
-          <div class="header-right">
-            <Button
-              icon="pi pi-refresh"
-              @click="refreshAnalytics"
-              :loading="isAnalyticsLoading"
-              outlined
-              aria-label="Refresh analytics"
-            />
-          </div>
-        </div>
-
-        <!-- Date Filter Toolbar -->
-        <div class="analytics-toolbar">
-          <div class="date-filters">
-            <Button
-              v-for="preset in datePresets"
-              :key="preset.value"
-              :label="preset.label"
-              :outlined="dateFilter !== preset.value"
-              @click="setDateFilter(preset.value)"
-              size="small"
-            />
-          </div>
-        </div>
-
         <!-- Metrics Grid (Step 9) -->
         <div class="analytics-metrics-grid">
           <MetricCard

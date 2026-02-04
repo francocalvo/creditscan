@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import type { Transaction } from '@/api/transactions'
 import { UsersService } from '@/api'
 import { TransactionsService } from '@/api/transactions'
+import { convertCurrencyBatch, parseDecimal, type CurrencyConversionRequest } from '@/api/currency'
 import { useTags } from '@/composables/useTags'
 import { useTransactionTags } from '@/composables/useTransactionTags'
 
@@ -60,6 +61,15 @@ export interface TopMerchant {
 }
 
 /**
+ * Transaction with converted amount for analytics.
+ * Extends the base Transaction type with a convertedAmount field
+ * that holds the amount in the target currency for consistent aggregation.
+ */
+export interface ConvertedTransaction extends Transaction {
+    convertedAmount: number
+}
+
+/**
  * Analytics composable for financial data aggregation and visualization.
  *
  * Provides state management for transactions, date filtering, and computed metrics.
@@ -80,14 +90,18 @@ export interface TopMerchant {
 export function useAnalytics() {
     // State
     const transactions = ref<Transaction[]>([])
+    const convertedTransactions = ref<ConvertedTransaction[]>([])
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const dateFilter = ref<DateFilterPreset>('all')
     const targetCurrency = ref('ARS')
+    let fetchInFlight: Promise<void> | null = null
 
     // Tag composables
     const tags = useTags()
     const transactionTags = useTransactionTags()
+
+    const normalizeCurrencyCode = (currency: string) => currency.trim().toUpperCase()
 
     /**
      * Validates that a string is a valid ISO 4217 currency code.
@@ -181,21 +195,21 @@ export function useAnalytics() {
     /**
      * Filtered transactions based on current date filter preset.
      *
-     * Uses the getDateThreshold helper to calculate the cutoff date.
+     * Uses getDateThreshold helper to calculate cutoff date.
      * Transactions with invalid txn_date values are excluded from results.
      *
-     * Filtering is inclusive: transactions on or after the threshold are included.
+     * Filtering is inclusive: transactions on or after threshold are included.
      */
     const filteredTransactions = computed(() => {
         const threshold = getDateThreshold(dateFilter.value)
 
         // 'all' preset: return all transactions as-is (preserves stable references)
         if (threshold === null) {
-            return transactions.value
+            return convertedTransactions.value
         }
 
         // Filter transactions by date, excluding invalid txn_date values
-        return transactions.value.filter((txn) => {
+        return convertedTransactions.value.filter((txn) => {
             const txnDate = parseLocalDate(txn.txn_date)
             if (!txnDate) {
                 return false
@@ -230,7 +244,7 @@ export function useAnalytics() {
         let highest = -Infinity
 
         for (const txn of txns) {
-            const amount = txn.amount
+            const amount = txn.convertedAmount
             total += amount
             if (amount > highest) {
                 highest = amount
@@ -278,7 +292,7 @@ export function useAnalytics() {
             const key = `${year}-${month.toString().padStart(2, '0')}`
 
             // Add amount to monthly total
-            monthlyTotals.set(key, (monthlyTotals.get(key) || 0) + txn.amount)
+            monthlyTotals.set(key, (monthlyTotals.get(key) || 0) + txn.convertedAmount)
         }
 
         // Convert map to array, sort chronologically, and format labels
@@ -322,7 +336,7 @@ export function useAnalytics() {
             const tagIds = transactionTags.getTagIdsForTransaction(txn.id)
 
             // Use absolute amount for charting (pie slices should be non-negative)
-            const effectiveAmount = Math.abs(txn.amount)
+            const effectiveAmount = Math.abs(txn.convertedAmount)
 
             if (tagIds.length === 0) {
                 // No tags - add to "Untagged" bucket
@@ -382,7 +396,7 @@ export function useAnalytics() {
             const entry = payeeTotals.get(payee) || { totalAmount: 0, transactionCount: 0 }
 
             // Accumulate totals
-            entry.totalAmount += txn.amount
+            entry.totalAmount += txn.convertedAmount
             entry.transactionCount += 1
 
             payeeTotals.set(payee, entry)
@@ -406,70 +420,132 @@ export function useAnalytics() {
      * Implements paginated transaction fetching and user preference loading.
      */
     const fetchAnalytics = async () => {
-        isLoading.value = true
-        error.value = null
-        try {
-            // Fetch current user and set target currency from preferences
-            const userResponse = await UsersService.readUserMe()
-            const user = userResponse as UserPublicWithCurrency
+        if (fetchInFlight) return fetchInFlight
 
-            // Validate and set target currency, falling back to 'ARS' if invalid
-            const currencyFromProfile = user.preferred_currency ?? 'ARS'
-            targetCurrency.value = isValidCurrency(currencyFromProfile)
-                ? currencyFromProfile
-                : 'ARS'
+        fetchInFlight = (async () => {
+            isLoading.value = true
+            error.value = null
+            try {
+                // Fetch current user and set target currency from preferences
+                const userResponse = await UsersService.readUserMe()
+                const user = userResponse as UserPublicWithCurrency
 
-            // Fetch all transactions with pagination
-            const allTransactions: Transaction[] = []
-            const limit = 100
-            let skip = 0
-            let totalCount: number | null = null
+                // Validate and set target currency, falling back to 'ARS' if invalid
+                const currencyFromProfile = normalizeCurrencyCode(user.preferred_currency ?? 'ARS')
+                targetCurrency.value = isValidCurrency(currencyFromProfile)
+                    ? currencyFromProfile
+                    : 'ARS'
 
-            while (true) {
-                const response = await TransactionsService.listTransactions(skip, limit)
-                const { data, count } = response
+                // Fetch all transactions with pagination
+                const allTransactions: Transaction[] = []
+                const limit = 100
+                let skip = 0
+                let totalCount: number | null = null
 
-                // Update total count from first response (null sentinel)
-                if (totalCount === null) {
-                    totalCount = count
+                while (true) {
+                    const response = await TransactionsService.listTransactions(skip, limit)
+                    const { data, count } = response
+
+                    // Update total count from first response (null sentinel)
+                    if (totalCount === null) {
+                        totalCount = count
+                    }
+
+                    // Add transactions to accumulator
+                    allTransactions.push(...data)
+
+                    // Termination conditions:
+                    // 1. We've fetched all known transactions (accumulated length == total count)
+                    // 2. Empty page returned (safety guard)
+                    // 3. Null total count with empty response (edge case)
+                    if ((totalCount !== null && allTransactions.length >= totalCount) || data.length === 0) {
+                        break
+                    }
+
+                    // Prepare for next page
+                    skip += limit
                 }
 
-                // Add transactions to accumulator
-                allTransactions.push(...data)
+                // Assign transactions once after loop completes
+                transactions.value = allTransactions
 
-                // Termination conditions:
-                // 1. We've fetched all known transactions (accumulated length == total count)
-                // 2. Empty page returned (safety guard)
-                // 3. Null total count with empty response (edge case)
-                if ((totalCount !== null && allTransactions.length >= totalCount) || data.length === 0) {
-                    break
+                // Populate convertedTransactions for analytics aggregation.
+                // Gracefully degrades to original amounts if conversion fails.
+                const baseConverted: ConvertedTransaction[] = allTransactions.map((txn) => ({
+                    ...txn,
+                    convertedAmount: txn.amount,
+                }))
+
+                const toCurrency = normalizeCurrencyCode(targetCurrency.value)
+                const conversionIndices: number[] = []
+                const conversions: CurrencyConversionRequest[] = []
+
+                for (let i = 0; i < allTransactions.length; i += 1) {
+                    const txn = allTransactions[i]
+                    const fromCurrency = normalizeCurrencyCode(txn.currency)
+
+                    if (fromCurrency === toCurrency) {
+                        continue
+                    }
+
+                    if (!isValidCurrency(fromCurrency) || !isValidCurrency(toCurrency)) {
+                        continue
+                    }
+
+                    conversionIndices.push(i)
+                    conversions.push({
+                        amount: txn.amount,
+                        from_currency: fromCurrency,
+                        to_currency: toCurrency,
+                        date: txn.txn_date,
+                    })
                 }
 
-                // Prepare for next page
-                skip += limit
+                if (conversions.length > 0) {
+                    try {
+                        const conversionResponse = await convertCurrencyBatch({ conversions })
+
+                        if (conversionResponse.results.length !== conversions.length) {
+                            throw new Error(
+                                `Currency conversion result count mismatch: expected ${conversions.length}, got ${conversionResponse.results.length}`
+                            )
+                        }
+
+                        for (let i = 0; i < conversionResponse.results.length; i += 1) {
+                            const result = conversionResponse.results[i]
+                            baseConverted[conversionIndices[i]].convertedAmount = parseDecimal(result.converted_amount)
+                        }
+                    } catch (conversionError) {
+                        console.warn('Currency conversion failed; falling back to original amounts.', conversionError)
+                    }
+                }
+
+                convertedTransactions.value = baseConverted
+
+                // Fetch tag data for analytics
+                await tags.fetchTags() // Cached, no-op if already fetched
+                transactionTags.reset() // Clear previous transaction-tag mappings
+
+                // Fetch transaction tags in batches of ~20 for performance
+                const transactionIds = allTransactions.map((txn) => txn.id)
+                const batchSize = 20
+
+                for (let i = 0; i < transactionIds.length; i += batchSize) {
+                    const batch = transactionIds.slice(i, i + batchSize)
+                    await transactionTags.fetchTagsForTransactions(batch)
+                }
+            } catch (err) {
+                console.error('Error fetching analytics:', err)
+                error.value = err instanceof Error ? err.message : 'Failed to fetch analytics data'
+            } finally {
+                isLoading.value = false
             }
+        })()
+            .finally(() => {
+                fetchInFlight = null
+            })
 
-            // Assign transactions once after loop completes
-            transactions.value = allTransactions
-
-            // Fetch tag data for analytics
-            await tags.fetchTags() // Cached, no-op if already fetched
-            transactionTags.reset() // Clear previous transaction-tag mappings
-
-            // Fetch transaction tags in batches of ~20 for performance
-            const transactionIds = allTransactions.map((txn) => txn.id)
-            const batchSize = 20
-
-            for (let i = 0; i < transactionIds.length; i += batchSize) {
-                const batch = transactionIds.slice(i, i + batchSize)
-                await transactionTags.fetchTagsForTransactions(batch)
-            }
-        } catch (err) {
-            console.error('Error fetching analytics:', err)
-            error.value = err instanceof Error ? err.message : 'Failed to fetch analytics data'
-        } finally {
-            isLoading.value = false
-        }
+        return fetchInFlight
     }
 
     /**
@@ -483,12 +559,8 @@ export function useAnalytics() {
 
     /**
      * Refresh analytics data by re-fetching from the backend.
-     * Placeholder - calls fetchAnalytics for now.
-     * Full implementation in Step 18.
      */
-    const refresh = () => {
-        return fetchAnalytics()
-    }
+    const refresh = () => fetchAnalytics()
 
     /**
      * Format an amount as currency using the target currency setting.
