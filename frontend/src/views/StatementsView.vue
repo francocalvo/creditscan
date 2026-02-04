@@ -9,10 +9,12 @@ import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
+import { getCardBackgroundColor } from '@/utils/cardColors'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
+import AddCardPlaceholder from '@/components/AddCardPlaceholder.vue'
 
 const {
   statementsWithCard,
@@ -498,6 +500,12 @@ const handlePaymentSubmit = async (paymentData: {
     isProcessingPayment.value = false
   }
 }
+
+// Handler for opening add card modal (stubbed for Step04, modal implemented in Step06)
+const openAddCardModal = () => {
+  // TODO: Open AddCardModal in Step06
+  console.log('Open add card modal')
+}
 </script>
 
 <template>
@@ -638,17 +646,15 @@ const handlePaymentSubmit = async (paymentData: {
         <p>Loading cards...</p>
       </div>
 
-      <div v-else-if="cards.length === 0" class="empty-state">
-        <i
-          class="pi pi-credit-card"
-          style="font-size: 64px; color: #d1d5db; margin-bottom: 16px"
-        ></i>
-        <h3 style="margin: 0 0 8px 0">No cards added yet</h3>
-        <p style="margin: 0; color: #6b7280">Add your first credit card to get started</p>
-      </div>
-
       <div v-else class="cards-grid">
-        <div v-for="card in cards" :key="card.id" class="card-item-large">
+        <!-- Add Card Placeholder (always shown as first item) -->
+        <AddCardPlaceholder @click="openAddCardModal" />
+        <div
+          v-for="card in cards"
+          :key="card.id"
+          class="card-item-large"
+          :style="{ background: getCardBackgroundColor(card.bank) }"
+        >
           <div class="card-header-section">
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
@@ -1192,11 +1198,11 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 .card-item-large {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 16px;
   padding: 24px;
   color: white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transition:
     transform 0.2s,
     box-shadow 0.2s;
