@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useCreditCards, CardBrand, type CreditCard, type CreditCardCreate } from '../useCreditCards'
+import { useCreditCards, CardBrand, type CreditCard } from '../useCreditCards'
 
 vi.mock('@/api', () => ({
   OpenAPI: {
     BASE: 'https://api.example.com',
-    TOKEN: 'test-token',
+    TOKEN: vi.fn().mockResolvedValue('test-token'),
   },
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: vi.fn().mockReturnValue({
+    user: { id: 'user-123' }
+  })
 }))
 
 const mockFetch = vi.fn()
@@ -18,7 +24,10 @@ describe('useCreditCards', () => {
     localStorage.clear()
   })
 
-  it('requires authentication', async () => {
+  it('requires authentication (token)', async () => {
+    const { OpenAPI } = await import('@/api')
+    vi.mocked(OpenAPI.TOKEN).mockResolvedValueOnce('')
+
     const { createCard } = useCreditCards()
 
     await expect(
@@ -33,8 +42,9 @@ describe('useCreditCards', () => {
   })
 
   it('POSTs to /api/v1/credit-cards/ and refreshes cards list', async () => {
-    localStorage.setItem('access_token', 'access-token')
-
+    const { OpenAPI } = await import('@/api')
+    vi.mocked(OpenAPI.TOKEN).mockResolvedValueOnce('access-token')
+    
     const createdCard: CreditCard = {
       id: 'card-123',
       user_id: 'user-123',
@@ -58,7 +68,7 @@ describe('useCreditCards', () => {
 
     const { createCard, cards } = useCreditCards()
 
-    const input: CreditCardCreate = {
+    const input = {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1234',
@@ -78,7 +88,10 @@ describe('useCreditCards', () => {
           Authorization: 'Bearer access-token',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(input),
+        body: JSON.stringify({
+          ...input,
+          user_id: 'user-123',
+        }),
       })
     )
 
@@ -97,7 +110,8 @@ describe('useCreditCards', () => {
   })
 
   it('throws with server error message', async () => {
-    localStorage.setItem('access_token', 'access-token')
+    const { OpenAPI } = await import('@/api')
+    vi.mocked(OpenAPI.TOKEN).mockResolvedValueOnce('access-token')
 
     mockFetch.mockResolvedValueOnce({
       ok: false,

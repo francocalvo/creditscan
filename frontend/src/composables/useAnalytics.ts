@@ -587,10 +587,10 @@ export function useAnalytics() {
    * formatCurrency(1234.56) // "$1,234.56" (when targetCurrency is USD)
    * ```
    */
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: any) => {
     const currency = isValidCurrency(targetCurrency.value) ? targetCurrency.value : 'USD'
 
-    const safeAmount = Number.isFinite(amount) ? amount : 0
+    const safeAmount = parseDecimal(amount)
     const absAmount = Math.abs(safeAmount)
 
     const baseFractionDigits = currency === 'ARS' ? 0 : 2

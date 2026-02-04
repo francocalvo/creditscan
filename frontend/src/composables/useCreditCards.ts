@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
 import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
+import { useAuthStore } from '@/stores/auth'
 
 export enum CardBrand {
   VISA = 'visa',
@@ -20,6 +21,7 @@ export interface CreditCard {
 }
 
 export interface CreditCardCreate {
+  user_id: string
   bank: string
   brand: CardBrand
   last4: string
@@ -85,10 +87,24 @@ export function useCreditCards() {
   /**
    * Create a new credit card for the current user and refresh the local cards list.
    */
-  const createCard = async (cardData: CreditCardCreate): Promise<CreditCard> => {
+  const createCard = async (cardData: Omit<CreditCardCreate, 'user_id'>): Promise<CreditCard> => {
     error.value = null
 
-    const token = localStorage.getItem('access_token')
+    const authStore = useAuthStore()
+    if (!authStore.user?.id) {
+      const authError = new Error('User not loaded')
+      error.value = authError
+      throw authError
+    }
+
+    const token =
+      typeof OpenAPI.TOKEN === 'function'
+        ? await OpenAPI.TOKEN({
+            method: 'POST',
+            url: '/api/v1/credit-cards/',
+          } as ApiRequestOptions<string>)
+        : OpenAPI.TOKEN || ''
+
     if (!token) {
       const authError = new Error('Not authenticated')
       error.value = authError
@@ -104,7 +120,10 @@ export function useCreditCards() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(cardData),
+        body: JSON.stringify({
+          ...cardData,
+          user_id: authStore.user.id,
+        }),
       })
 
       if (!response.ok) {

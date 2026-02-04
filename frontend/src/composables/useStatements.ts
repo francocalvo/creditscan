@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { OpenAPI, UsersService } from '@/api'
 import { useCreditCards, type CreditCard } from './useCreditCards'
 import { parseDateString } from '@/utils/date'
+import { parseDecimal } from '@/api/currency'
 import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 /**
@@ -199,9 +200,9 @@ export function useStatements() {
     }
   }
 
-  const formatCurrency = (amount: number | null): string => {
+  const formatCurrency = (amount: any): string => {
     const currency = isValidCurrency(targetCurrency.value) ? targetCurrency.value : 'USD'
-    const safeAmount = amount === null ? 0 : Number.isFinite(amount) ? amount : 0
+    const safeAmount = amount === null || amount === undefined ? 0 : parseDecimal(amount)
     const absAmount = Math.abs(safeAmount)
 
     const baseFractionDigits = currency === 'ARS' ? 0 : 2

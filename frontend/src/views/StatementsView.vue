@@ -359,10 +359,6 @@ const activeCards = computed(() => {
   return cards.value.length
 })
 
-const pendingStatements = computed(() => {
-  return statementsWithCard.value.filter((s) => s.status === 'pending').length
-})
-
 const creditUtilization = computed(() => {
   // We don't have credit limit data yet, so we can't compute utilization.
   return 'N/A'
@@ -414,11 +410,6 @@ const getCardBrandIcon = (brand?: string): string => {
   return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
-// Get statements count per card
-const getCardStatementsCount = (cardId: string) => {
-  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
-}
-
 // Get latest balance for a card
 const getCardLatestBalance = (cardId: string) => {
   const cardStatements = statementsWithCard.value
@@ -428,7 +419,7 @@ const getCardLatestBalance = (cardId: string) => {
       return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
 
-  return cardStatements.length > 0 ? cardStatements[0].current_balance : null
+  return cardStatements.length > 0 ? cardStatements[0]?.current_balance : null
 }
 
 // Handle payment button click
@@ -546,7 +537,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       <MetricCard
         title="Active Cards"
         :value="activeCards.toString()"
-        :subtitle="`${pendingStatements} statements pending`"
+        subtitle="Total cards registered"
         icon="pi pi-credit-card"
       />
 
@@ -699,10 +690,6 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
             <div class="card-stat">
               <div class="stat-label">Current Balance</div>
               <div class="stat-value">{{ formatCurrency(getCardLatestBalance(card.id)) }}</div>
-            </div>
-            <div class="card-stat">
-              <div class="stat-label">Statements</div>
-              <div class="stat-value">{{ getCardStatementsCount(card.id) }}</div>
             </div>
           </div>
         </div>
