@@ -30,7 +30,7 @@ export type DateFilterPreset = 'week' | 'month' | '3months' | '6months' | 'year'
 export interface SummaryMetrics {
     totalSpending: number
     transactionCount: number
-    averageTransaction: number
+    medianTransaction: number
     highestTransaction: number
 }
 
@@ -234,7 +234,7 @@ export function useAnalytics() {
             return {
                 totalSpending: 0,
                 transactionCount: 0,
-                averageTransaction: 0,
+                medianTransaction: 0,
                 highestTransaction: 0,
             }
         }
@@ -242,21 +242,30 @@ export function useAnalytics() {
         // Calculate total and highest in a single reduce pass
         let total = 0
         let highest = -Infinity
+        const amounts: number[] = new Array(txns.length)
 
-        for (const txn of txns) {
+        for (let i = 0; i < txns.length; i += 1) {
+            const txn = txns[i]
             const amount = txn.convertedAmount
             total += amount
             if (amount > highest) {
                 highest = amount
             }
+            amounts[i] = amount
         }
 
         const count = txns.length
+        amounts.sort((a, b) => a - b)
+        const midIndex = Math.floor(count / 2)
+        const median =
+            count % 2 === 1
+                ? amounts[midIndex]
+                : (amounts[midIndex - 1] + amounts[midIndex]) / 2
 
         return {
             totalSpending: total,
             transactionCount: count,
-            averageTransaction: total / count,
+            medianTransaction: median,
             highestTransaction: highest,
         }
     })
@@ -473,7 +482,9 @@ export function useAnalytics() {
                 // Gracefully degrades to original amounts if conversion fails.
                 const baseConverted: ConvertedTransaction[] = allTransactions.map((txn) => ({
                     ...txn,
-                    convertedAmount: txn.amount,
+                    // Backend may return Decimal fields as strings even if the SDK types say `number`.
+                    // Always normalize to a finite number so aggregations don't produce NaN.
+                    convertedAmount: parseDecimal(txn.amount),
                 }))
 
                 const toCurrency = normalizeCurrencyCode(targetCurrency.value)
@@ -579,10 +590,25 @@ export function useAnalytics() {
             ? targetCurrency.value
             : 'USD'
 
+        const safeAmount = Number.isFinite(amount) ? amount : 0
+        const absAmount = Math.abs(safeAmount)
+
+        const baseFractionDigits = currency === 'ARS' ? 0 : 2
+
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency,
-        }).format(amount)
+            minimumFractionDigits: baseFractionDigits,
+            maximumFractionDigits: baseFractionDigits,
+            ...(absAmount >= 1_000_000
+                ? {
+                      notation: 'compact' as const,
+                      compactDisplay: 'short' as const,
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 1,
+                  }
+                : {}),
+        }).format(safeAmount)
     }
 
     return {

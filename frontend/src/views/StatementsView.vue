@@ -762,13 +762,13 @@ const handlePaymentSubmit = async (paymentData: {
           />
 
           <MetricCard
-            title="Average"
-            :value="formatAnalyticsCurrency(summaryMetrics.averageTransaction)"
+            title="Median Transaction"
+            :value="formatAnalyticsCurrency(summaryMetrics.medianTransaction)"
             icon="pi pi-chart-line"
           />
 
           <MetricCard
-            title="Highest"
+            title="Highest Transaction"
             :value="formatAnalyticsCurrency(summaryMetrics.highestTransaction)"
             icon="pi pi-arrow-up"
           />
@@ -1440,6 +1440,8 @@ const handlePaymentSubmit = async (paymentData: {
 
 .chart-container {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-title {
@@ -1452,6 +1454,19 @@ const handlePaymentSubmit = async (paymentData: {
 .chart-wrapper {
   position: relative;
   height: 300px;
+}
+
+.chart-card--wide .chart-wrapper {
+  height: 420px;
+}
+
+.chart-wrapper .p-chart {
+  height: 100%;
+}
+
+.chart-wrapper canvas {
+  height: 100% !important;
+  width: 100% !important;
 }
 
 .chart-empty-state {
@@ -1591,6 +1606,10 @@ const handlePaymentSubmit = async (paymentData: {
 
   .chart-wrapper {
     height: 250px;
+  }
+
+  .chart-card--wide .chart-wrapper {
+    height: 320px;
   }
 
   .date-filters {
