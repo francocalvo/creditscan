@@ -15,4 +15,6 @@ clean:
     find . -type d -name "htmlcov" -exec rm -rf {} +
     find . -type d -name ".mypy_cache" -exec rm -rf {} +
 
+garage-bootstrap:
+    bash scripts/garage-bootstrap.sh
 

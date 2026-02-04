@@ -195,19 +195,25 @@ services:
       # Enable redirection for HTTP and HTTPS
       - traefik.http.routers.${STACK_NAME?Variable not
         set}-frontend-http.middlewares=https-redirect
+
   garage:
     image: dxflrs/garage:v2.2.0
     restart: always
     ports:
       - "3900:3900"  # S3 API
-      - "3901:3901"  # Admin API
+      - "3901:3901"  # RPC
+      - "3902:3902"  # S3 Web
+      - "3903:3903"  # Admin API
     volumes:
-      - garage_data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
     environment:
       - GARAGE_ALLOW_WORLD_READABLE_SECRETS=true
 
 volumes:
   app-db-data:
+  garage_meta:
   garage_data:
 
 networks:

@@ -8,6 +8,14 @@
 docker compose watch
 ```
 
+If you're using the included Garage (S3-compatible) service, run the bootstrap once after starting the stack (and anytime you wipe volumes). This applies the Garage layout and (optionally) imports the S3 key + grants bucket permissions:
+
+```bash
+./scripts/garage-bootstrap.sh
+```
+
+Note: `docker compose down -v` deletes Garage metadata, so you'll see "Layout not ready" and missing keys/buckets until you re-run the bootstrap.
+
 * Now you can open your browser and interact with these URLs:
 
 Frontend, built with Docker, with routes handled based on the path: http://localhost:5173

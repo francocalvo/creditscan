@@ -6,6 +6,7 @@ updating the upload job status.
 """
 
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -158,9 +159,27 @@ async def process_upload_job(
     get_card_usecase: GetCreditCardUseCase = provide_get_card(session)
 
     try:
-        # Update job to PROCESSING
+        # Update job to PROCESSING with retry logic
+        # This handles the race condition where the background task starts
+        # before the endpoint's transaction is fully committed
         logger.info(f"Starting processing for job {job_id}")
-        job_service.update_status(job_id, UploadJobStatus.PROCESSING)
+        max_retries = 5
+        retry_delay = 0.5  # seconds
+        for attempt in range(max_retries):
+            try:
+                job_service.update_status(job_id, UploadJobStatus.PROCESSING)
+                break
+            except Exception as e:
+                if "not found" in str(e).lower() and attempt < max_retries - 1:
+                    logger.warning(
+                        f"Job {job_id} not found, retrying in {retry_delay}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(retry_delay)
+                    # Refresh the session to get latest data
+                    session.expire_all()
+                else:
+                    raise
 
         # Get card for default currency and user_id
         card: CreditCardPublic = get_card_usecase.execute(card_id)
