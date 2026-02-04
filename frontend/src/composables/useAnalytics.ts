@@ -1,5 +1,20 @@
 import { ref, computed } from 'vue'
 import type { Transaction } from '@/api/transactions'
+import { UsersService } from '@/api'
+import { TransactionsService } from '@/api/transactions'
+
+/**
+ * Extended user type with preferred_currency field.
+ * Used as a workaround until SDK types are regenerated.
+ */
+type UserPublicWithCurrency = {
+    email: string
+    is_active?: boolean
+    is_superuser?: boolean
+    full_name?: string | null
+    id: string
+    preferred_currency?: string | null
+}
 
 /**
  * Date filter preset options for analytics queries.
@@ -131,15 +146,48 @@ export function useAnalytics() {
 
     /**
      * Fetch analytics data from the backend.
-     * Placeholder implementation - currently a no-op beyond state management.
-     * Full implementation in Step 5.
+     * Implements paginated transaction fetching and user preference loading.
      */
     const fetchAnalytics = async () => {
         isLoading.value = true
         error.value = null
         try {
-            // TODO: Implement in Step 5 - fetch transactions with pagination
-            // Currently a no-op placeholder
+            // Fetch current user and set target currency from preferences
+            const userResponse = await UsersService.readUserMe()
+            const user = userResponse as UserPublicWithCurrency
+            targetCurrency.value = user.preferred_currency ?? 'ARS'
+
+            // Fetch all transactions with pagination
+            const allTransactions: Transaction[] = []
+            const limit = 100
+            let skip = 0
+            let totalCount = 0
+
+            while (true) {
+                const response = await TransactionsService.listTransactions(skip, limit)
+                const { data, count } = response
+
+                // Update total count from first response
+                if (totalCount === 0) {
+                    totalCount = count
+                }
+
+                // Add transactions to accumulator
+                allTransactions.push(...data)
+
+                // Termination conditions:
+                // 1. We've fetched all known transactions (accumulated length == total count)
+                // 2. Empty page returned (safety guard)
+                if (allTransactions.length >= totalCount || data.length === 0) {
+                    break
+                }
+
+                // Prepare for next page
+                skip += limit
+            }
+
+            // Assign transactions once after loop completes
+            transactions.value = allTransactions
         } catch (err) {
             console.error('Error fetching analytics:', err)
             error.value = err instanceof Error ? err.message : 'Failed to fetch analytics data'
