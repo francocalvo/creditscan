@@ -2,6 +2,8 @@ import { ref, computed } from 'vue'
 import type { Transaction } from '@/api/transactions'
 import { UsersService } from '@/api'
 import { TransactionsService } from '@/api/transactions'
+import { useTags } from '@/composables/useTags'
+import { useTransactionTags } from '@/composables/useTransactionTags'
 
 /**
  * Extended user type with preferred_currency field.
@@ -40,11 +42,12 @@ export interface MonthlySpending {
 }
 
 /**
- * Spending breakdown by tag/category.
+ * Spending breakdown by tag/category with percentage.
  */
 export interface SpendingByTag {
     tag: string
     amount: number
+    percentage: number
 }
 
 /**
@@ -83,6 +86,10 @@ export function useAnalytics() {
     const dateFilter = ref<DateFilterPreset>('all')
     const targetCurrency = ref('ARS')
 
+    // Tag composables
+    const tags = useTags()
+    const transactionTags = useTransactionTags()
+
     /**
      * Validates that a string is a valid ISO 4217 currency code.
      * Uses Intl.NumberFormat to test if the currency code is recognized.
@@ -100,9 +107,49 @@ export function useAnalytics() {
     }
 
     /**
+     * Parse a date string, treating date-only format (YYYY-MM-DD) as local date.
+     * Backend sends txn_date as date-only strings, which JavaScript's Date()
+     * constructor parses as UTC midnight. This causes day shifts for non-UTC timezones.
+     * We parse YYYY-MM-DD explicitly as local dates to avoid this issue.
+     *
+     * @param dateStr - The date string to parse
+     * @returns A Date object for valid dates, null otherwise
+     */
+    const parseLocalDate = (dateStr: string): Date | null => {
+        // Try YYYY-MM-DD format (date-only from backend)
+        const dateOnlyMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+        if (dateOnlyMatch) {
+            const [_, yearStr, monthStr, dayStr] = dateOnlyMatch
+            const year = parseInt(yearStr, 10)
+            const month = parseInt(monthStr, 10) - 1  // Months are 0-indexed in JS
+            const day = parseInt(dayStr, 10)
+            const localDate = new Date(year, month, day)
+            // Guard against overflow (e.g. 2026-02-31 becomes March 3rd in JS)
+            if (
+                localDate.getFullYear() !== year ||
+                localDate.getMonth() !== month ||
+                localDate.getDate() !== day
+            ) {
+                return null
+            }
+            return localDate
+        }
+
+        // Fallback to standard Date parsing (for full ISO datetime strings)
+        const date = new Date(dateStr)
+        return isNaN(date.getTime()) ? null : date
+    }
+
+    /**
      * Get the date threshold for a given filter preset.
      * Returns null for 'all' preset (no filtering), otherwise returns the
      * threshold date (inclusive) for the specified time window.
+     *
+     * Threshold is normalized to start-of-day (00:00:00.000) to ensure
+     * consistent day-based filtering regardless of when the user applies the filter.
+     *
+     * The cutoff is inclusive and represents the start of the earliest day in the
+     * requested window (e.g. "past 7 days" includes today + previous 6 days).
      *
      * @param preset - The date filter preset to get threshold for
      * @returns The threshold Date object, or null for 'all' preset
@@ -123,8 +170,11 @@ export function useAnalytics() {
         }
 
         const days = daysMap[preset as Exclude<DateFilterPreset, 'all'>]
+
+        // Create threshold normalized to start-of-day
         const threshold = new Date()
-        threshold.setDate(threshold.getDate() - days)
+        threshold.setHours(0, 0, 0, 0)  // Normalize to midnight
+        threshold.setDate(threshold.getDate() - (days - 1))
 
         return threshold
     }
@@ -147,10 +197,8 @@ export function useAnalytics() {
 
         // Filter transactions by date, excluding invalid txn_date values
         return transactions.value.filter((txn) => {
-            const txnDate = new Date(txn.txn_date)
-
-            // Exclude transactions with invalid dates
-            if (isNaN(txnDate.getTime())) {
+            const txnDate = parseLocalDate(txn.txn_date)
+            if (!txnDate) {
                 return false
             }
 
@@ -162,9 +210,14 @@ export function useAnalytics() {
     /**
      * Summary metrics derived from filtered transactions.
      * Handles empty state gracefully by returning zero values.
+     *
+     * Uses reduce-based max calculation to avoid argument limits on large arrays.
+     * Caches transactions and computed values to avoid repeated .value accesses.
      */
     const summaryMetrics = computed<SummaryMetrics>(() => {
-        if (filteredTransactions.value.length === 0) {
+        const txns = filteredTransactions.value
+
+        if (txns.length === 0) {
             return {
                 totalSpending: 0,
                 transactionCount: 0,
@@ -173,33 +226,134 @@ export function useAnalytics() {
             }
         }
 
-        const amounts = filteredTransactions.value.map(t => t.amount)
-        const totalSpending = amounts.reduce((sum, amount) => sum + amount, 0)
+        // Calculate total and highest in a single reduce pass
+        let total = 0
+        let highest = -Infinity
+
+        for (const txn of txns) {
+            const amount = txn.amount
+            total += amount
+            if (amount > highest) {
+                highest = amount
+            }
+        }
+
+        const count = txns.length
 
         return {
-            totalSpending,
-            transactionCount: filteredTransactions.value.length,
-            averageTransaction: totalSpending / filteredTransactions.value.length,
-            highestTransaction: Math.max(...amounts),
+            totalSpending: total,
+            transactionCount: count,
+            averageTransaction: total / count,
+            highestTransaction: highest,
         }
     })
 
     /**
      * Monthly spending aggregation for charts.
-     * Placeholder - returns empty array for now.
-     * Full implementation in Step 10.
+     *
+     * Groups transactions by month (YYYY-MM) and calculates total spending per month.
+     * Uses parseLocalDate to handle date-only strings from backend correctly.
+     * Results are sorted chronologically and month labels are formatted as "Jan 2024".
+     *
+     * Reactive to date filter changes through filteredTransactions dependency.
      */
     const spendingByMonth = computed<MonthlySpending[]>(() => {
-        return []
+        const txns = filteredTransactions.value
+
+        if (txns.length === 0) {
+            return []
+        }
+
+        // Build map keyed by YYYY-MM
+        const monthlyTotals = new Map<string, number>()
+
+        for (const txn of txns) {
+            const txnDate = parseLocalDate(txn.txn_date)
+            if (!txnDate) {
+                continue
+            }
+
+            // Create YYYY-MM key (month is 1-indexed for sorting)
+            const year = txnDate.getFullYear()
+            const month = txnDate.getMonth() + 1
+            const key = `${year}-${month.toString().padStart(2, '0')}`
+
+            // Add amount to monthly total
+            monthlyTotals.set(key, (monthlyTotals.get(key) || 0) + txn.amount)
+        }
+
+        // Convert map to array, sort chronologically, and format labels
+        return Array.from(monthlyTotals.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([monthKey, amount]) => {
+                // Parse YYYY-MM and format as "Jan 2024"
+                const [year, month] = monthKey.split('-').map(Number)
+                const formattedMonth = new Date(year, month - 1)
+                    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+
+                return {
+                    month: formattedMonth,
+                    amount
+                }
+            })
     })
 
     /**
-     * Spending breakdown by tag/category.
-     * Placeholder - returns empty array for now.
-     * Full implementation in Step 12.
+     * Spending breakdown by tag/category with percentages.
+     *
+     * Aggregates spending by tag from filtered transactions, including an
+     * "Untagged" bucket for transactions without tags. Multi-tag
+     * transactions split their amount evenly across all tags.
+     *
+     * Each entry includes the tag name, amount, and percentage of total.
+     * Results are sorted by amount descending for better visualization.
      */
     const spendingByTag = computed<SpendingByTag[]>(() => {
-        return []
+        const txns = filteredTransactions.value
+
+        if (txns.length === 0) {
+            return []
+        }
+
+        // Build spending by tag map
+        const tagTotals = new Map<string, number>()
+
+        for (const txn of txns) {
+            // Get tag IDs for this transaction
+            const tagIds = transactionTags.getTagIdsForTransaction(txn.id)
+
+            // Use absolute amount for charting (pie slices should be non-negative)
+            const effectiveAmount = Math.abs(txn.amount)
+
+            if (tagIds.length === 0) {
+                // No tags - add to "Untagged" bucket
+                tagTotals.set('Untagged', (tagTotals.get('Untagged') || 0) + effectiveAmount)
+            } else {
+                // Split amount evenly across all tags
+                const amountPerTag = effectiveAmount / tagIds.length
+
+                for (const tagId of tagIds) {
+                    // Look up tag label from cache
+                    const tag = tags.getTagById(tagId)
+                    const label = tag?.label || `Tag ${tagId}`
+
+                    tagTotals.set(label, (tagTotals.get(label) || 0) + amountPerTag)
+                }
+            }
+        }
+
+        // Convert to array and calculate total
+        const spendingEntries = Array.from(tagTotals.entries())
+        const total = spendingEntries.reduce((sum, [_, amount]) => sum + amount, 0)
+
+        // Add percentage and sort by amount descending
+        return spendingEntries
+            .map(([tag, amount]) => ({
+                tag,
+                amount,
+                percentage: total > 0 ? (amount / total) * 100 : 0,
+            }))
+            .sort((a, b) => b.amount - a.amount)
     })
 
     /**
@@ -261,6 +415,19 @@ export function useAnalytics() {
 
             // Assign transactions once after loop completes
             transactions.value = allTransactions
+
+            // Fetch tag data for analytics
+            await tags.fetchTags() // Cached, no-op if already fetched
+            transactionTags.reset() // Clear previous transaction-tag mappings
+
+            // Fetch transaction tags in batches of ~20 for performance
+            const transactionIds = allTransactions.map((txn) => txn.id)
+            const batchSize = 20
+
+            for (let i = 0; i < transactionIds.length; i += batchSize) {
+                const batch = transactionIds.slice(i, i + batchSize)
+                await transactionTags.fetchTagsForTransactions(batch)
+            }
         } catch (err) {
             console.error('Error fetching analytics:', err)
             error.value = err instanceof Error ? err.message : 'Failed to fetch analytics data'

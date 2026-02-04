@@ -8,9 +8,12 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
+import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
+import Button from 'primevue/button'
+import Chart from 'primevue/chart'
 
 const { 
   statementsWithCard, 
@@ -34,6 +37,20 @@ const {
   formatDate: formatTransactionDate
 } = useTransactions()
 
+const {
+  isLoading: isAnalyticsLoading,
+  error: analyticsError,
+  dateFilter,
+  setDateFilter,
+  fetchAnalytics,
+  refresh: refreshAnalytics,
+  filteredTransactions,
+  summaryMetrics,
+  spendingByMonth,
+  spendingByTag,
+  formatCurrency: formatAnalyticsCurrency
+} = useAnalytics()
+
 const enrichedTransactions = computed(() => {
   return transactions.value.map(txn => {
     const statement = statementsWithCard.value.find(s => s.id === txn.statement_id)
@@ -44,6 +61,182 @@ const enrichedTransactions = computed(() => {
     }
   })
 })
+
+/**
+ * Transform spendingByMonth into Chart.js data format.
+ * Creates a new object when spendingByMonth changes to ensure proper reactivity.
+ */
+const monthlyChartData = computed(() => {
+  if (!spendingByMonth.value || spendingByMonth.value.length === 0) {
+    return {
+      labels: [],
+      datasets: []
+    }
+  }
+
+  return {
+    labels: spendingByMonth.value.map(item => item.month),
+    datasets: [
+      {
+        label: 'Monthly Spending',
+        data: spendingByMonth.value.map(item => item.amount),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2
+      }
+    ]
+  }
+})
+
+/**
+ * Chart options for monthly spending line chart.
+ * Configured for responsive layout with area fill.
+ */
+const monthlyChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      backgroundColor: '#1f2937',
+      titleColor: '#f9fafb',
+      bodyColor: '#f9fafb',
+      padding: 12,
+      cornerRadius: 8,
+      displayColors: false,
+      callbacks: {
+        label: (context: any) => {
+          const value = context.parsed.y
+          return ` ${formatAnalyticsCurrency(value)}`
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: {
+        display: false
+      },
+      ticks: {
+        color: '#6b7280',
+        font: {
+          size: 12
+        }
+      }
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: '#f3f4f6',
+        borderDash: [5, 5]
+      },
+      ticks: {
+        color: '#6b7280',
+        font: {
+          size: 12
+        },
+        callback: (value: any) => formatAnalyticsCurrency(value)
+      }
+    }
+  }
+}
+
+/**
+ * Color palette for tag chart segments.
+ * Provides 12 distinguishable colors for different tag categories.
+ * Cycles through colors if there are more categories than colors.
+ */
+const tagChartColors = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#6366f1', // indigo
+  '#14b8a6', // teal
+  '#eab308', // yellow
+  '#a855f7'  // purple
+]
+
+/**
+ * Transform spendingByTag into Chart.js pie format.
+ * Creates a new object when spendingByTag changes to ensure proper reactivity.
+ * Applies colors from palette, cycling if more categories than colors available.
+ */
+const tagChartData = computed(() => {
+  if (!spendingByTag.value || spendingByTag.value.length === 0) {
+    return {
+      labels: [],
+      datasets: []
+    }
+  }
+
+  return {
+    labels: spendingByTag.value.map(item => item.tag),
+    datasets: [
+      {
+        data: spendingByTag.value.map(item => item.amount),
+        backgroundColor: spendingByTag.value.map((_, index) =>
+          tagChartColors[index % tagChartColors.length]
+        ),
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }
+    ]
+  }
+})
+
+/**
+ * Chart options for spending by tag pie chart.
+ * Configured for responsive layout with legend on the right side.
+ */
+const tagChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'right' as const,
+      labels: {
+        color: '#374151',
+        font: {
+          size: 12
+        },
+        padding: 15,
+        usePointStyle: true,
+        pointStyle: 'circle'
+      }
+    },
+    tooltip: {
+      backgroundColor: '#1f2937',
+      titleColor: '#f9fafb',
+      bodyColor: '#f9fafb',
+      padding: 12,
+      cornerRadius: 8,
+      displayColors: true,
+      callbacks: {
+        label: (context: any) => {
+          const dataIndex = context.dataIndex
+          const item = spendingByTag.value[dataIndex]
+          if (!item) return ''
+          const percentage = item.percentage.toFixed(1)
+          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+        }
+      }
+    }
+  }
+}
 
 const toast = useToast()
 
@@ -70,6 +263,29 @@ watch(statementsWithCard, (updatedStatements) => {
     selectedStatement.value = latest
   }
 })
+
+// Analytics composable
+const hasFetchedAnalytics = ref(false)
+
+// Check if there are no transactions for the current filter
+const hasNoTransactions = computed(() => filteredTransactions.value.length === 0)
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'analytics' && !hasFetchedAnalytics.value) {
+    fetchAnalytics()
+    hasFetchedAnalytics.value = true
+  }
+}, { immediate: true })
+
+// Date filter presets for analytics
+const datePresets = [
+  { label: 'Last Week', value: 'week' },
+  { label: 'Last Month', value: 'month' },
+  { label: 'Last 3 Months', value: '3months' },
+  { label: 'Last 6 Months', value: '6months' },
+  { label: 'Last Year', value: 'year' },
+  { label: 'All Time', value: 'all' }
+] as const
 
 const tabs = [
   { id: 'statements', label: 'Statements' },
@@ -428,12 +644,141 @@ const handlePaymentSubmit = async (paymentData: {
       </div>
     </div>
 
-    <!-- Analytics Section (Placeholder) -->
-    <div v-else-if="activeTab === 'analytics'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-chart-line placeholder-icon"></i>
-        <h3>Analytics</h3>
-        <p>Analytics dashboard coming soon</p>
+    <!-- Analytics Section -->
+    <div v-else-if="activeTab === 'analytics'" class="analytics-section">
+      <!-- Loading State -->
+      <div v-if="isAnalyticsLoading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading analytics...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="analyticsError" class="empty-state">
+        <i class="pi pi-exclamation-circle error-icon"></i>
+        <h3>Error Loading Analytics</h3>
+        <p>{{ analyticsError }}</p>
+        <Button
+          label="Retry"
+          icon="pi pi-refresh"
+          @click="refreshAnalytics"
+          outlined
+        />
+      </div>
+
+      <!-- Empty State (no transactions) -->
+      <div v-else-if="hasNoTransactions && !analyticsError && !isAnalyticsLoading" class="empty-state">
+        <i class="pi pi-inbox empty-icon"></i>
+        <h3>No Transactions Found</h3>
+        <p>There are no transactions to analyze yet.</p>
+      </div>
+
+      <!-- Analytics Content -->
+      <div v-else>
+        <div class="section-header">
+          <div class="header-left">
+            <h2 class="section-title">Analytics</h2>
+            <p class="section-subtitle">View insights into your spending patterns</p>
+          </div>
+          <div class="header-right">
+            <Button
+              icon="pi pi-refresh"
+              @click="refreshAnalytics"
+              :loading="isAnalyticsLoading"
+              outlined
+              aria-label="Refresh analytics"
+            />
+          </div>
+        </div>
+
+        <!-- Date Filter Toolbar -->
+        <div class="analytics-toolbar">
+          <div class="date-filters">
+            <Button
+              v-for="preset in datePresets"
+              :key="preset.value"
+              :label="preset.label"
+              :outlined="dateFilter !== preset.value"
+              @click="setDateFilter(preset.value)"
+              size="small"
+            />
+          </div>
+        </div>
+
+        <!-- Metrics Grid (Step 9) -->
+        <div class="analytics-metrics-grid">
+          <MetricCard
+            title="Total Spending"
+            :value="formatAnalyticsCurrency(summaryMetrics.totalSpending)"
+            icon="pi pi-wallet"
+          />
+
+          <MetricCard
+            title="Transactions"
+            :value="summaryMetrics.transactionCount.toString()"
+            icon="pi pi-list"
+          />
+
+          <MetricCard
+            title="Average"
+            :value="formatAnalyticsCurrency(summaryMetrics.averageTransaction)"
+            icon="pi pi-chart-line"
+          />
+
+          <MetricCard
+            title="Highest"
+            :value="formatAnalyticsCurrency(summaryMetrics.highestTransaction)"
+            icon="pi pi-arrow-up"
+          />
+        </div>
+
+        <!-- Charts Grid (Steps 10-15) -->
+        <div class="charts-grid">
+          <!-- Monthly Spending Chart (Step 11) -->
+          <div class="chart-card chart-card--wide">
+            <div v-if="spendingByMonth.length === 0" class="chart-empty-state">
+              <i class="pi pi-chart-line"></i>
+              <p>No chart data for selected period</p>
+            </div>
+            <div v-else class="chart-container">
+              <h4 class="chart-title">Monthly Spending</h4>
+              <div class="chart-wrapper">
+                <Chart
+                  type="line"
+                  :data="monthlyChartData"
+                  :options="monthlyChartOptions"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Spending by Tag Chart (Step 13) -->
+          <div v-if="spendingByTag.length === 0" class="chart-card">
+            <div class="chart-container">
+              <div class="chart-empty-state">
+                <i class="pi pi-tags" style="font-size: 2rem; color: #9ca3af"></i>
+                <p>No tag data for selected period</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="chart-card">
+            <div class="chart-container">
+              <h4>Spending by Tag</h4>
+              <div class="chart-wrapper">
+                <Chart
+                  type="pie"
+                  :data="tagChartData"
+                  :options="tagChartOptions"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Merchants List (Step 15) -->
+          <div class="chart-placeholder">
+            <h4>Top Merchants</h4>
+            <p>Coming soon</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -974,5 +1319,158 @@ const handlePaymentSubmit = async (paymentData: {
   color: #6b7280;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+/* Analytics Section */
+.analytics-section {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.analytics-toolbar {
+  margin-bottom: 24px;
+}
+
+.date-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.analytics-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.chart-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chart-card--wide {
+  grid-column: 1 / -1;
+}
+
+.chart-container {
+  padding: 20px;
+}
+
+.chart-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 300px;
+}
+
+.chart-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #6b7280;
+}
+
+.chart-empty-state i {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: #d1d5db;
+}
+
+.chart-placeholder {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-placeholder h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.error-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  color: #ef4444;
+}
+
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  color: #d1d5db;
+}
+
+/* Responsive adjustments for analytics */
+@media (max-width: 1024px) {
+  .analytics-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card--wide {
+    grid-column: 1;
+  }
+
+  .chart-wrapper {
+    height: 250px;
+  }
+
+  .date-filters {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 8px;
+  }
 }
 </style>
