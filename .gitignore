@@ -22,3 +22,5 @@ backend/.coverage
 backend/coverage.xml
 frontend/coverage/
 
+# Local dev data volumes
+.data/

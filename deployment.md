@@ -144,6 +144,46 @@ With the environment variables in place, you can deploy with Docker Compose:
 docker compose -f docker-compose.yml up -d
 ```
 
+## Garage (S3-compatible storage)
+
+This stack includes a [Garage](https://garagehq.deuxfleurs.fr/) service that provides an S3-compatible API for storing uploaded PDFs.
+
+Key points:
+
+- Garage uses `garage.toml` for its configuration and persistent Docker volumes for metadata/data.
+- On a fresh install (or after wiping Docker volumes), Garage needs a one-time bootstrap step to assign/apply the cluster layout. Until then it will respond with errors like "Layout not ready".
+- If Garage metadata is wiped, buckets/keys may be lost, and the backend will fail with S3 `AccessDenied` / missing-key errors until you re-provision them.
+
+### Bootstrap Garage
+
+After starting the stack, run:
+
+```bash
+./scripts/garage-bootstrap.sh
+```
+
+This script:
+
+- assigns/applies a single-node layout (if needed)
+- ensures the configured bucket exists
+- optionally imports an existing access key (if `S3_ACCESS_KEY` + `S3_SECRET_KEY` are set) and grants bucket permissions
+
+### Backend S3 settings
+
+The backend expects these environment variables (typically provided via `.env`/secrets):
+
+- `S3_ENDPOINT_URL`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_BUCKET`
+- `S3_REGION`
+
+For containers, `S3_ENDPOINT_URL` should generally be `http://garage:3900`.
+
+### Persistence warning
+
+Avoid `docker compose down -v` on the server unless you intentionally want to wipe Garage state.
+
 For production you wouldn't want to have the overrides in
 `docker-compose.override.yml`, that's why we explicitly specify
 `docker-compose.yml` as the file to use.
