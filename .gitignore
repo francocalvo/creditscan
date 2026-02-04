@@ -14,3 +14,11 @@ PROMPT.md
 **/.ralph/*
 **/specs/*
 **/llm/*
+llm/
+
+# Test coverage
+backend/htmlcov/
+backend/.coverage
+backend/coverage.xml
+frontend/coverage/
+

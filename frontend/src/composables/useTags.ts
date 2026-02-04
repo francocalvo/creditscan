@@ -8,6 +8,7 @@
  */
 import { ref, computed } from 'vue'
 import { OpenAPI } from '@/api'
+import type { ApiRequestOptions } from '@/api/core/ApiRequestOptions'
 
 export interface Tag {
   tag_id: string
@@ -48,7 +49,12 @@ export function useTags() {
 
     try {
       const token =
-        typeof OpenAPI.TOKEN === 'function' ? await OpenAPI.TOKEN({} as any) : OpenAPI.TOKEN || ''
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'GET',
+              url: '/api/v1/tags/',
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
       const url = `${OpenAPI.BASE}/api/v1/tags/`
 
       const response = await fetch(url, {

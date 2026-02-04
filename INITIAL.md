@@ -1,54 +1,29 @@
-# Implement upload statement workflow
-
-**Status:** In progress
-**Agent:** backend
-
 ## User Story
-
 **As a** user,
-**I want to** upload a PDF credit card statement,
-**So that** the system automatically extracts and stores all my transactions without manual data entry.
+**I want to** see detailed financial analytics,
+**So that** I can understand my spending patterns and make better financial decisions.
 
 ## Repo Notes
+- The Analytics tab currently exists as a placeholder in `frontend/src/views/StatementsView.vue`.
+- Backend currently does not expose analytics aggregation endpoints.
+- Backend *does* expose `GET /api/v1/transactions` with `skip`/`limit`.
 
-- Backend already has JSON CRUD endpoints for statements + transactions:
-  - `POST /api/v1/card-statements/`
-  - `POST /api/v1/transactions/`
-- There is currently **no** PDF upload endpoint.
-- Tagging infrastructure exists (`tags` + `transaction_tags` domains), but automatic rules do not yet exist.
+## MVP Approach (No new backend endpoints)
+- Build charts based on the most recent N transactions fetched via `GET /api/v1/transactions`.
+- Add simple date-range UI client-side; if server-side filtering is needed later, extend the transactions endpoint.
 
-## Proposed Backend API
+## Future (Backend-supported)
+- Add aggregation endpoints when data volume makes client-side aggregation too expensive:
+	- `GET /api/v1/analytics/spending-by-month`
+	- `GET /api/v1/analytics/spending-by-tag`
+	- `GET /api/v1/analytics/top-merchants`
 
-- `POST /api/v1/card-statements/upload`
-  - Accept `multipart/form-data` with `card_id` and `file` (PDF)
-  - Create a `CardStatement` and associated `Transaction` rows
-  - Apply rules (once rules engine exists) by creating `TransactionTag` rows
-  - Return created statement + transaction count
-
-## Extraction Requirements
-
-- Extract statement metadata:
-  - period start/end, close date, due date
-  - previous/current balance, minimum payment
-- Extract transactions:
-  - txn_date, payee, description, amount, currency
-  - installments (`installment_cur`/`installment_tot`) when present
-
-## Implementation Notes
-
-- Start with one supported PDF format (define a "supported" bank/brand) and return a clear 400/422 for unsupported PDFs.
-- Prefer a single DB transaction for statement + transactions creation.
-- Add structured error handling and logging.
-
-## Dependencies
-
-- Depends on backend rules engine for auto-tagging after upload.
+## Technical Implementation
+- Use PrimeVue Chart components.
+- Create `frontend/src/composables/useAnalytics.ts` for aggregation logic + loading states.
 
 ## Acceptance Criteria
-
-- [ ] PDF upload endpoint exists and accepts a PDF
-- [ ] Statement metadata extracted and stored
-- [ ] Transactions created with correct dates/amounts
-- [ ] Installments stored when present
-- [ ] (When rules exist) tags auto-applied
-- [ ] Clear errors for unsupported formats
+- [ ] Monthly spending chart displayed
+- [ ] Spending by tag/category chart displayed (based on available data)
+- [ ] Top merchants list
+- [ ] Loading/empty states handled

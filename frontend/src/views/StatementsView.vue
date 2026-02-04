@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useStatements } from '@/composables/useStatements'
-import { getCardDisplayName } from '@/composables/useCreditCards'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
+import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
+import Button from 'primevue/button'
+import Chart from 'primevue/chart'
 
-const { 
-  statementsWithCard, 
+const {
+  statementsWithCard,
   cards,
   balance,
   isLoading,
@@ -21,9 +23,9 @@ const {
   fetchStatements,
   fetchBalance,
   createPayment,
-  formatCurrency, 
-  formatDate, 
-  formatPeriod 
+  formatCurrency,
+  formatDate,
+  formatPeriod,
 } = useStatements()
 
 const {
@@ -31,19 +33,237 @@ const {
   isLoading: isTransactionsLoading,
   fetchTransactions,
   formatCurrency: formatTransactionCurrency,
-  formatDate: formatTransactionDate
+  formatDate: formatTransactionDate,
 } = useTransactions()
 
+const {
+  isLoading: isAnalyticsLoading,
+  error: analyticsError,
+  dateFilter,
+  setDateFilter,
+  fetchAnalytics,
+  refresh: refreshAnalytics,
+  filteredTransactions,
+  summaryMetrics,
+  spendingByMonth,
+  spendingByTag,
+  topMerchants,
+  formatCurrency: formatAnalyticsCurrency,
+} = useAnalytics()
+
 const enrichedTransactions = computed(() => {
-  return transactions.value.map(txn => {
-    const statement = statementsWithCard.value.find(s => s.id === txn.statement_id)
+  return transactions.value.map((txn) => {
+    const statement = statementsWithCard.value.find((s) => s.id === txn.statement_id)
     return {
       ...txn,
       card: statement?.card,
-      status: statement?.status || 'pending'
+      status: statement?.status || 'pending',
     }
   })
 })
+
+/**
+ * Transform spendingByMonth into Chart.js data format.
+ * Creates a new object when spendingByMonth changes to ensure proper reactivity.
+ */
+const monthlyChartData = computed(() => {
+  if (!spendingByMonth.value || spendingByMonth.value.length === 0) {
+    return {
+      labels: [],
+      datasets: [],
+    }
+  }
+
+  return {
+    labels: spendingByMonth.value.map((item) => item.month),
+    datasets: [
+      {
+        label: 'Monthly Spending',
+        data: spendingByMonth.value.map((item) => item.amount),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+      },
+    ],
+  }
+})
+
+/**
+ * Chart options for monthly spending line chart.
+ * Configured for responsive layout with area fill.
+ */
+const monthlyChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      backgroundColor: '#1f2937',
+      titleColor: '#f9fafb',
+      bodyColor: '#f9fafb',
+      padding: 12,
+      cornerRadius: 8,
+      displayColors: false,
+      callbacks: {
+        label: (context: unknown) => {
+          const value = context.parsed.y
+          return ` ${formatAnalyticsCurrency(value)}`
+        },
+      },
+    },
+  },
+  scales: {
+    x: {
+      grid: {
+        display: false,
+      },
+      ticks: {
+        color: '#6b7280',
+        font: {
+          size: 12,
+        },
+      },
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: '#f3f4f6',
+        borderDash: [5, 5],
+      },
+      ticks: {
+        color: '#6b7280',
+        font: {
+          size: 12,
+        },
+        callback: (value: unknown) => formatAnalyticsCurrency(value),
+      },
+    },
+  },
+}
+
+/**
+ * Color palette for tag chart segments.
+ * Provides 12 distinguishable colors for different tag categories.
+ * Cycles through colors if there are more categories than colors.
+ */
+const tagChartColors = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#6366f1', // indigo
+  '#14b8a6', // teal
+  '#eab308', // yellow
+  '#a855f7', // purple
+]
+
+/**
+ * Transform spendingByTag into Chart.js pie format.
+ * Creates a new object when spendingByTag changes to ensure proper reactivity.
+ * Applies colors from palette, cycling if more categories than colors available.
+ */
+const tagChartData = computed(() => {
+  if (!spendingByTag.value || spendingByTag.value.length === 0) {
+    return {
+      labels: [],
+      datasets: [],
+    }
+  }
+
+  return {
+    labels: spendingByTag.value.map((item) => item.tag),
+    datasets: [
+      {
+        data: spendingByTag.value.map((item) => item.amount),
+        backgroundColor: spendingByTag.value.map(
+          (_, index) => tagChartColors[index % tagChartColors.length],
+        ),
+        borderWidth: 2,
+        borderColor: '#ffffff',
+      },
+    ],
+  }
+})
+
+/**
+ * Chart options for spending by tag pie chart.
+ * Configured for responsive layout with legend on the right side.
+ * Legend moves to bottom on mobile screens for better space utilization.
+ */
+const tagChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'right' as const,
+      labels: {
+        color: '#374151',
+        font: {
+          size: 12,
+        },
+        padding: 15,
+        usePointStyle: true,
+        pointStyle: 'circle',
+      },
+    },
+    tooltip: {
+      backgroundColor: '#1f2937',
+      titleColor: '#f9fafb',
+      bodyColor: '#f9fafb',
+      padding: 12,
+      cornerRadius: 8,
+      displayColors: true,
+      callbacks: {
+        label: (context: unknown) => {
+          const dataIndex = context.dataIndex
+          const item = spendingByTag.value[dataIndex]
+          if (!item) return ''
+          const percentage = item.percentage.toFixed(1)
+          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+        },
+      },
+    },
+  },
+}
+
+// Computed options that respond to screen size
+const isMobile = ref(false)
+
+// Check screen size on mount and resize
+onMounted(() => {
+  const checkScreenSize = () => {
+    isMobile.value = window.innerWidth <= 768
+  }
+  checkScreenSize()
+  window.addEventListener('resize', checkScreenSize)
+  onUnmounted(() => {
+    window.removeEventListener('resize', checkScreenSize)
+  })
+})
+
+// Adjust pie chart legend position based on screen size
+// Note: We use type assertion here because Chart.js position types don't
+// allow dynamic switching between 'right' and 'bottom' at runtime
+watch(
+  isMobile,
+  (mobile) => {
+    tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as 'bottom' | 'right'
+  },
+  { immediate: true },
+)
 
 const toast = useToast()
 
@@ -55,7 +275,7 @@ const filterStatus = ref('all')
 const showPaymentModal = ref(false)
 const showDetailModal = ref(false)
 const detailStartInEditMode = ref(false)
-const selectedStatement = ref<typeof statementsWithCard.value[0] | null>(null)
+const selectedStatement = ref<(typeof statementsWithCard.value)[0] | null>(null)
 const isProcessingPayment = ref(false)
 const isTransitioningModals = ref(false)
 
@@ -71,11 +291,53 @@ watch(statementsWithCard, (updatedStatements) => {
   }
 })
 
+// Analytics composable
+const analyticsInitialized = ref(false)
+
+// Check if there are no transactions for the current filter
+const hasNoTransactions = computed(() => filteredTransactions.value.length === 0)
+
+const handleAnalyticsRefresh = async () => {
+  if (isAnalyticsLoading.value) return
+
+  try {
+    await refreshAnalytics()
+  } finally {
+    analyticsInitialized.value = true
+  }
+}
+
+watch(
+  activeTab,
+  async (newTab) => {
+    if (newTab !== 'analytics') return
+    if (analyticsInitialized.value) return
+    if (isAnalyticsLoading.value) return
+
+    try {
+      await fetchAnalytics()
+    } finally {
+      analyticsInitialized.value = true
+    }
+  },
+  { immediate: true },
+)
+
+// Date filter presets for analytics
+const datePresets = [
+  { label: 'Last Week', value: 'week' },
+  { label: 'Last Month', value: 'month' },
+  { label: 'Last 3 Months', value: '3months' },
+  { label: 'Last 6 Months', value: '6months' },
+  { label: 'Last Year', value: 'year' },
+  { label: 'All Time', value: 'all' },
+] as const
+
 const tabs = [
   { id: 'statements', label: 'Statements' },
   { id: 'cards', label: 'Cards' },
   { id: 'analytics', label: 'Analytics' },
-  { id: 'transactions', label: 'Transactions' }
+  { id: 'transactions', label: 'Transactions' },
 ]
 
 // Calculate metrics from statements and balance endpoint
@@ -92,12 +354,12 @@ const activeCards = computed(() => {
 })
 
 const pendingStatements = computed(() => {
-  return statementsWithCard.value.filter(s => s.status === 'pending').length
+  return statementsWithCard.value.filter((s) => s.status === 'pending').length
 })
 
 const creditUtilization = computed(() => {
-  // Mock calculation - in real app would use credit limits
-  return '23%'
+  // We don't have credit limit data yet, so we can't compute utilization.
+  return 'N/A'
 })
 
 // Filter statements based on search and status
@@ -106,10 +368,10 @@ const filteredStatements = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(s => {
+    filtered = filtered.filter((s) => {
       if (!s.card) return false
       return (
-        s.card.last4.includes(query) || 
+        s.card.last4.includes(query) ||
         s.card.bank.toLowerCase().includes(query) ||
         s.card.brand.toLowerCase().includes(query)
       )
@@ -117,7 +379,7 @@ const filteredStatements = computed(() => {
   }
 
   if (filterStatus.value !== 'all') {
-    filtered = filtered.filter(s => s.status === filterStatus.value)
+    filtered = filtered.filter((s) => s.status === filterStatus.value)
   }
 
   return filtered
@@ -129,7 +391,7 @@ onMounted(() => {
   fetchTransactions()
 })
 
-const getStatementCardDisplay = (statement: typeof statementsWithCard.value[0]) => {
+const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]) => {
   if (!statement.card) return 'Unknown Card'
   const brandName = statement.card.brand.charAt(0).toUpperCase() + statement.card.brand.slice(1)
   return `${statement.card.bank} ${brandName} ••${statement.card.last4}`
@@ -141,43 +403,43 @@ const getCardBrandIcon = (brand?: string): string => {
     mastercard: 'pi pi-credit-card',
     amex: 'pi pi-credit-card',
     discover: 'pi pi-credit-card',
-    other: 'pi pi-credit-card'
+    other: 'pi pi-credit-card',
   }
   return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
 // Get statements count per card
 const getCardStatementsCount = (cardId: string) => {
-  return statementsWithCard.value.filter(s => s.card_id === cardId).length
+  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
 }
 
 // Get latest balance for a card
 const getCardLatestBalance = (cardId: string) => {
   const cardStatements = statementsWithCard.value
-    .filter(s => s.card_id === cardId)
+    .filter((s) => s.card_id === cardId)
     .sort((a, b) => {
       if (!a.period_end || !b.period_end) return 0
       return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
-  
+
   return cardStatements.length > 0 ? cardStatements[0].current_balance : null
 }
 
 // Handle payment button click
-const handlePayClick = (statement: typeof statementsWithCard.value[0]) => {
+const handlePayClick = (statement: (typeof statementsWithCard.value)[0]) => {
   selectedStatement.value = statement
   showPaymentModal.value = true
 }
 
 // Handle View Details button click
-const handleViewDetails = (statement: typeof statementsWithCard.value[0]) => {
+const handleViewDetails = (statement: (typeof statementsWithCard.value)[0]) => {
   selectedStatement.value = statement
   detailStartInEditMode.value = false
   showDetailModal.value = true
 }
 
 // Handle Pay button click from detail modal
-const handlePayFromDetail = (statement: typeof statementsWithCard.value[0]) => {
+const handlePayFromDetail = (statement: (typeof statementsWithCard.value)[0]) => {
   if (isTransitioningModals.value) return
   isTransitioningModals.value = true
   showDetailModal.value = false
@@ -220,7 +482,7 @@ const handlePaymentSubmit = async (paymentData: {
       severity: 'success',
       summary: 'Payment Successful',
       detail: `Payment of ${formatCurrency(paymentData.amount)} has been recorded.`,
-      life: 3000
+      life: 3000,
     })
     showPaymentModal.value = false
     selectedStatement.value = null
@@ -228,8 +490,9 @@ const handlePaymentSubmit = async (paymentData: {
     toast.add({
       severity: 'error',
       summary: 'Payment Failed',
-      detail: error instanceof Error ? error.message : 'An error occurred while processing the payment.',
-      life: 5000
+      detail:
+        error instanceof Error ? error.message : 'An error occurred while processing the payment.',
+      life: 5000,
     })
   } finally {
     isProcessingPayment.value = false
@@ -247,35 +510,31 @@ const handlePaymentSubmit = async (paymentData: {
         subtitle="All unpaid statements"
         icon="pi pi-dollar"
       />
-      
+
       <MetricCard
         title="Monthly Balance"
         :value="monthlyBalance"
         subtitle="Excluding future installments"
         icon="pi pi-chart-bar"
       />
-      
+
       <MetricCard
         title="Active Cards"
         :value="activeCards.toString()"
         :subtitle="`${pendingStatements} statements pending`"
         icon="pi pi-credit-card"
       />
-      
+
       <MetricCard
         title="Credit Utilization"
         :value="creditUtilization"
-        subtitle="Excellent utilization rate"
+        subtitle="Requires credit limits"
         icon="pi pi-trending-up"
       />
     </div>
 
     <!-- Tab Navigation -->
-    <TabNavigation 
-      :tabs="tabs" 
-      :activeTab="activeTab"
-      @update:activeTab="activeTab = $event"
-    />
+    <TabNavigation :tabs="tabs" :activeTab="activeTab" @update:activeTab="activeTab = $event" />
 
     <!-- Statements Section -->
     <div v-if="activeTab === 'statements'" class="statements-section">
@@ -290,14 +549,14 @@ const handlePaymentSubmit = async (paymentData: {
       <div class="controls">
         <div class="search-box">
           <i class="pi pi-search search-icon"></i>
-          <input 
+          <input
             v-model="searchQuery"
-            type="text" 
+            type="text"
             placeholder="Search statements..."
             class="search-input"
           />
         </div>
-        
+
         <div class="filter-controls">
           <button class="filter-button">
             <i class="pi pi-cog"></i>
@@ -343,14 +602,16 @@ const handlePaymentSubmit = async (paymentData: {
               </td>
               <td>
                 <div class="action-buttons">
-                  <button 
-                    class="action-button" 
+                  <button
+                    class="action-button"
                     @click="handlePayClick(statement)"
                     :disabled="statement.is_fully_paid"
                   >
                     Pay
                   </button>
-                  <button class="action-button" @click="handleViewDetails(statement)">View Details</button>
+                  <button class="action-button" @click="handleViewDetails(statement)">
+                    View Details
+                  </button>
                 </div>
               </td>
             </tr>
@@ -378,17 +639,16 @@ const handlePaymentSubmit = async (paymentData: {
       </div>
 
       <div v-else-if="cards.length === 0" class="empty-state">
-        <i class="pi pi-credit-card" style="font-size: 64px; color: #d1d5db; margin-bottom: 16px;"></i>
-        <h3 style="margin: 0 0 8px 0;">No cards added yet</h3>
-        <p style="margin: 0; color: #6b7280;">Add your first credit card to get started</p>
+        <i
+          class="pi pi-credit-card"
+          style="font-size: 64px; color: #d1d5db; margin-bottom: 16px"
+        ></i>
+        <h3 style="margin: 0 0 8px 0">No cards added yet</h3>
+        <p style="margin: 0; color: #6b7280">Add your first credit card to get started</p>
       </div>
 
       <div v-else class="cards-grid">
-        <div 
-          v-for="card in cards" 
-          :key="card.id"
-          class="card-item-large"
-        >
+        <div v-for="card in cards" :key="card.id" class="card-item-large">
           <div class="card-header-section">
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
@@ -397,11 +657,9 @@ const handlePaymentSubmit = async (paymentData: {
               <i class="pi pi-ellipsis-v"></i>
             </div>
           </div>
-          
+
           <div class="card-body">
-            <div class="card-number">
-              •••• •••• •••• {{ card.last4 }}
-            </div>
+            <div class="card-number">•••• •••• •••• {{ card.last4 }}</div>
             <div class="card-details-row">
               <div class="card-detail">
                 <div class="detail-label">Bank</div>
@@ -428,12 +686,161 @@ const handlePaymentSubmit = async (paymentData: {
       </div>
     </div>
 
-    <!-- Analytics Section (Placeholder) -->
-    <div v-else-if="activeTab === 'analytics'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-chart-line placeholder-icon"></i>
-        <h3>Analytics</h3>
-        <p>Analytics dashboard coming soon</p>
+    <!-- Analytics Section -->
+    <div v-else-if="activeTab === 'analytics'" class="analytics-section">
+      <div class="section-header">
+        <div class="header-left">
+          <h2 class="section-title">Analytics</h2>
+          <p class="section-subtitle">View insights into your spending patterns</p>
+        </div>
+        <div class="header-right">
+          <Button
+            icon="pi pi-refresh"
+            @click="handleAnalyticsRefresh"
+            :loading="isAnalyticsLoading"
+            :disabled="isAnalyticsLoading"
+            outlined
+            aria-label="Refresh analytics"
+          />
+        </div>
+      </div>
+
+      <!-- Date Filter Toolbar -->
+      <div class="analytics-toolbar">
+        <div class="date-filters" role="group" aria-label="Date filter options">
+          <Button
+            v-for="preset in datePresets"
+            :key="preset.value"
+            :label="preset.label"
+            :outlined="dateFilter !== preset.value"
+            @click="setDateFilter(preset.value)"
+            size="small"
+            :aria-pressed="dateFilter === preset.value"
+          />
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="isAnalyticsLoading || !analyticsInitialized" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading analytics...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="analyticsError" class="empty-state">
+        <i class="pi pi-exclamation-circle error-icon"></i>
+        <h3>Error Loading Analytics</h3>
+        <p>{{ analyticsError }}</p>
+        <Button
+          label="Retry"
+          icon="pi pi-refresh"
+          @click="handleAnalyticsRefresh"
+          :loading="isAnalyticsLoading"
+          :disabled="isAnalyticsLoading"
+          outlined
+        />
+      </div>
+
+      <!-- Empty State (no transactions) -->
+      <div v-else-if="hasNoTransactions" class="empty-state">
+        <i class="pi pi-inbox empty-icon"></i>
+        <h3>No Transactions Found</h3>
+        <p>There are no transactions to analyze yet.</p>
+      </div>
+
+      <!-- Analytics Content -->
+      <div v-else>
+        <!-- Metrics Grid (Step 9) -->
+        <div class="analytics-metrics-grid">
+          <MetricCard
+            title="Total Spending"
+            :value="formatAnalyticsCurrency(summaryMetrics.totalSpending)"
+            icon="pi pi-wallet"
+          />
+
+          <MetricCard
+            title="Transactions"
+            :value="summaryMetrics.transactionCount.toString()"
+            icon="pi pi-list"
+          />
+
+          <MetricCard
+            title="Median Transaction"
+            :value="formatAnalyticsCurrency(summaryMetrics.medianTransaction)"
+            icon="pi pi-chart-line"
+          />
+
+          <MetricCard
+            title="Highest Transaction"
+            :value="formatAnalyticsCurrency(summaryMetrics.highestTransaction)"
+            icon="pi pi-arrow-up"
+          />
+        </div>
+
+        <!-- Charts Grid (Steps 10-15) -->
+        <div class="charts-grid">
+          <!-- Monthly Spending Chart (Step 11) -->
+          <div class="chart-card chart-card--wide">
+            <div v-if="spendingByMonth.length === 0" class="chart-empty-state">
+              <i class="pi pi-chart-line"></i>
+              <p>No chart data for selected period</p>
+            </div>
+            <div v-else class="chart-container">
+              <h4 class="chart-title">Monthly Spending</h4>
+              <div class="chart-wrapper">
+                <Chart type="line" :data="monthlyChartData" :options="monthlyChartOptions" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Spending by Tag Chart (Step 13) -->
+          <div v-if="spendingByTag.length === 0" class="chart-card">
+            <div class="chart-container">
+              <div class="chart-empty-state">
+                <i class="pi pi-tags" style="font-size: 2rem; color: #9ca3af"></i>
+                <p>No tag data for selected period</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="chart-card">
+            <div class="chart-container">
+              <h4>Spending by Tag</h4>
+              <div class="chart-wrapper">
+                <Chart type="pie" :data="tagChartData" :options="tagChartOptions" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Merchants List (Step 15) -->
+          <div class="chart-card">
+            <div v-if="topMerchants.length === 0" class="chart-empty-state">
+              <i class="pi pi-store" style="font-size: 2rem; color: #9ca3af"></i>
+              <p>No merchant data for selected period</p>
+            </div>
+            <div v-else class="chart-container">
+              <h4>Top Merchants</h4>
+              <div class="merchants-list">
+                <div
+                  v-for="(merchant, index) in topMerchants"
+                  :key="merchant.payee"
+                  class="merchant-item"
+                >
+                  <div class="merchant-rank">{{ index + 1 }}</div>
+                  <div class="merchant-info">
+                    <div class="merchant-name">{{ merchant.payee }}</div>
+                    <div class="merchant-count">
+                      {{ merchant.transactionCount }}
+                      {{ merchant.transactionCount === 1 ? 'transaction' : 'transactions' }}
+                    </div>
+                  </div>
+                  <div class="merchant-amount">
+                    {{ formatAnalyticsCurrency(merchant.totalAmount) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -483,7 +890,9 @@ const handlePaymentSubmit = async (paymentData: {
                 </span>
                 <span v-else>-</span>
               </td>
-              <td class="balance-cell">{{ formatTransactionCurrency(transaction.amount, transaction.currency) }}</td>
+              <td class="balance-cell">
+                {{ formatTransactionCurrency(transaction.amount, transaction.currency) }}
+              </td>
               <td>
                 <StatusBadge :status="transaction.status" />
               </td>
@@ -502,7 +911,11 @@ const handlePaymentSubmit = async (paymentData: {
       v-if="selectedStatement"
       v-model:visible="showPaymentModal"
       :statement-id="selectedStatement.id"
-      :current-balance="typeof selectedStatement.current_balance === 'string' ? parseFloat(selectedStatement.current_balance) : selectedStatement.current_balance"
+      :current-balance="
+        typeof selectedStatement.current_balance === 'string'
+          ? parseFloat(selectedStatement.current_balance)
+          : selectedStatement.current_balance
+      "
       :statement-card="getStatementCardDisplay(selectedStatement)"
       :is-submitting="isProcessingPayment"
       @submit="handlePaymentSubmit"
@@ -755,7 +1168,9 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */
@@ -782,7 +1197,9 @@ const handlePaymentSubmit = async (paymentData: {
   padding: 24px;
   color: white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   cursor: pointer;
   min-height: 240px;
   display: flex;
@@ -974,5 +1391,237 @@ const handlePaymentSubmit = async (paymentData: {
   color: #6b7280;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+/* Analytics Section */
+.analytics-section {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.analytics-toolbar {
+  margin-bottom: 24px;
+}
+
+.date-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.analytics-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.chart-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chart-card--wide {
+  grid-column: 1 / -1;
+}
+
+.chart-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 300px;
+}
+
+.chart-card--wide .chart-wrapper {
+  height: 420px;
+}
+
+.chart-wrapper .p-chart {
+  height: 100%;
+}
+
+.chart-wrapper canvas {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.chart-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #6b7280;
+}
+
+.chart-empty-state i {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: #d1d5db;
+}
+
+.chart-placeholder {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-placeholder h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Merchants List Styles */
+.merchants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.merchant-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.merchant-item:hover {
+  background: #f3f4f6;
+}
+
+.merchant-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.merchant-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.merchant-name {
+  font-weight: 500;
+  color: #111827;
+  font-size: 14px;
+}
+
+.merchant-count {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.merchant-amount {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+  text-align: right;
+}
+
+.error-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  color: #ef4444;
+}
+
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  color: #d1d5db;
+}
+
+/* Responsive adjustments for analytics */
+@media (max-width: 1024px) {
+  .analytics-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card--wide {
+    grid-column: 1;
+  }
+
+  .chart-wrapper {
+    height: 250px;
+  }
+
+  .chart-card--wide .chart-wrapper {
+    height: 320px;
+  }
+
+  .date-filters {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 8px;
+  }
 }
 </style>

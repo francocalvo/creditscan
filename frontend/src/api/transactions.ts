@@ -14,6 +14,7 @@ export type Transaction = {
     user_id: string
     created_at: string
     updated_at: string
+    payee?: string | null
 }
 
 export type TransactionsPublic = {

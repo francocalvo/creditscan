@@ -16,11 +16,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isSignup = computed(() => route.name === 'signup')
-const pageTitle = computed(() => isSignup.value ? 'Sign Up' : 'Login')
+const pageTitle = computed(() => (isSignup.value ? 'Sign Up' : 'Login'))
 
 // Dark mode detection
 const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
-const logoSrc = computed(() => isDarkMode.value ? logoDark : logoLight)
+const logoSrc = computed(() => (isDarkMode.value ? logoDark : logoLight))
 
 const updateDarkMode = () => {
   isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
@@ -30,17 +30,17 @@ onMounted(() => {
   // Create a MutationObserver to watch for class changes on the document element
   const observer = new MutationObserver(updateDarkMode)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  
+
   // Store observer for cleanup
-  ;(window as any).__darkModeObserver = observer
+  ;(window as { __darkModeObserver?: MutationObserver }).__darkModeObserver = observer
 })
 
 onUnmounted(() => {
   // Clean up observer
-  const observer = (window as any).__darkModeObserver
+  const observer = (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
   if (observer) {
     observer.disconnect()
-    delete (window as any).__darkModeObserver
+    delete (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
   }
 })
 
@@ -59,15 +59,16 @@ const isValidEmail = (email: string): boolean => {
 
 // Form validation
 const isFormValid = computed(() => {
-  const baseValid = email.value.trim() !== '' && 
-                    password.value.trim() !== '' && 
-                    isValidEmail(email.value)
-  
+  const baseValid =
+    email.value.trim() !== '' && password.value.trim() !== '' && isValidEmail(email.value)
+
   if (isSignup.value) {
-    return baseValid && 
-           fullName.value.trim() !== '' && 
-           confirmPassword.value.trim() !== '' &&
-           password.value === confirmPassword.value
+    return (
+      baseValid &&
+      fullName.value.trim() !== '' &&
+      confirmPassword.value.trim() !== '' &&
+      password.value === confirmPassword.value
+    )
   }
   return baseValid
 })
@@ -75,7 +76,7 @@ const isFormValid = computed(() => {
 // Password validation for signup
 const passwordErrors = computed(() => {
   if (!formSubmitted.value || !isSignup.value) return []
-  
+
   const errors = []
   if (password.value.length < 8) {
     errors.push('Password must be at least 8 characters long')
@@ -85,7 +86,7 @@ const passwordErrors = computed(() => {
 
 const confirmPasswordError = computed(() => {
   if (!formSubmitted.value || !isSignup.value || !confirmPassword.value) return null
-  
+
   if (password.value !== confirmPassword.value) {
     return 'Passwords do not match'
   }
@@ -102,24 +103,24 @@ const handleSubmit = async () => {
         await authStore.register({
           email: email.value,
           full_name: fullName.value,
-          password: password.value
+          password: password.value,
         })
-        
+
         // Auto-login after registration
         await authStore.login({
           username: email.value,
-          password: password.value
+          password: password.value,
         })
       } else {
         await authStore.login({
           username: email.value,
-          password: password.value
+          password: password.value,
         })
       }
-      
-      const redirectPath = route.query.redirect as string || '/'
+
+      const redirectPath = (route.query.redirect as string) || '/'
       router.push(redirectPath)
-    } catch (err) {
+    } catch {
       // Error handled by store
     }
   }
@@ -134,9 +135,12 @@ const resetExtraFields = () => {
 
 // Watch for route changes
 import { watch } from 'vue'
-watch(() => route.name, () => {
-  resetExtraFields()
-})
+watch(
+  () => route.name,
+  () => {
+    resetExtraFields()
+  },
+)
 </script>
 
 <template>
@@ -145,7 +149,7 @@ watch(() => route.name, () => {
       <div class="auth-logo">
         <img :src="logoSrc" alt="FindDash Logo" />
       </div>
-      
+
       <Card class="auth-card">
         <template #header>
           <div class="card-header">
@@ -171,7 +175,9 @@ watch(() => route.name, () => {
                     class="w-full"
                   />
                 </div>
-                <small v-if="formSubmitted && !fullName" class="error-text">Full name is required</small>
+                <small v-if="formSubmitted && !fullName" class="error-text"
+                  >Full name is required</small
+                >
               </div>
             </transition>
 
@@ -210,12 +216,10 @@ watch(() => route.name, () => {
                   class="w-full"
                 />
               </div>
-              <small v-if="formSubmitted && !password" class="error-text">Password is required</small>
-              <small
-                v-for="(error, index) in passwordErrors"
-                :key="index"
-                class="error-text"
+              <small v-if="formSubmitted && !password" class="error-text"
+                >Password is required</small
               >
+              <small v-for="(error, index) in passwordErrors" :key="index" class="error-text">
                 {{ error }}
               </small>
             </div>
@@ -231,7 +235,9 @@ watch(() => route.name, () => {
                     placeholder="Confirm your password"
                     :toggleMask="true"
                     :feedback="false"
-                    :class="{ invalid: formSubmitted && (!confirmPassword || confirmPasswordError) }"
+                    :class="{
+                      invalid: formSubmitted && (!confirmPassword || confirmPasswordError),
+                    }"
                     autocomplete="new-password"
                     class="w-full"
                   />
@@ -252,10 +258,10 @@ watch(() => route.name, () => {
 
             <!-- Submit button -->
             <div class="button-container">
-              <Button 
-                type="submit" 
-                :label="isSignup ? 'Sign Up' : 'Login'" 
-                :icon="isSignup ? 'pi pi-user-plus' : 'pi pi-sign-in'" 
+              <Button
+                type="submit"
+                :label="isSignup ? 'Sign Up' : 'Login'"
+                :icon="isSignup ? 'pi pi-user-plus' : 'pi pi-sign-in'"
                 :loading="authStore.loading"
                 class="p-button-primary auth-button"
               />
@@ -264,11 +270,11 @@ watch(() => route.name, () => {
             <!-- Toggle link -->
             <div class="toggle-link">
               <p v-if="isSignup">
-                Already have an account? 
+                Already have an account?
                 <router-link to="/auth/login" class="link">Log In</router-link>
               </p>
               <p v-else>
-                Don't have an account? 
+                Don't have an account?
                 <router-link to="/auth/signup" class="link">Sign Up</router-link>
               </p>
             </div>

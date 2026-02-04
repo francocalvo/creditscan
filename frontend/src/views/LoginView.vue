@@ -30,14 +30,14 @@ const handleSubmit = async () => {
     try {
       await authStore.login({
         username: username.value,
-        password: password.value
+        password: password.value,
       })
-      
+
       // Redirect to the originally requested URL or home
-      const redirectPath = route.query.redirect as string || '/'
+      const redirectPath = (route.query.redirect as string) || '/'
       router.push(redirectPath)
-    } catch (err) {
-      // Error is handled by the store
+    } catch {
+      // Error is handled by store
     }
   }
 }
@@ -45,58 +45,58 @@ const handleSubmit = async () => {
 
 <template>
   <form @submit.prevent="handleSubmit" class="form-container">
-            <div class="form-field">
-              <label for="username">Username</label>
-              <div class="input-wrapper">
-                <InputText
-                  id="username"
-                  v-model="username"
-                  placeholder="Enter your username"
-                  :class="{ invalid: formSubmitted && !username }"
-                  autocomplete="username"
-                  class="w-full"
-                />
-              </div>
-              <small v-if="formSubmitted && !username" class="error-text">Username required</small>
-            </div>
+    <div class="form-field">
+      <label for="username">Username</label>
+      <div class="input-wrapper">
+        <InputText
+          id="username"
+          v-model="username"
+          placeholder="Enter your username"
+          :class="{ invalid: formSubmitted && !username }"
+          autocomplete="username"
+          class="w-full"
+        />
+      </div>
+      <small v-if="formSubmitted && !username" class="error-text">Username required</small>
+    </div>
 
-            <div class="form-field">
-              <label for="password">Password</label>
-              <div class="input-wrapper">
-                <Password
-                  id="password"
-                  v-model="password"
-                  placeholder="Enter your password"
-                  :toggleMask="true"
-                  :feedback="false"
-                  :class="{ invalid: formSubmitted && !password }"
-                  autocomplete="current-password"
-                  class="w-full"
-                />
-              </div>
-              <small v-if="formSubmitted && !password" class="error-text">Password required</small>
-            </div>
+    <div class="form-field">
+      <label for="password">Password</label>
+      <div class="input-wrapper">
+        <Password
+          id="password"
+          v-model="password"
+          placeholder="Enter your password"
+          :toggleMask="true"
+          :feedback="false"
+          :class="{ invalid: formSubmitted && !password }"
+          autocomplete="current-password"
+          class="w-full"
+        />
+      </div>
+      <small v-if="formSubmitted && !password" class="error-text">Password required</small>
+    </div>
 
-            <div v-if="authStore.error" class="error-message">
-              <Message severity="error">{{ authStore.error.message }}</Message>
-            </div>
+    <div v-if="authStore.error" class="error-message">
+      <Message severity="error">{{ authStore.error.message }}</Message>
+    </div>
 
-            <div class="button-container">
-              <Button 
-                type="submit" 
-                label="Login" 
-                icon="pi pi-sign-in" 
-                :loading="authStore.loading"
-                class="p-button-primary login-button"
-              />
-            </div>
+    <div class="button-container">
+      <Button
+        type="submit"
+        label="Login"
+        icon="pi pi-sign-in"
+        :loading="authStore.loading"
+        class="p-button-primary login-button"
+      />
+    </div>
 
-            <div class="signup-link">
-              <p>
-                Don't have an account? 
-                <router-link to="/auth/signup" class="link">Sign Up</router-link>
-              </p>
-            </div>
+    <div class="signup-link">
+      <p>
+        Don't have an account?
+        <router-link to="/auth/signup" class="link">Sign Up</router-link>
+      </p>
+    </div>
   </form>
 </template>
 

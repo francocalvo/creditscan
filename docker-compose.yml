@@ -196,7 +196,7 @@ services:
       - traefik.http.routers.${STACK_NAME?Variable not
         set}-frontend-http.middlewares=https-redirect
   garage:
-    image: dxflrs/garage:v0.9
+    image: dxflrs/garage:v2.2.0
     restart: always
     ports:
       - "3900:3900"  # S3 API

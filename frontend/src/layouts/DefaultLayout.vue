@@ -16,7 +16,7 @@ const authStore = useAuthStore()
 
 // Dark mode detection
 const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
-const logoSrc = computed(() => isDarkMode.value ? logoDark : logoLight)
+const logoSrc = computed(() => (isDarkMode.value ? logoDark : logoLight))
 
 const updateDarkMode = () => {
   isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
@@ -26,17 +26,17 @@ onMounted(() => {
   // Create a MutationObserver to watch for class changes on the document element
   const observer = new MutationObserver(updateDarkMode)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-  
+
   // Store observer for cleanup
-  ;(window as any).__darkModeObserver = observer
+  ;(window as { __darkModeObserver?: MutationObserver }).__darkModeObserver = observer
 })
 
 onUnmounted(() => {
   // Clean up observer
-  const observer = (window as any).__darkModeObserver
+  const observer = (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
   if (observer) {
     observer.disconnect()
-    delete (window as any).__darkModeObserver
+    delete (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
   }
 })
 
@@ -53,10 +53,10 @@ const userMenuItems = ref<MenuItem[]>([
     icon: 'pi pi-cog',
     command: () => {
       router.push('/settings')
-    }
+    },
   },
   {
-    separator: true
+    separator: true,
   },
   {
     label: 'Logout',
@@ -64,8 +64,8 @@ const userMenuItems = ref<MenuItem[]>([
     command: () => {
       authStore.logout()
       router.push('/auth/login')
-    }
-  }
+    },
+  },
 ])
 
 // User initials for avatar
@@ -87,7 +87,6 @@ const handleUploadStatement = () => {
 const toggleDarkMode = () => {
   document.documentElement.classList.toggle('my-app-dark')
 }
-
 </script>
 
 <template>
@@ -100,22 +99,22 @@ const toggleDarkMode = () => {
             <span class="logo-text">CreditScan</span>
           </router-link>
         </div>
-        
+
         <div class="header-actions">
           <Button
-            label="Upload Statement"  
+            label="Upload Statement"
             icon="pi pi-upload"
             @click="handleUploadStatement"
             class="upload-button"
           />
-          
+
           <Button
             icon="pi pi-moon"
             @click="toggleDarkMode"
             class="p-button-rounded p-button-text"
             aria-label="Toggle Dark Mode"
           />
-          
+
           <div class="user-menu-container">
             <Avatar
               :label="userInitials"
@@ -128,7 +127,7 @@ const toggleDarkMode = () => {
         </div>
       </div>
     </header>
-    
+
     <main class="content">
       <router-view></router-view>
     </main>
@@ -207,7 +206,9 @@ const toggleDarkMode = () => {
   background-color: var(--primary-color);
   color: white;
   font-weight: 600;
-  transition: transform 0.2s, opacity 0.2s;
+  transition:
+    transform 0.2s,
+    opacity 0.2s;
 }
 
 .user-avatar:hover {
@@ -226,15 +227,15 @@ const toggleDarkMode = () => {
   .header-content {
     padding: 1rem;
   }
-  
+
   .logo-text {
     font-size: 1.25rem;
   }
-  
+
   .upload-button {
     padding: 0.5rem 1rem;
   }
-  
+
   .upload-button :deep(.p-button-label) {
     display: none;
   }
@@ -244,11 +245,11 @@ const toggleDarkMode = () => {
   .logo-text {
     font-size: 1rem;
   }
-  
+
   .logo-image {
     height: 32px;
   }
-  
+
   .header-actions {
     gap: 0.5rem;
   }

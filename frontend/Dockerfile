@@ -1,4 +1,4 @@
-FROM node:22-alpine as build-stage
+FROM node:22-alpine as base
 
 WORKDIR /app
 
@@ -18,6 +18,16 @@ ARG NODE_ENV=production
 # Set environment variables for build
 ENV VITE_API_URL=$VITE_API_URL
 ENV NODE_ENV=$NODE_ENV
+
+# Development stage - runs Vite dev server with HMR
+FROM base as development-stage
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+# Build stage - builds production assets
+FROM base as build-stage
 
 # Build the application
 RUN npm run build

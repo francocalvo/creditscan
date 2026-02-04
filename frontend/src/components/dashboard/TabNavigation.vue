@@ -13,7 +13,7 @@ interface Emits {
   (e: 'update:activeTab', value: string): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const handleTabClick = (tabId: string) => {
@@ -65,4 +65,3 @@ const handleTabClick = (tabId: string) => {
   border-bottom-color: #111827;
 }
 </style>
-

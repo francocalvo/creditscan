@@ -46,12 +46,11 @@ class UpdateUserUseCase:
             if existing_user and existing_user.id != user_id:
                 raise DuplicateUserError("User with this email already exists")
 
-        # Convert UserUpdateMe to UserUpdate if needed
+        # Convert UserUpdateMe to UserUpdate if needed, preserving only set fields
         if isinstance(user_data, UserUpdateMe):
-            update_data = UserUpdate(
-                email=user_data.email,
-                full_name=user_data.full_name,
-            )
+            # Use model_dump(exclude_unset=True) to only include explicitly provided fields
+            update_dict = user_data.model_dump(exclude_unset=True)
+            update_data = UserUpdate.model_validate(update_dict)
         else:
             update_data = user_data
 
