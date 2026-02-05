@@ -165,6 +165,67 @@ export function useCreditCards() {
     }
   }
 
+  /**
+   * Delete a credit card by id and update the local cards list on success.
+   */
+  const deleteCard = async (cardId: string): Promise<void> => {
+    error.value = null
+
+    const token =
+      typeof OpenAPI.TOKEN === 'function'
+        ? await OpenAPI.TOKEN({
+            method: 'DELETE',
+            url: `/api/v1/credit-cards/${cardId}`,
+          } as ApiRequestOptions<string>)
+        : OpenAPI.TOKEN || ''
+
+    if (!token) {
+      const authError = new Error('Not authenticated')
+      error.value = authError
+      throw authError
+    }
+
+    const url = `${OpenAPI.BASE}/api/v1/credit-cards/${cardId}`
+
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.status === 204) {
+        cards.value = cards.value.filter((card) => card.id !== cardId)
+        return
+      }
+
+      if (!response.ok) {
+        let message = 'Failed to delete credit card'
+        try {
+          const body: unknown = await response.json()
+          if (typeof body === 'object' && body !== null && 'detail' in body) {
+            const detail = (body as { detail?: unknown }).detail
+            if (typeof detail === 'string' && detail.trim()) {
+              message = detail
+            }
+          }
+        } catch {
+          // ignore JSON parsing errors and fall back to default message
+        }
+
+        throw new Error(message)
+      }
+
+      cards.value = cards.value.filter((card) => card.id !== cardId)
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error('Failed to delete credit card')
+      error.value = err
+      throw err
+    }
+  }
+
   return {
     cards,
     isLoading,
@@ -172,6 +233,7 @@ export function useCreditCards() {
     fetchCards,
     getCardById,
     createCard,
+    deleteCard,
   }
 }
 
