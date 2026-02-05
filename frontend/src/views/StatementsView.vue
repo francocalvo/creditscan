@@ -29,7 +29,43 @@ const {
   formatCurrency,
   formatDate,
   formatPeriod,
+  deleteCreditCard,
 } = useStatements()
+
+const isDeletingCard = ref(false)
+
+const handleDeleteCard = async (card: (typeof cards.value)[0]) => {
+  const statementsCount = statementsWithCard.value.filter((s) => s.card_id === card.id).length
+  let message = `Are you sure you want to delete the ${card.bank} card ending in ${card.last4}?`
+
+  if (statementsCount > 0) {
+    message += `\n\nWarning: This card has ${statementsCount} associated statement(s). Deleting it might fail or cause data inconsistencies if the backend doesn't handle cascading deletes.`
+  }
+
+  if (!window.confirm(message)) return
+
+  isDeletingCard.value = true
+  try {
+    await deleteCreditCard(card.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Card Deleted',
+      detail: 'The credit card has been successfully removed.',
+      life: 3000,
+    })
+    // Refresh all data
+    await Promise.all([fetchStatements(), fetchBalance(), fetchTransactions()])
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: error instanceof Error ? error.message : 'An error occurred while deleting the card.',
+      life: 5000,
+    })
+  } finally {
+    isDeletingCard.value = false
+  }
+}
 
 const {
   transactions,
@@ -667,9 +703,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
             </div>
-            <div class="card-menu">
-              <i class="pi pi-ellipsis-v"></i>
-            </div>
+            <button
+              class="card-delete-button"
+              @click.stop="handleDeleteCard(card)"
+              title="Delete Card"
+              :disabled="isDeletingCard"
+            >
+              <i class="pi pi-trash"></i>
+            </button>
           </div>
 
           <div class="card-body">
@@ -1244,6 +1285,29 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   align-items: center;
   justify-content: center;
   font-size: 24px;
+}
+
+.card-delete-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-delete-button:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.8);
+  color: white;
+}
+
+.card-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .card-menu {
