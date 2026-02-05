@@ -49,6 +49,12 @@ export interface UserBalance {
   monthly_balance: number
 }
 
+export interface AggregateUtilization {
+  value: number | null
+  missingCount: number
+  totalCount: number
+}
+
 export function useStatements() {
   const statements = ref<CardStatement[]>([])
   const balance = ref<UserBalance>({ total_balance: 0, monthly_balance: 0 })
@@ -241,6 +247,65 @@ export function useStatements() {
     return `${start.toLocaleDateString('en-US', { month: 'short' })} - ${end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
   }
 
+  /**
+   * Computes aggregate credit utilization across all cards.
+   *
+   * Rules:
+   * - A card limit is "present" only when credit_limit is a finite number > 0
+   * - If all cards are missing limits, returns null value
+   * - Otherwise, imputes missing limits with the average of known limits
+   * - Utilization = (total outstanding_balance / total limits) * 100
+   *
+   * @returns AggregateUtilization with value (percent or null), missingCount, totalCount
+   */
+  const aggregateUtilization = computed<AggregateUtilization>(() => {
+    const allCards = cards.value
+    const totalCount = allCards.length
+
+    // No cards: return null value
+    if (totalCount === 0) {
+      return {
+        value: null,
+        missingCount: 0,
+        totalCount: 0,
+      }
+    }
+
+    // Find cards with valid limits (finite and > 0)
+    const cardsWithLimits = allCards.filter(
+      (card) => card.credit_limit !== null && card.credit_limit > 0 && Number.isFinite(card.credit_limit)
+    )
+    const missingCount = totalCount - cardsWithLimits.length
+
+    // All cards missing limits: return null value
+    if (cardsWithLimits.length === 0) {
+      return {
+        value: null,
+        missingCount,
+        totalCount,
+      }
+    }
+
+    // Calculate average of known limits
+    const avgLimit = cardsWithLimits.reduce((sum, card) => sum + card.credit_limit!, 0) / cardsWithLimits.length
+
+    // Sum outstanding balance across all cards
+    const totalBalance = allCards.reduce((sum, card) => sum + card.outstanding_balance, 0)
+
+    // Sum limits, imputing missing limits with average
+    const totalLimit =
+      cardsWithLimits.reduce((sum, card) => sum + card.credit_limit!, 0) + missingCount * avgLimit
+
+    // Calculate utilization percent (keep as unrounded number for formatting)
+    const value = (totalBalance / totalLimit) * 100
+
+    return {
+      value,
+      missingCount,
+      totalCount,
+    }
+  })
+
   const fetchBalance = async () => {
     isBalanceLoading.value = true
     error.value = null
@@ -391,6 +456,66 @@ export function useStatements() {
     }
   }
 
+  /**
+   * Updates a credit card's credit limit.
+   *
+   * @param cardId - The ID of the credit card to update
+   * @param creditLimit - The new credit limit value (must be > 0)
+   * @returns Promise that resolves on successful update
+   * @throws Error if the API request fails
+   */
+  const updateCardLimit = async (cardId: string, creditLimit: number) => {
+    error.value = null
+
+    try {
+      const token =
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'PATCH',
+              url: `/api/v1/credit-cards/${cardId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
+
+      const url = `${OpenAPI.BASE}/api/v1/credit-cards/${cardId}`
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credit_limit: creditLimit }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+
+        // Handle FastAPI validation error format (detail can be string or array)
+        let errorMessage = `Failed to update credit limit: ${response.statusText}`
+        if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((err: { msg?: string; [key: string]: unknown }) => err.msg || String(err)).join(', ')
+          }
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const updatedCard = await response.json()
+
+      // Refresh credit cards so cards ref in StatementsView updates
+      await fetchCreditCards()
+
+      return updatedCard
+    } catch (e) {
+      error.value = e instanceof Error ? e : new Error('Failed to update credit limit')
+      console.error('Error updating credit limit:', e)
+      throw error.value
+    }
+  }
+
   return {
     statements,
     statementsWithCard,
@@ -403,8 +528,10 @@ export function useStatements() {
     fetchBalance,
     createPayment,
     updateStatement,
+    updateCardLimit,
     formatCurrency,
     formatDate,
     formatPeriod,
+    aggregateUtilization,
   }
 }

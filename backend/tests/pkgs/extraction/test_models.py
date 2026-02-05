@@ -209,6 +209,44 @@ class TestExtractedStatement:
         assert statement.transactions[0].merchant == "Amazon"
         assert statement.transactions[1].installment is not None
 
+    def test_statement_with_credit_limit(self):
+        """Test that ExtractedStatement parses credit_limit when present."""
+        data = {
+            "statement_id": "STMT-2025-001",
+            "period": {
+                "start": "2025-01-01",
+                "end": "2025-01-31",
+                "due_date": "2025-02-10",
+            },
+            "current_balance": [{"amount": 750.50, "currency": "USD"}],
+            "credit_limit": {"amount": 5000.00, "currency": "USD"},
+            "transactions": [],
+        }
+
+        statement = ExtractedStatement.model_validate(data)
+
+        assert statement.credit_limit is not None
+        assert statement.credit_limit.amount == Decimal("5000")
+        assert statement.credit_limit.currency == "USD"
+
+    def test_statement_with_null_credit_limit(self):
+        """Test that ExtractedStatement handles null credit_limit."""
+        data = {
+            "statement_id": "STMT-2025-001",
+            "period": {
+                "start": "2025-01-01",
+                "end": "2025-01-31",
+                "due_date": "2025-02-10",
+            },
+            "current_balance": [{"amount": 750.50, "currency": "USD"}],
+            "credit_limit": None,
+            "transactions": [],
+        }
+
+        statement = ExtractedStatement.model_validate(data)
+
+        assert statement.credit_limit is None
+
     def test_statement_handles_partial_data(self):
         """Test that ExtractedStatement works with missing optional fields."""
         data = {

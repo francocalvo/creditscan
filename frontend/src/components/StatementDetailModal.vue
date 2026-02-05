@@ -415,8 +415,12 @@ const visiblePages = computed<(number | null)[]>(() => {
   // Remove consecutive duplicates
   const filteredPages: (number | null)[] = []
   for (let i = 0; i < pages.length; i++) {
-    if (pages[i] !== pages[i - 1]) {
-      filteredPages.push(pages[i])
+    const page = pages[i]
+    if (page === undefined) continue
+
+    const previousPage = i > 0 ? pages[i - 1] : undefined
+    if (page !== previousPage) {
+      filteredPages.push(page)
     }
   }
 

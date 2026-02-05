@@ -1,7 +1,7 @@
 """Unit tests for process_upload usecase."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
@@ -11,7 +11,12 @@ from app.domains.card_statements.domain.models import (
     CardStatementPublic,
     StatementStatus,
 )
-from app.domains.credit_cards.domain.models import CreditCardPublic
+from app.domains.credit_cards.domain.models import (
+    CardBrand,
+    CreditCard,
+    CreditCardPublic,
+    LimitSource,
+)
 from app.domains.rules.domain.models import ApplyRulesResponse
 from app.domains.transactions.domain.models import (
     TransactionPublic,
@@ -21,6 +26,7 @@ from app.domains.upload_jobs.domain.errors import (
     ExtractionError,
 )
 from app.domains.upload_jobs.domain.models import UploadJobStatus
+from app.domains.upload_jobs.service.atomic_import import AtomicImportService
 from app.domains.upload_jobs.usecases.process_upload.usecase import (
     _apply_rules_to_statement,
     _get_sanitized_error_message,
@@ -66,6 +72,33 @@ def mock_currency_service():
     service = Mock()
     service.convert_balance = AsyncMock(return_value=Decimal("100.00"))
     return service
+
+
+@pytest.fixture
+def atomic_import_service(mock_currency_service) -> AtomicImportService:
+    """AtomicImportService instance with mocked currency service.
+
+    Uses __new__ to avoid invoking provider functions in __init__.
+    """
+    service = AtomicImportService.__new__(AtomicImportService)
+    service.session = Mock()
+    service.currency_service = mock_currency_service
+    return service
+
+
+@pytest.fixture
+def ars_credit_card() -> CreditCard:
+    """Example ARS credit card for limit update tests."""
+    return CreditCard(
+        user_id=uuid.uuid4(),
+        bank="Test Bank",
+        brand=CardBrand.VISA,
+        last4="1234",
+        default_currency="ARS",
+        credit_limit=None,
+        limit_last_updated_at=None,
+        limit_source=None,
+    )
 
 
 @pytest.fixture
@@ -233,7 +266,7 @@ class TestAtomicImport:
             mock_atomic_service.import_statement_atomic.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_import_partial_statement_atomic(
+    async def test_import_partial_statement_atomic_success(
         self, mock_session, mock_currency_service
     ):
         """Given: partial extraction data
@@ -266,6 +299,142 @@ class TestAtomicImport:
 
             assert result[0] is not None
             mock_atomic_service.import_partial_statement_atomic.assert_called_once()
+
+
+class TestCreditLimitUpdate:
+    """Test suite for credit limit updates during atomic import."""
+
+    @pytest.mark.asyncio
+    async def test_updates_card_limit_when_no_existing_limit(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: card with no existing limit
+        When: a statement includes a same-currency credit limit
+        Then: card limit is updated from the statement
+        """
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=Money(amount=Decimal("500000"), currency="ARS"),
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.credit_limit == Decimal("500000")
+        assert ars_credit_card.limit_source == LimitSource.STATEMENT
+        assert ars_credit_card.limit_last_updated_at == datetime.combine(
+            date(2025, 1, 31), datetime.min.time()
+        )
+        mock_currency_service.convert_balance.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_update_when_statement_older(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: card has a newer limit timestamp
+        When: statement period_end is older
+        Then: limit update is skipped
+        """
+        ars_credit_card.credit_limit = Decimal("400000")
+        ars_credit_card.limit_source = LimitSource.MANUAL
+        ars_credit_card.limit_last_updated_at = datetime(2025, 2, 1, 0, 0, 0)
+
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=Money(amount=Decimal("500000"), currency="ARS"),
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.credit_limit == Decimal("400000")
+        assert ars_credit_card.limit_source == LimitSource.MANUAL
+        assert ars_credit_card.limit_last_updated_at == datetime(2025, 2, 1, 0, 0, 0)
+        mock_currency_service.convert_balance.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_extracted_limit_is_null(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: statement has no extracted credit limit
+        When: limit update is evaluated
+        Then: update is skipped
+        """
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=None,
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.credit_limit is None
+        assert ars_credit_card.limit_source is None
+        assert ars_credit_card.limit_last_updated_at is None
+        mock_currency_service.convert_balance.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_converts_currency_when_needed(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: statement limit in USD, card in ARS
+        When: limit update is evaluated
+        Then: limit is converted to card's currency
+        """
+        mock_currency_service.convert_balance = AsyncMock(
+            return_value=Decimal("500000")  # 500 USD * 1000 = 500000 ARS
+        )
+
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=Money(amount=Decimal("500"), currency="USD"),
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.credit_limit == Decimal("500000")
+        assert ars_credit_card.limit_source == LimitSource.STATEMENT
+        mock_currency_service.convert_balance.assert_called_once()
+        args, _kwargs = mock_currency_service.convert_balance.call_args
+        assert isinstance(args[0], list) and len(args[0]) == 1
+        assert args[0][0].amount == Decimal("500")
+        assert args[0][0].currency == "USD"
+        assert args[1] == "ARS"
+
+    @pytest.mark.asyncio
+    async def test_skips_on_conversion_failure(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: currency conversion fails
+        When: limit update is evaluated
+        Then: limit update is skipped (not an error)
+        """
+        mock_currency_service.convert_balance = AsyncMock(
+            side_effect=CurrencyConversionError("Conversion failed")
+        )
+
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=Money(amount=Decimal("500"), currency="USD"),
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.credit_limit is None
+        assert ars_credit_card.limit_source is None
+        assert ars_credit_card.limit_last_updated_at is None
+        mock_currency_service.convert_balance.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_updates_limit_last_updated_at_correctly(
+        self, atomic_import_service, ars_credit_card, mock_currency_service
+    ):
+        """Given: a successful limit update
+        When: a newer statement provides a limit
+        Then: limit_last_updated_at is set to statement period_end (00:00)
+        """
+        await atomic_import_service._maybe_update_card_limit(
+            card=ars_credit_card,
+            extracted_limit=Money(amount=Decimal("500000"), currency="ARS"),
+            statement_period_end=date(2025, 1, 31),
+        )
+
+        assert ars_credit_card.limit_last_updated_at == datetime.combine(
+            date(2025, 1, 31), datetime.min.time()
+        )
+        mock_currency_service.convert_balance.assert_not_called()
 
 
 class TestProcessUploadJob:

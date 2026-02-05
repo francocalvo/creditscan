@@ -51,6 +51,10 @@ describe('useCreditCards', () => {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1234',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
       alias: 'Personal',
     }
 
@@ -132,4 +136,3 @@ describe('useCreditCards', () => {
     expect(error.value?.message).toBe('Invalid card data')
   })
 })
-

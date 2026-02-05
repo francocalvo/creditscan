@@ -35,6 +35,8 @@ class TestExtractionService:
         assert EXTRACTION_PROMPT in prompt
         assert "statement_id" in prompt
         assert "transactions" in prompt
+        assert "credit_limit" in prompt
+        assert "Límite de crédito" in prompt
 
     def test_extract_json_from_response_handles_raw_json(self):
         """Test that _extract_json_from_response() handles raw JSON."""

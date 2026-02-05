@@ -7,7 +7,7 @@ are created, or neither is.
 
 import logging
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlmodel import Session
@@ -17,9 +17,16 @@ from app.domains.card_statements.domain.models import (
     CardStatementPublic,
     StatementStatus,
 )
+from app.domains.credit_cards.domain.models import (
+    CreditCard,
+    LimitSource,
+)
 from app.domains.transactions.domain.models import (
     Transaction,
     TransactionPublic,
+)
+from app.domains.upload_jobs.domain.errors import (
+    CurrencyConversionError,
 )
 from app.pkgs.currency import provide as provide_currency
 from app.pkgs.extraction.models import ExtractedStatement, Money
@@ -78,6 +85,13 @@ class AtomicImportService:
                 data.minimum_payment or [], target_currency
             )
 
+            # Fetch card for potential limit update
+            card = self.session.get(CreditCard, card_id)
+            if card is None:
+                logger.error(f"Card {card_id} not found during import")
+                # Raise to fail the entire import (atomicity)
+                raise ValueError(f"Card {card_id} not found")
+
             # Create statement within the transaction
             statement = CardStatement(
                 card_id=card_id,
@@ -94,6 +108,13 @@ class AtomicImportService:
             )
             self.session.add(statement)
             self.session.flush()  # Flush to get the statement ID
+
+            # Update card's credit limit if appropriate
+            await self._maybe_update_card_limit(
+                card=card,
+                extracted_limit=data.credit_limit,
+                statement_period_end=data.period.end,
+            )
 
             # Create all transactions
             transactions: list[Transaction] = []
@@ -291,6 +312,112 @@ class AtomicImportService:
             if isinstance(value, int):
                 return value
         return None
+
+    async def _convert_single_amount(
+        self, amount: Decimal, from_currency: str, to_currency: str
+    ) -> Decimal:
+        """Convert a single amount from one currency to another.
+
+        Wraps CurrencyService.convert_balance to handle single amounts.
+        Note: This uses the current API rate, not date-based rates.
+        When PR #10 merges, this should use date-based conversion.
+
+        Args:
+            amount: Amount to convert
+            from_currency: Source currency code
+            to_currency: Target currency code
+
+        Returns:
+            Converted amount in target currency
+
+        Raises:
+            CurrencyConversionError: If conversion fails
+        """
+        if from_currency == to_currency:
+            # Same currency, no conversion needed
+            return amount.quantize(Decimal("0.01"))
+
+        # Use CurrencyService by creating a single-item Money list
+        money_list = [Money(amount=amount, currency=from_currency)]
+        converted = await self.currency_service.convert_balance(money_list, to_currency)
+        logger.info(f"Converted {amount} {from_currency} -> {converted} {to_currency}")
+        return converted
+
+    async def _maybe_update_card_limit(
+        self,
+        card: CreditCard,
+        extracted_limit: Money | None,
+        statement_period_end: date,
+    ) -> None:
+        """Update card's credit limit if appropriate.
+
+        Updates the card's credit limit from the statement only if:
+        1. Extracted limit is present and greater than 0
+        2. Statement is newer than existing limit (by date)
+        3. Currency conversion succeeds if needed
+
+        If update occurs, sets limit_source to "statement" and
+        limit_last_updated_at to the statement period end.
+
+        Args:
+            card: The credit card to potentially update
+            extracted_limit: Credit limit extracted from statement (may be None)
+            statement_period_end: The period end date of the statement
+        """
+        # Skip if no valid limit extracted
+        if extracted_limit is None or extracted_limit.amount <= Decimal("0"):
+            logger.info("Skipping limit update: extracted limit is null or zero")
+            return
+
+        # Check if we should update based on date
+        should_update = (
+            card.limit_last_updated_at is None
+            or statement_period_end > card.limit_last_updated_at.date()
+        )
+
+        if not should_update:
+            logger.info(
+                f"Skipping limit update: statement date {statement_period_end} "
+                f"is not newer than existing limit date {card.limit_last_updated_at}"
+            )
+            return
+
+        # Determine the limit amount in card's currency
+        if extracted_limit.currency != card.default_currency:
+            try:
+                # Try to convert to card's currency
+                # Note: Using current rate, not date-based (PR #10 pending)
+                limit_in_card_currency = await self._convert_single_amount(
+                    amount=extracted_limit.amount,
+                    from_currency=extracted_limit.currency,
+                    to_currency=card.default_currency,
+                )
+                logger.info(
+                    f"Converted limit from {extracted_limit.currency} to "
+                    f"{card.default_currency}: {limit_in_card_currency}"
+                )
+            except CurrencyConversionError as e:
+                # Conversion failed - skip limit update silently
+                logger.warning(
+                    f"Could not convert credit limit from "
+                    f"{extracted_limit.currency} to {card.default_currency}: {e}"
+                )
+                return
+        else:
+            # Same currency - use extracted amount directly
+            limit_in_card_currency = extracted_limit.amount
+
+        # Update the card's limit
+        card.credit_limit = limit_in_card_currency
+        card.limit_source = LimitSource.STATEMENT
+        card.limit_last_updated_at = datetime.combine(
+            statement_period_end, datetime.min.time()
+        )
+
+        logger.info(
+            f"Updated card {card.id} limit to {limit_in_card_currency} "
+            f"{card.default_currency} from statement (period: {statement_period_end})"
+        )
 
 
 def provide_atomic_import(session: Session) -> AtomicImportService:

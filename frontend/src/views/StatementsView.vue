@@ -7,10 +7,13 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import AddCardModal from '@/components/AddCardModal.vue'
+import CardUtilization from '@/components/cards/CardUtilization.vue'
+import SetLimitModal from '@/components/cards/SetLimitModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
 import { getCardBackgroundColor } from '@/utils/cardColors'
+import type { CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -29,6 +32,8 @@ const {
   formatCurrency,
   formatDate,
   formatPeriod,
+  aggregateUtilization,
+  updateCardLimit,
 } = useStatements()
 
 const {
@@ -115,15 +120,17 @@ const monthlyChartOptions = {
       bodyColor: '#f9fafb',
       padding: 12,
       cornerRadius: 8,
-      displayColors: false,
-      callbacks: {
-        label: (context: unknown) => {
-          const value = context.parsed.y
-          return ` ${formatAnalyticsCurrency(value)}`
-        },
-      },
-    },
-  },
+	      displayColors: false,
+	      callbacks: {
+	        label: (context: any) => {
+	          const rawValue = context?.parsed?.y
+	          const value =
+	            typeof rawValue === 'number' || typeof rawValue === 'string' ? rawValue : 0
+	          return ` ${formatAnalyticsCurrency(value)}`
+	        },
+	      },
+	    },
+	  },
   scales: {
     x: {
       grid: {
@@ -142,16 +149,17 @@ const monthlyChartOptions = {
         color: '#f3f4f6',
         borderDash: [5, 5],
       },
-      ticks: {
-        color: '#6b7280',
-        font: {
-          size: 12,
-        },
-        callback: (value: unknown) => formatAnalyticsCurrency(value),
-      },
-    },
-  },
-}
+	      ticks: {
+	        color: '#6b7280',
+	        font: {
+	          size: 12,
+	        },
+	        callback: (value: unknown) =>
+	          formatAnalyticsCurrency(typeof value === 'number' || typeof value === 'string' ? value : 0),
+	      },
+	    },
+	  },
+	}
 
 /**
  * Color palette for tag chart segments.
@@ -209,38 +217,38 @@ const tagChartData = computed(() => {
 const tagChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'right' as const,
-      labels: {
-        color: '#374151',
-        font: {
-          size: 12,
+	plugins: {
+	  legend: {
+	      position: 'right' as 'right' | 'bottom',
+	      labels: {
+	        color: '#374151',
+	        font: {
+	          size: 12,
         },
         padding: 15,
         usePointStyle: true,
         pointStyle: 'circle',
       },
     },
-    tooltip: {
+	    tooltip: {
       backgroundColor: '#1f2937',
       titleColor: '#f9fafb',
       bodyColor: '#f9fafb',
       padding: 12,
       cornerRadius: 8,
       displayColors: true,
-      callbacks: {
-        label: (context: unknown) => {
-          const dataIndex = context.dataIndex
-          const item = spendingByTag.value[dataIndex]
-          if (!item) return ''
-          const percentage = item.percentage.toFixed(1)
-          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
-        },
-      },
-    },
-  },
-}
+	      callbacks: {
+	        label: (context: any) => {
+	          const dataIndex = typeof context?.dataIndex === 'number' ? context.dataIndex : -1
+	          const item = spendingByTag.value[dataIndex]
+	          if (!item) return ''
+	          const percentage = item.percentage.toFixed(1)
+	          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+	        },
+	      },
+	    },
+	  },
+	}
 
 // Computed options that respond to screen size
 const isMobile = ref(false)
@@ -263,7 +271,7 @@ onMounted(() => {
 watch(
   isMobile,
   (mobile) => {
-    tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as 'bottom' | 'right'
+    tagChartOptions.plugins.legend.position = mobile ? 'bottom' : 'right'
   },
   { immediate: true },
 )
@@ -284,6 +292,16 @@ const isTransitioningModals = ref(false)
 
 // Add Card modal state
 const showAddCardModal = ref(false)
+
+// Set Limit modal state (for Step06)
+const showSetLimitModal = ref(false)
+const cardForLimitEdit = ref<CreditCard | null>(null)
+
+// Handler for opening set limit modal
+const handleSetLimit = (card: CreditCard) => {
+  cardForLimitEdit.value = card
+  showSetLimitModal.value = true
+}
 
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
@@ -357,11 +375,6 @@ const monthlyBalance = computed(() => {
 
 const activeCards = computed(() => {
   return cards.value.length
-})
-
-const creditUtilization = computed(() => {
-  // We don't have credit limit data yet, so we can't compute utilization.
-  return 'N/A'
 })
 
 // Filter statements based on search and status
@@ -514,6 +527,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   fetchStatements()
   fetchBalance()
 }
+
+// Handler for set limit modal save success
+const handleLimitSaved = () => {
+  if (!cardForLimitEdit.value) return
+  // Show success toast
+  toast.add({
+    severity: 'success',
+    summary: 'Credit Limit Updated',
+    detail: `Limit updated for ${cardForLimitEdit.value.bank} ••${cardForLimitEdit.value.last4}`,
+    life: 3000,
+  })
+  // Clear card reference
+  cardForLimitEdit.value = null
+}
 </script>
 
 <template>
@@ -543,8 +570,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
       <MetricCard
         title="Credit Utilization"
-        :value="creditUtilization"
-        subtitle="Requires credit limits"
+        :value="
+          aggregateUtilization.value === null
+            ? 'N/A'
+            : aggregateUtilization.value.toFixed(1) + '%'
+        "
+        :subtitle="
+          aggregateUtilization.totalCount === 0
+            ? 'No cards'
+            : aggregateUtilization.missingCount === aggregateUtilization.totalCount
+            ? 'Requires credit limits'
+            : aggregateUtilization.missingCount === 0
+            ? 'All cards have limits'
+            : `${aggregateUtilization.missingCount} of ${aggregateUtilization.totalCount} cards missing limits`
+        "
         icon="pi pi-trending-up"
       />
     </div>
@@ -685,6 +724,12 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
               </div>
             </div>
           </div>
+
+          <CardUtilization
+            :card="card"
+            :format-currency="formatCurrency"
+            @set-limit="handleSetLimit"
+          />
 
           <div class="card-footer-section">
             <div class="card-stat">
@@ -947,6 +992,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       v-model:visible="showAddCardModal"
       :existing-cards="cards"
       @card-created="handleCardCreated"
+    />
+
+    <!-- Set Limit Modal -->
+    <SetLimitModal
+      v-model="showSetLimitModal"
+      :card="cardForLimitEdit"
+      :on-save="updateCardLimit"
+      @saved="handleLimitSaved"
     />
 
     <!-- Toast notifications -->
