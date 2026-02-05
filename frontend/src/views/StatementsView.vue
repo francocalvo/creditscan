@@ -11,10 +11,13 @@ import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
 import { getCardBackgroundColor } from '@/utils/cardColors'
+import type { CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import AddCardPlaceholder from '@/components/AddCardPlaceholder.vue'
 
 const {
@@ -284,6 +287,27 @@ const isTransitioningModals = ref(false)
 
 // Add Card modal state
 const showAddCardModal = ref(false)
+
+const cardMenuRef = ref()
+const selectedCardForMenu = ref<CreditCard | null>(null)
+
+const handleDeleteCard = (card: CreditCard | null) => {
+  if (!card) return
+  console.log('Delete card:', card.id)
+}
+
+const cardMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: 'Delete',
+    icon: 'pi pi-trash',
+    command: () => handleDeleteCard(selectedCardForMenu.value),
+  },
+])
+
+const toggleCardMenu = (event: Event, card: CreditCard) => {
+  selectedCardForMenu.value = card
+  cardMenuRef.value.toggle(event)
+}
 
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
@@ -667,9 +691,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
             </div>
-            <div class="card-menu">
-              <i class="pi pi-ellipsis-v"></i>
-            </div>
+            <button
+              type="button"
+              class="card-menu-trigger"
+              @click.stop="toggleCardMenu($event, card)"
+              aria-label="Card options"
+            >
+              <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+            </button>
           </div>
 
           <div class="card-body">
@@ -694,6 +723,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
           </div>
         </div>
       </div>
+
+      <Menu ref="cardMenuRef" :model="cardMenuItems" popup />
     </div>
 
     <!-- Analytics Section -->
@@ -1246,16 +1277,26 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   font-size: 24px;
 }
 
-.card-menu {
+.card-menu-trigger {
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   padding: 8px;
   border-radius: 4px;
   transition: background 0.2s;
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.card-menu:hover {
+.card-menu-trigger:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.card-menu-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
 }
 
 .card-body {
