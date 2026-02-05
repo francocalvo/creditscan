@@ -1,28 +1,124 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useTags, type Tag } from '@/composables/useTags'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import TagFormModal from '@/components/settings/TagFormModal.vue'
+import DeleteConfirmDialog from '@/components/settings/DeleteConfirmDialog.vue'
 
-const { tags, isLoading, fetchTags } = useTags()
+const toast = useToast()
+const { tags, isLoading, fetchTags, deleteTag, getTagUsageCount } = useTags()
 
 const showCreateModal = ref(false)
 const editingTag = ref<Tag | null>(null)
 const deletingTag = ref<Tag | null>(null)
 
+// Delete dialog state
+const showDeleteDialog = ref(false)
+const deleteWarning = ref<string | undefined>(undefined)
+const isDeleting = ref(false)
+
 onMounted(() => {
   fetchTags()
 })
 
-const handleCreate = () => {
+/**
+ * Computed visibility for the tag form modal (create or edit mode)
+ */
+const isFormModalVisible = computed({
+  get: () => showCreateModal.value || editingTag.value !== null,
+  set: (value: boolean) => {
+    if (!value) {
+      showCreateModal.value = false
+      editingTag.value = null
+    }
+  },
+})
+
+/**
+ * Handle create tag button
+ */
+function handleCreate(): void {
   showCreateModal.value = true
 }
 
-const handleEdit = (tag: Tag) => {
+/**
+ * Handle edit tag button
+ */
+function handleEdit(tag: Tag): void {
   editingTag.value = tag
 }
 
-const handleDelete = (tag: Tag) => {
+/**
+ * Handle delete tag button - shows confirmation dialog with usage info
+ */
+async function handleDelete(tag: Tag): Promise<void> {
   deletingTag.value = tag
+
+  // Fetch usage count to show warning
+  const usage = await getTagUsageCount(tag.tag_id)
+
+  if (usage.rules > 0 || usage.transactions > 0) {
+    const parts: string[] = []
+    if (usage.rules > 0) {
+      parts.push(`${usage.rules} rule${usage.rules > 1 ? 's' : ''}`)
+    }
+    if (usage.transactions > 0) {
+      parts.push(`${usage.transactions} transaction${usage.transactions > 1 ? 's' : ''}`)
+    }
+    deleteWarning.value = `This tag is used by ${parts.join(' and ')}. Deleting it will remove these associations.`
+  } else {
+    deleteWarning.value = undefined
+  }
+
+  showDeleteDialog.value = true
+}
+
+/**
+ * Handle delete confirmation
+ */
+async function confirmDelete(): Promise<void> {
+  if (!deletingTag.value) return
+
+  isDeleting.value = true
+
+  try {
+    await deleteTag(deletingTag.value.tag_id)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Tag Deleted',
+      detail: `"${deletingTag.value.label}" has been deleted`,
+      life: 3000,
+    })
+
+    showDeleteDialog.value = false
+    deletingTag.value = null
+    deleteWarning.value = undefined
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: e instanceof Error ? e.message : 'Failed to delete tag',
+      life: 5000,
+    })
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+/**
+ * Handle form modal saved event
+ */
+function handleFormSaved(): void {
+  const wasEditing = editingTag.value !== null
+
+  toast.add({
+    severity: 'success',
+    summary: wasEditing ? 'Tag Updated' : 'Tag Created',
+    detail: wasEditing ? 'Tag has been updated' : 'Tag has been created',
+    life: 3000,
+  })
 }
 </script>
 
@@ -100,6 +196,23 @@ const handleDelete = (tag: Tag) => {
         </tbody>
       </table>
     </div>
+
+    <!-- Tag Form Modal (Create/Edit) -->
+    <TagFormModal
+      v-model:visible="isFormModalVisible"
+      :tag="editingTag"
+      @saved="handleFormSaved"
+    />
+
+    <!-- Delete Confirmation Dialog -->
+    <DeleteConfirmDialog
+      v-model:visible="showDeleteDialog"
+      title="Delete Tag"
+      :message="`Are you sure you want to delete the tag '${deletingTag?.label}'?`"
+      :warningMessage="deleteWarning"
+      :loading="isDeleting"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 

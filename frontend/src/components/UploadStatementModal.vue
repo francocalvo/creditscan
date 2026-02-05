@@ -10,6 +10,7 @@
  import Message from 'primevue/message'
  import { useCreditCards } from '@/composables/useCreditCards'
  import { useStatementUpload } from '@/composables/useStatementUpload'
+ import { useRules } from '@/composables/useRules'
  import FileDropZone from '@/components/FileDropZone.vue'
 
 // PrimeVue type definitions don't include 'data' property, but it's supported at runtime
@@ -58,6 +59,9 @@ const {
   stopPolling,
   reset: resetUpload,
 } = useStatementUpload()
+
+// Rules composable for auto-apply
+const { applyRules } = useRules()
 
 /**
  * Update modal visibility, ensuring close actions run through one path.
@@ -117,12 +121,13 @@ function closeModal(): void {
 /**
  * Handle background job completion with toast notification.
  * Only shows toast when modal is closed to avoid duplicate notifications.
+ * Also auto-applies rules to the uploaded statement.
  */
-function handleBackgroundComplete(job: {
+async function handleBackgroundComplete(job: {
   status: string
   statement_id: string | null
   error_message: string | null
-}): void {
+}): Promise<void> {
   // Only show toast if modal is actually closed (user didn't just open it again)
   if (props.visible) {
     return
@@ -140,6 +145,24 @@ function handleBackgroundComplete(job: {
       group: 'upload-complete',
       data: { statementId: job.statement_id }
     } as ExtendedToastMessageOptions)
+
+    // Auto-apply rules to the new statement's transactions
+    if (job.statement_id) {
+      try {
+        const result = await applyRules({ statement_id: job.statement_id })
+        if (result.tags_applied > 0) {
+          toast.add({
+            severity: 'info',
+            summary: 'Rules Applied',
+            detail: `Applied ${result.tags_applied} tag${result.tags_applied > 1 ? 's' : ''} to new transactions`,
+            life: 3000,
+          })
+        }
+      } catch (e) {
+        // Silent failure for auto-apply - don't block the success flow
+        console.error('Error auto-applying rules:', e)
+      }
+    }
   } else if (job.status === 'failed') {
     toast.add({
       severity: 'error',
@@ -221,11 +244,30 @@ async function handleUpload(): Promise<void> {
 
 /**
  * Handle job completion from background polling.
+ * Applies rules automatically after successful upload.
  */
-function handleJobComplete(job: { status: string; statement_id: string | null }): void {
+async function handleJobComplete(job: { status: string; statement_id: string | null }): Promise<void> {
   if (job.status === 'completed' || job.status === 'partial') {
     // Transition to success step
     currentStep.value = 'success'
+
+    // Auto-apply rules to the new statement's transactions
+    if (job.statement_id) {
+      try {
+        const result = await applyRules({ statement_id: job.statement_id })
+        if (result.tags_applied > 0) {
+          toast.add({
+            severity: 'info',
+            summary: 'Rules Applied',
+            detail: `Applied ${result.tags_applied} tag${result.tags_applied > 1 ? 's' : ''} to new transactions`,
+            life: 3000,
+          })
+        }
+      } catch (e) {
+        // Silent failure for auto-apply - don't block the success flow
+        console.error('Error auto-applying rules:', e)
+      }
+    }
   } else if (job.status === 'failed') {
     // Transition to error step
     currentStep.value = 'error'

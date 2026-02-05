@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import ProfileTab from '@/components/settings/ProfileTab.vue'
 import TagsTab from '@/components/settings/TagsTab.vue'
+import RulesTab from '@/components/settings/RulesTab.vue'
 
 const activeTab = ref<'profile' | 'tags' | 'rules'>('profile')
 
@@ -33,13 +34,7 @@ const tabs = [
     <TagsTab v-else-if="activeTab === 'tags'" />
 
     <!-- Rules Tab -->
-    <div v-else-if="activeTab === 'rules'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-list-check placeholder-icon"></i>
-        <h3>Rules</h3>
-        <p>Configure automation rules for automatic transaction tagging</p>
-      </div>
-    </div>
+    <RulesTab v-else-if="activeTab === 'rules'" />
   </div>
 </template>
 
@@ -69,36 +64,6 @@ const tabs = [
 }
 
 .section-subtitle {
-  font-size: 15px;
-  color: #6b7280;
-  margin: 0;
-}
-
-.placeholder-section {
-  padding: 80px 20px;
-}
-
-.placeholder-content {
-  text-align: center;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.placeholder-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 24px;
-  color: #d1d5db;
-}
-
-.placeholder-content h3 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 12px 0;
-}
-
-.placeholder-content p {
   font-size: 15px;
   color: #6b7280;
   margin: 0;
