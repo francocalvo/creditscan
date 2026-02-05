@@ -1,7 +1,7 @@
 """Upload job domain models."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from sqlalchemy import UniqueConstraint
@@ -41,7 +41,7 @@ class UploadJob(SQLModel, table=True):
     )
     error_message: str | None = Field(default=None, max_length=2000)
     retry_count: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime | None = Field(default=None)
     completed_at: datetime | None = Field(default=None)
 
