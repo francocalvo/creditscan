@@ -200,7 +200,7 @@ export function useStatements() {
     }
   }
 
-  const formatCurrency = (amount: any): string => {
+  const formatCurrency = (amount: number | string | null | undefined): string => {
     const currency = isValidCurrency(targetCurrency.value) ? targetCurrency.value : 'USD'
     const safeAmount = amount === null || amount === undefined ? 0 : parseDecimal(amount)
     const absAmount = Math.abs(safeAmount)

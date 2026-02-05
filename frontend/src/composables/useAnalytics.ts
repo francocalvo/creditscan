@@ -587,7 +587,7 @@ export function useAnalytics() {
    * formatCurrency(1234.56) // "$1,234.56" (when targetCurrency is USD)
    * ```
    */
-  const formatCurrency = (amount: any) => {
+  const formatCurrency = (amount: number | string) => {
     const currency = isValidCurrency(targetCurrency.value) ? targetCurrency.value : 'USD'
 
     const safeAmount = parseDecimal(amount)

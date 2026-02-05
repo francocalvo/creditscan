@@ -33,7 +33,7 @@ export function useTransactions() {
     }
   }
 
-  const formatCurrency = (amount: any, currency: string = 'USD') => {
+  const formatCurrency = (amount: number | string, currency: string = 'USD') => {
     const safeAmount = parseDecimal(amount)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
