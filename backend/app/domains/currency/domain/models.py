@@ -1,5 +1,7 @@
 """Currency conversion domain models."""
 
+import uuid
+from datetime import UTC, datetime
 from datetime import date as Date
 from decimal import Decimal
 
@@ -33,6 +35,7 @@ class CurrencyConversionResponse(SQLModel):
     from_currency: str
     to_currency: str
     rate: Decimal
+    rate_date: Date
 
 
 class BatchCurrencyConversionRequest(SQLModel):
@@ -45,3 +48,47 @@ class BatchCurrencyConversionResponse(SQLModel):
     """Response model for batch currency conversion."""
 
     results: list[CurrencyConversionResponse]
+
+
+class ExchangeRatePublic(SQLModel):
+    """Public response model for an exchange rate."""
+
+    rate_date: Date
+    buy_rate: Decimal
+    sell_rate: Decimal
+    average_rate: Decimal
+    source: str
+    fetched_at: datetime
+
+
+class ExchangeRatesResponse(SQLModel):
+    """Response model for multiple exchange rates."""
+
+    base_currency: str
+    target_currency: str
+    rates: list[ExchangeRatePublic]
+
+
+# Exchange rate database model
+class ExchangeRate(SQLModel, table=True):
+    """Database model for storing exchange rates."""
+
+    __tablename__ = "exchange_rate"  # type: ignore[assignment]
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    # Rate data
+    from_currency: str = Field(max_length=3, default="USD")
+    to_currency: str = Field(max_length=3, default="ARS")
+    buy_rate: Decimal = Field(decimal_places=4, max_digits=12)
+    sell_rate: Decimal = Field(decimal_places=4, max_digits=12)
+
+    # Metadata
+    rate_date: Date = Field(index=True, unique=True)
+    source: str = Field(max_length=50, default="cronista_mep")
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))  # type: ignore[arg-type]
+
+    @property
+    def average_rate(self) -> Decimal:
+        """Calculate the average of buy and sell rates."""
+        return (self.buy_rate + self.sell_rate) / 2

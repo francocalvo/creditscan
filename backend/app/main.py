@@ -1,3 +1,6 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -5,6 +8,26 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.domains.currency.service.rate_scheduler import RateExtractionScheduler
+from app.domains.upload_jobs.service.job_resumption import resume_pending_jobs
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    """Handle app lifecycle events."""
+    # Startup tasks
+    await resume_pending_jobs()
+
+    scheduler = RateExtractionScheduler(
+        hour=settings.RATE_EXTRACTION_HOUR,
+        minute=settings.RATE_EXTRACTION_MINUTE,
+    )
+    scheduler.start()
+
+    yield
+
+    # Shutdown tasks
+    await scheduler.stop()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -18,6 +41,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     generate_unique_id_function=custom_generate_unique_id,
+    lifespan=lifespan,
 )
 
 # Set all CORS enabled origins
@@ -31,11 +55,3 @@ if settings.all_cors_origins:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Run startup tasks including job resumption."""
-    from app.domains.upload_jobs.service.job_resumption import resume_pending_jobs
-
-    await resume_pending_jobs()
