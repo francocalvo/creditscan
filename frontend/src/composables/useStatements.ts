@@ -56,7 +56,7 @@ export function useStatements() {
   const isBalanceLoading = ref(false)
   const error = ref<Error | null>(null)
 
-  const { cards, fetchCards: fetchCreditCards } = useCreditCards()
+  const { cards, fetchCards: fetchCreditCards, deleteCard } = useCreditCards()
 
   const targetCurrency = ref('ARS')
   let preferredCurrencyFetchInFlight: Promise<void> | null = null
@@ -403,6 +403,7 @@ export function useStatements() {
     fetchBalance,
     createPayment,
     updateStatement,
+    deleteCard,
     formatCurrency,
     formatDate,
     formatPeriod,

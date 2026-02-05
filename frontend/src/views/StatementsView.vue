@@ -28,6 +28,7 @@ const {
   isBalanceLoading,
   fetchStatements,
   fetchBalance,
+  deleteCard,
   createPayment,
   formatCurrency,
   formatDate,
@@ -291,16 +292,60 @@ const showAddCardModal = ref(false)
 const cardMenuRef = ref()
 const selectedCardForMenu = ref<CreditCard | null>(null)
 
-const handleDeleteCard = (card: CreditCard | null) => {
+/**
+ * Count the number of statements associated with a given card.
+ * @param cardId - The ID of the card to count statements for
+ * @returns The number of statements associated with the card
+ */
+const getCardStatementCount = (cardId: string): number => {
+  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
+}
+
+const handleDeleteCard = async (card: CreditCard | null) => {
   if (!card) return
-  console.log('Delete card:', card.id)
+
+  // Count statements associated with this card
+  const statementCount = getCardStatementCount(card.id)
+
+  // Build confirmation message based on statement count
+  let confirmMessage: string
+  if (statementCount > 0) {
+    confirmMessage = `This card has ${statementCount} statement(s). Deleting it will also remove all associated statements. Continue?`
+  } else {
+    confirmMessage = `Delete ${card.bank} card ending in ${card.last4}?`
+  }
+
+  const confirmed = window.confirm(confirmMessage)
+  if (!confirmed) return
+
+  try {
+    await deleteCard(card.id)
+    await fetchStatements()
+    toast.add({
+      severity: 'success',
+      summary: 'Card Deleted',
+      detail: 'Card deleted successfully',
+      life: 3000,
+    })
+    selectedCardForMenu.value = null
+  } catch (error) {
+    console.error('Failed to delete card:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: 'Failed to delete card',
+      life: 5000,
+    })
+  }
 }
 
 const cardMenuItems = computed<MenuItem[]>(() => [
   {
     label: 'Delete',
     icon: 'pi pi-trash',
-    command: () => handleDeleteCard(selectedCardForMenu.value),
+    command: () => {
+      void handleDeleteCard(selectedCardForMenu.value)
+    },
   },
 ])
 
