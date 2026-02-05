@@ -1,42 +1,84 @@
-# Create load modal for cc statements
-
-**Agent:** frontend
-**Status:** In progress
-**Dependencies:** https://www.notion.so/2faf6e7f0572803691dbe22683966e7b
-
 ## User Story
-**As a** user,
-**I want** a modal to upload new credit card statements,
-**So that** I can easily add new data to the system.
 
-## Repo Notes
-- The header button currently navigates to `/upload-statement` (`frontend/src/layouts/DefaultLayout.vue`), but no route/view exists yet.
+**As a** user, **So that** I can view and analyze my spending across different
+currencies in a consistent way. **I want to** have my transactions automatically
+converted to a unified currency,
 
-## Status / Dependency
-This is blocked until the backend upload workflow exists.
+## Description
 
-## UX Plan (Modal)
+Credit card statements may contain transactions in multiple currencies (e.g.,
+USD purchases on an ARS card). This task adds a currency conversion endpoint
+that:
 
-### Step 1: Select Card
-- Dropdown for existing cards (use `useCreditCards` / already-loaded cards).
+1. Converts transaction amounts to a unified/base currency for storage and
+   analytics
+2. Retrieves historical exchange rates for accurate conversion at transaction
+   date
+3. Allows displaying amounts in the original or converted currency as needed
 
-### Step 2: Upload File
-- PDF-only validation
-- Drag & drop + file picker
+## API Endpoint
 
-### Step 3: Processing
-- Loading indicator during upload
-- Show clear errors for unsupported format / extraction failure
+### `POST /api/v1/currency/convert`
 
-### Step 4: Confirmation (Optional)
-- If backend supports it: show extracted summary + transaction count before final save
+Convert an amount from one currency to another.
 
-## API Integration
-Check implemented in backend!
+**Request Body:**
+
+```json
+{
+  "amount": 150.0,
+  "from_currency": "USD",
+  "to_currency": "ARS",
+  "date": "2024-01-15"
+}
+```
+
+**Response:**
+
+```json
+{
+  "original_amount": 150.0,
+  "original_currency": "USD",
+  "converted_amount": 127500.0,
+  "target_currency": "ARS",
+  "exchange_rate": 850.0,
+  "rate_date": "2024-01-15"
+}
+```
+
+### `GET /api/v1/currency/rates`
+
+Get current or historical exchange rates.
+
+**Query Parameters:**
+
+- `base` (required) - Base currency code (e.g., "USD")
+- `symbols` (optional) - Comma-separated target currencies (e.g., "ARS")
+- `date` (optional) - Historical date for rates
+
+## Technical Implementation
+
+1. Create currency conversion service with exchange rate provider integration
+   (e.g., BCRA API, Dolar API, or similar)
+2. Implement rate caching to minimize API calls (rates don't change frequently)
+3. Create database table for storing historical rates (fallback/offline support)
+4. Add `/api/v1/currency/convert` endpoint
+5. Add `/api/v1/currency/rates` endpoint
+6. Consider adding a user preference for base/display currency
+
+## Supported Currencies
+
+- ARS (Argentine Peso)
+- USD (US Dollar)
 
 ## Acceptance Criteria
-- [ ] Modal opens from header button
-- [ ] Card selection works
-- [ ] PDF upload works with progress/loading
-- [ ] Success/error feedback displayed
-- [ ] Statement appears in list after upload
+
+- [ ] Convert endpoint accepts amount, source currency, target currency, and
+      optional date
+- [ ] Conversion uses historical rate when date is provided
+- [ ] Rates endpoint returns current exchange rates for requested currencies
+- [ ] Exchange rates are cached to reduce external API calls
+- [ ] API returns appropriate errors for unsupported currencies
+- [ ] Conversion is accurate to 2 decimal places for display currencies
+- [ ] Endpoint handles external API failures gracefully (fallback to cached
+      rates)
