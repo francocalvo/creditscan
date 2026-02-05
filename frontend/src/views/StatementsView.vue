@@ -621,7 +621,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
                   <button
                     class="action-button"
                     @click="handlePayClick(statement)"
-                    :disabled="statement.is_fully_paid"
+                    :disabled="statement.status === 'paid'"
                   >
                     Pay
                   </button>
