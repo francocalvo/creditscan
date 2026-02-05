@@ -6,13 +6,16 @@ import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
+import AddCardModal from '@/components/AddCardModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
+import { getCardBackgroundColor } from '@/utils/cardColors'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
+import AddCardPlaceholder from '@/components/AddCardPlaceholder.vue'
 
 const {
   statementsWithCard,
@@ -279,6 +282,9 @@ const selectedStatement = ref<(typeof statementsWithCard.value)[0] | null>(null)
 const isProcessingPayment = ref(false)
 const isTransitioningModals = ref(false)
 
+// Add Card modal state
+const showAddCardModal = ref(false)
+
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
 })
@@ -353,10 +359,6 @@ const activeCards = computed(() => {
   return cards.value.length
 })
 
-const pendingStatements = computed(() => {
-  return statementsWithCard.value.filter((s) => s.status === 'pending').length
-})
-
 const creditUtilization = computed(() => {
   // We don't have credit limit data yet, so we can't compute utilization.
   return 'N/A'
@@ -408,11 +410,6 @@ const getCardBrandIcon = (brand?: string): string => {
   return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
-// Get statements count per card
-const getCardStatementsCount = (cardId: string) => {
-  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
-}
-
 // Get latest balance for a card
 const getCardLatestBalance = (cardId: string) => {
   const cardStatements = statementsWithCard.value
@@ -422,7 +419,7 @@ const getCardLatestBalance = (cardId: string) => {
       return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
 
-  return cardStatements.length > 0 ? cardStatements[0].current_balance : null
+  return cardStatements.length > 0 ? cardStatements[0]?.current_balance : null
 }
 
 // Handle payment button click
@@ -498,6 +495,25 @@ const handlePaymentSubmit = async (paymentData: {
     isProcessingPayment.value = false
   }
 }
+
+// Handler for opening add card modal
+const openAddCardModal = () => {
+  showAddCardModal.value = true
+}
+
+// Handler for card creation success
+const handleCardCreated = (card: { bank: string; last4: string }) => {
+  // Show success toast
+  toast.add({
+    severity: 'success',
+    summary: 'Card Added',
+    detail: `${card.bank} card ending in ${card.last4} has been added`,
+    life: 3000,
+  })
+  // Refresh statements and cards list
+  fetchStatements()
+  fetchBalance()
+}
 </script>
 
 <template>
@@ -521,7 +537,7 @@ const handlePaymentSubmit = async (paymentData: {
       <MetricCard
         title="Active Cards"
         :value="activeCards.toString()"
-        :subtitle="`${pendingStatements} statements pending`"
+        subtitle="Total cards registered"
         icon="pi pi-credit-card"
       />
 
@@ -638,17 +654,15 @@ const handlePaymentSubmit = async (paymentData: {
         <p>Loading cards...</p>
       </div>
 
-      <div v-else-if="cards.length === 0" class="empty-state">
-        <i
-          class="pi pi-credit-card"
-          style="font-size: 64px; color: #d1d5db; margin-bottom: 16px"
-        ></i>
-        <h3 style="margin: 0 0 8px 0">No cards added yet</h3>
-        <p style="margin: 0; color: #6b7280">Add your first credit card to get started</p>
-      </div>
-
       <div v-else class="cards-grid">
-        <div v-for="card in cards" :key="card.id" class="card-item-large">
+        <!-- Add Card Placeholder (always shown as first item) -->
+        <AddCardPlaceholder @click="openAddCardModal" />
+        <div
+          v-for="card in cards"
+          :key="card.id"
+          class="card-item-large"
+          :style="{ background: getCardBackgroundColor(card.bank) }"
+        >
           <div class="card-header-section">
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
@@ -676,10 +690,6 @@ const handlePaymentSubmit = async (paymentData: {
             <div class="card-stat">
               <div class="stat-label">Current Balance</div>
               <div class="stat-value">{{ formatCurrency(getCardLatestBalance(card.id)) }}</div>
-            </div>
-            <div class="card-stat">
-              <div class="stat-label">Statements</div>
-              <div class="stat-value">{{ getCardStatementsCount(card.id) }}</div>
             </div>
           </div>
         </div>
@@ -930,6 +940,13 @@ const handlePaymentSubmit = async (paymentData: {
       :start-in-edit-mode="detailStartInEditMode"
       @pay="handlePayFromDetail"
       @statement-updated="handleStatementUpdated"
+    />
+
+    <!-- Add Card Modal -->
+    <AddCardModal
+      v-model:visible="showAddCardModal"
+      :existing-cards="cards"
+      @card-created="handleCardCreated"
     />
 
     <!-- Toast notifications -->
@@ -1192,11 +1209,11 @@ const handlePaymentSubmit = async (paymentData: {
 }
 
 .card-item-large {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 16px;
   padding: 24px;
   color: white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transition:
     transform 0.2s,
     box-shadow 0.2s;

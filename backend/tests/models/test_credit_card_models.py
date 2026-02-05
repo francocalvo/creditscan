@@ -62,3 +62,66 @@ class TestCreditCardDefaultCurrency:
             last4="1234",
         )
         assert card.default_currency == "ARS"
+
+
+class TestCreditCardAlias:
+    """Tests for the alias field on CreditCard."""
+
+    def test_alias_defaults_to_none(self):
+        """CreditCard should default alias to None."""
+        card = CreditCardBase(
+            user_id=uuid.uuid4(),
+            bank="Test Bank",
+            brand=CardBrand.VISA,
+            last4="1234",
+        )
+        assert card.alias is None
+
+    def test_alias_can_be_set(self):
+        """CreditCard should accept custom alias."""
+        card = CreditCardBase(
+            user_id=uuid.uuid4(),
+            bank="Test Bank",
+            brand=CardBrand.VISA,
+            last4="1234",
+            alias="Personal Card",
+        )
+        assert card.alias == "Personal Card"
+
+    def test_credit_card_create_has_optional_alias(self):
+        """CreditCardCreate should have optional alias field."""
+        card_without_alias = CreditCardCreate(
+            user_id=uuid.uuid4(),
+            bank="Test Bank",
+            brand=CardBrand.VISA,
+            last4="1234",
+        )
+        assert card_without_alias.alias is None
+
+        card_with_alias = CreditCardCreate(
+            user_id=uuid.uuid4(),
+            bank="Test Bank",
+            brand=CardBrand.VISA,
+            last4="1234",
+            alias="Work Card",
+        )
+        assert card_with_alias.alias == "Work Card"
+
+    def test_credit_card_update_has_optional_alias(self):
+        """CreditCardUpdate should have optional alias field."""
+        update = CreditCardUpdate()
+        assert update.alias is None
+
+        update_with_alias = CreditCardUpdate(alias="Travel Card")
+        assert update_with_alias.alias == "Travel Card"
+
+    def test_credit_card_table_model_has_alias(self):
+        """CreditCard table model should have alias field."""
+        card = CreditCard(
+            user_id=uuid.uuid4(),
+            bank="Test Bank",
+            brand=CardBrand.VISA,
+            last4="1234",
+            alias="Test Alias",
+        )
+        assert card.alias == "Test Alias"

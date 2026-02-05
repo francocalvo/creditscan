@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { TransactionsService, type Transaction } from '@/api/transactions'
 import { useToast } from 'primevue/usetoast'
 import { parseDateString } from '@/utils/date'
+import { parseDecimal } from '@/api/currency'
 
 export function useTransactions() {
   const transactions = ref<Transaction[]>([])
@@ -32,11 +33,12 @@ export function useTransactions() {
     }
   }
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
+  const formatCurrency = (amount: number | string, currency: string = 'USD') => {
+    const safeAmount = parseDecimal(amount)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
-    }).format(amount)
+    }).format(safeAmount)
   }
 
   const formatDate = (dateString: string) => {
