@@ -11,10 +11,13 @@ import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
 import { getCardBackgroundColor } from '@/utils/cardColors'
+import type { CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import AddCardPlaceholder from '@/components/AddCardPlaceholder.vue'
 
 const {
@@ -25,6 +28,7 @@ const {
   isBalanceLoading,
   fetchStatements,
   fetchBalance,
+  deleteCard,
   createPayment,
   formatCurrency,
   formatDate,
@@ -284,6 +288,71 @@ const isTransitioningModals = ref(false)
 
 // Add Card modal state
 const showAddCardModal = ref(false)
+
+const cardMenuRef = ref()
+const selectedCardForMenu = ref<CreditCard | null>(null)
+
+/**
+ * Count the number of statements associated with a given card.
+ * @param cardId - The ID of the card to count statements for
+ * @returns The number of statements associated with the card
+ */
+const getCardStatementCount = (cardId: string): number => {
+  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
+}
+
+const handleDeleteCard = async (card: CreditCard | null) => {
+  if (!card) return
+
+  // Count statements associated with this card
+  const statementCount = getCardStatementCount(card.id)
+
+  // Build confirmation message based on statement count
+  let confirmMessage: string
+  if (statementCount > 0) {
+    confirmMessage = `This card has ${statementCount} statement(s). Deleting it will also remove all associated statements. Continue?`
+  } else {
+    confirmMessage = `Delete ${card.bank} card ending in ${card.last4}?`
+  }
+
+  const confirmed = window.confirm(confirmMessage)
+  if (!confirmed) return
+
+  try {
+    await deleteCard(card.id)
+    await fetchStatements()
+    toast.add({
+      severity: 'success',
+      summary: 'Card Deleted',
+      detail: 'Card deleted successfully',
+      life: 3000,
+    })
+    selectedCardForMenu.value = null
+  } catch (error) {
+    console.error('Failed to delete card:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: 'Failed to delete card',
+      life: 5000,
+    })
+  }
+}
+
+const cardMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: 'Delete',
+    icon: 'pi pi-trash',
+    command: () => {
+      void handleDeleteCard(selectedCardForMenu.value)
+    },
+  },
+])
+
+const toggleCardMenu = (event: Event, card: CreditCard) => {
+  selectedCardForMenu.value = card
+  cardMenuRef.value.toggle(event)
+}
 
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
@@ -667,9 +736,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
             <div class="card-brand-icon">
               <i :class="getCardBrandIcon(card.brand)"></i>
             </div>
-            <div class="card-menu">
-              <i class="pi pi-ellipsis-v"></i>
-            </div>
+            <button
+              type="button"
+              class="card-menu-trigger"
+              @click.stop="toggleCardMenu($event, card)"
+              aria-label="Card options"
+            >
+              <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+            </button>
           </div>
 
           <div class="card-body">
@@ -694,6 +768,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
           </div>
         </div>
       </div>
+
+      <Menu ref="cardMenuRef" :model="cardMenuItems" popup />
     </div>
 
     <!-- Analytics Section -->
@@ -1246,16 +1322,26 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   font-size: 24px;
 }
 
-.card-menu {
+.card-menu-trigger {
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   padding: 8px;
   border-radius: 4px;
   transition: background 0.2s;
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.card-menu:hover {
+.card-menu-trigger:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.card-menu-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
 }
 
 .card-body {
