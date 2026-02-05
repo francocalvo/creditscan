@@ -84,7 +84,8 @@ card_data AS (
         user_id,
         bank,
         brand::cardbrand,
-        last4
+        last4,
+        'ARS' AS default_currency
     FROM user_data,
     (VALUES
         ('ICBC', 'MASTERCARD', '4521'),
@@ -97,8 +98,8 @@ card_data AS (
         ('Galicia', 'VISA', '5678')
     ) AS cards(bank, brand, last4)
 )
-INSERT INTO credit_card (id, user_id, bank, brand, last4)
-SELECT id, user_id, bank, brand, last4 FROM card_data;
+INSERT INTO credit_card (id, user_id, bank, brand, last4, default_currency)
+SELECT id, user_id, bank, brand, last4, default_currency FROM card_data;
 
 -- =============================================================================
 -- INSERT STATEMENTS (48 total: 8 cards * 6 months)
@@ -108,7 +109,8 @@ WITH user_data AS (
     SELECT id AS user_id FROM "user" WHERE email = :'user_email'
 ),
 cards AS (
-    SELECT cc.id AS card_id, cc.bank, cc.brand
+    SELECT cc.id AS card_id, cc.bank, cc.brand,
+           row_number() OVER (ORDER BY cc.bank, cc.brand) AS card_num
     FROM credit_card cc
     JOIN user_data u ON cc.user_id = u.user_id
 ),
@@ -133,12 +135,15 @@ statement_data AS (
         0.00 AS minimum_payment,
         -- Current month (offset 0) is not paid, past months are fully paid
         CASE WHEN m.m_offset = 0 THEN false ELSE true END AS is_fully_paid,
+        'ARS' AS currency,
+        -- Only one current month statement is PENDING_REVIEW, rest are COMPLETE
+        CASE WHEN m.m_offset = 0 AND c.card_num = 1 THEN 'PENDING_REVIEW'::statementstatus ELSE 'COMPLETE'::statementstatus END AS status,
         CASE WHEN m.m_offset = 0 THEN 'current' ELSE 'past' END AS month_type
     FROM cards c
     CROSS JOIN months m
 )
-INSERT INTO card_statement (id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid)
-SELECT id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid
+INSERT INTO card_statement (id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid, currency, status)
+SELECT id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid, currency, status
 FROM statement_data;
 
 -- =============================================================================
