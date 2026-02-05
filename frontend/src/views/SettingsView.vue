@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import TabNavigation from '@/components/dashboard/TabNavigation.vue'
+import ProfileTab from '@/components/settings/ProfileTab.vue'
+import TagsTab from '@/components/settings/TagsTab.vue'
 
 const activeTab = ref<'profile' | 'tags' | 'rules'>('profile')
 
@@ -25,22 +27,10 @@ const tabs = [
     <TabNavigation :tabs="tabs" :activeTab="activeTab" @update:activeTab="activeTab = $event as 'profile' | 'tags' | 'rules'" />
 
     <!-- Profile Tab -->
-    <div v-if="activeTab === 'profile'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-user placeholder-icon"></i>
-        <h3>Profile</h3>
-        <p>Manage your account information and preferences</p>
-      </div>
-    </div>
+    <ProfileTab v-if="activeTab === 'profile'" />
 
     <!-- Tags Tab -->
-    <div v-else-if="activeTab === 'tags'" class="placeholder-section">
-      <div class="placeholder-content">
-        <i class="pi pi-tag placeholder-icon"></i>
-        <h3>Tags</h3>
-        <p>Create and manage tags for categorizing your transactions</p>
-      </div>
-    </div>
+    <TagsTab v-else-if="activeTab === 'tags'" />
 
     <!-- Rules Tab -->
     <div v-else-if="activeTab === 'rules'" class="placeholder-section">
