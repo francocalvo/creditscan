@@ -1246,7 +1246,7 @@ const handleCancel = () => {
             <Button
               label="Pay"
               icon="pi pi-credit-card"
-              :disabled="statement.is_fully_paid"
+              :disabled="statement.status === 'paid'"
               @click="handlePay"
               severity="primary"
             />
