@@ -16,7 +16,7 @@ export const isStringWithValue = (value: unknown): value is string => {
   return isString(value) && value !== ''
 }
 
-export const isBlob = (value: unknown): value is Blob => {
+export const isBlob = (value: any): value is Blob => {
   return value instanceof Blob
 }
 
@@ -31,9 +31,9 @@ export const isSuccess = (status: number): boolean => {
 export const base64 = (str: string): string => {
   try {
     return btoa(str)
-  } catch {
-    // Fallback for Node.js environments where btoa is not available
-    return typeof Buffer !== 'undefined' ? Buffer.from(str).toString('base64') : btoa(str)
+  } catch (err) {
+    // @ts-ignore
+    return Buffer.from(str).toString('base64')
   }
 }
 
@@ -49,9 +49,7 @@ export const getQueryString = (params: Record<string, unknown>): string => {
       return
     }
 
-    if (value instanceof Date) {
-      append(key, value.toISOString())
-    } else if (Array.isArray(value)) {
+    if (Array.isArray(value)) {
       value.forEach((v) => encodePair(key, v))
     } else if (typeof value === 'object') {
       Object.entries(value).forEach(([k, v]) => encodePair(`${key}[${k}]`, v))
@@ -108,10 +106,10 @@ export const getFormData = (options: ApiRequestOptions): FormData | undefined =>
   return undefined
 }
 
-type Resolver<T> = (options: ApiRequestOptions<T>) => Promise<T>
+type Resolver<T> = (options: ApiRequestOptions) => Promise<T>
 
 export const resolve = async <T>(
-  options: ApiRequestOptions<T>,
+  options: ApiRequestOptions,
   resolver?: T | Resolver<T>,
 ): Promise<T | undefined> => {
   if (typeof resolver === 'function') {
@@ -120,9 +118,9 @@ export const resolve = async <T>(
   return resolver
 }
 
-export const getHeaders = async <T>(
+export const getHeaders = async (
   config: OpenAPIConfig,
-  options: ApiRequestOptions<T>,
+  options: ApiRequestOptions,
 ): Promise<Record<string, string>> => {
   const [token, username, password, additionalHeaders] = await Promise.all([
     resolve(options, config.TOKEN),
@@ -182,7 +180,7 @@ export const getRequestBody = (options: ApiRequestOptions): unknown => {
 
 export const sendRequest = async <T>(
   config: OpenAPIConfig,
-  options: ApiRequestOptions<T>,
+  options: ApiRequestOptions,
   url: string,
   body: unknown,
   formData: FormData | undefined,
@@ -294,7 +292,7 @@ export const catchErrorCodes = (options: ApiRequestOptions, result: ApiResult): 
     const errorBody = (() => {
       try {
         return JSON.stringify(result.body, null, 2)
-      } catch {
+      } catch (e) {
         return undefined
       }
     })()
@@ -317,7 +315,7 @@ export const catchErrorCodes = (options: ApiRequestOptions, result: ApiResult): 
  */
 export const request = <T>(
   config: OpenAPIConfig,
-  options: ApiRequestOptions<T>,
+  options: ApiRequestOptions,
   axiosClient: AxiosInstance = axios,
 ): CancelablePromise<T> => {
   return new CancelablePromise(async (resolve, reject, onCancel) => {
@@ -346,17 +344,12 @@ export const request = <T>(
         const responseBody = getResponseBody(response)
         const responseHeader = getResponseHeader(response, options.responseHeader)
 
-        let transformedBody = responseBody
-        if (options.responseTransformer && isSuccess(response.status)) {
-          transformedBody = await options.responseTransformer(responseBody)
-        }
-
         const result: ApiResult = {
           url,
           ok: isSuccess(response.status),
           status: response.status,
           statusText: response.statusText,
-          body: responseHeader ?? transformedBody,
+          body: responseHeader ?? responseBody,
         }
 
         catchErrorCodes(options, result)

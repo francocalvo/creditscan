@@ -73,7 +73,7 @@ const router = createRouter({
         {
           path: 'preferences',
           name: 'preferences',
-          component: () => import('../views/AboutView.vue'),
+          component: () => import('../views/SettingsView.vue'),
         },
       ],
     },

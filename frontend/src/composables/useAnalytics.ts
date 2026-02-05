@@ -1,23 +1,9 @@
 import { ref, computed } from 'vue'
-import type { Transaction } from '@/api/transactions'
-import { UsersService } from '@/api'
-import { TransactionsService } from '@/api/transactions'
+import type { TransactionPublic } from '@/api'
+import { UsersService, TransactionsService } from '@/api'
 import { convertCurrencyBatch, parseDecimal, type CurrencyConversionRequest } from '@/api/currency'
 import { useTags } from '@/composables/useTags'
 import { useTransactionTags } from '@/composables/useTransactionTags'
-
-/**
- * Extended user type with preferred_currency field.
- * Used as a workaround until SDK types are regenerated.
- */
-type UserPublicWithCurrency = {
-  email: string
-  is_active?: boolean
-  is_superuser?: boolean
-  full_name?: string | null
-  id: string
-  preferred_currency?: string | null
-}
 
 /**
  * Date filter preset options for analytics queries.
@@ -65,7 +51,7 @@ export interface TopMerchant {
  * Extends the base Transaction type with a convertedAmount field
  * that holds the amount in the target currency for consistent aggregation.
  */
-export interface ConvertedTransaction extends Transaction {
+export interface ConvertedTransaction extends TransactionPublic {
   convertedAmount: number
 }
 
@@ -89,7 +75,7 @@ export interface ConvertedTransaction extends Transaction {
  */
 export function useAnalytics() {
   // State
-  const transactions = ref<Transaction[]>([])
+  const transactions = ref<TransactionPublic[]>([])
   const convertedTransactions = ref<ConvertedTransaction[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -132,7 +118,10 @@ export function useAnalytics() {
     // Try YYYY-MM-DD format (date-only from backend)
     const dateOnlyMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
     if (dateOnlyMatch) {
-      const [, yearStr, monthStr, dayStr] = dateOnlyMatch
+      const yearStr = dateOnlyMatch[1]
+      const monthStr = dateOnlyMatch[2]
+      const dayStr = dateOnlyMatch[3]
+      if (!yearStr || !monthStr || !dayStr) return null
       const year = parseInt(yearStr, 10)
       const month = parseInt(monthStr, 10) - 1 // Months are 0-indexed in JS
       const day = parseInt(dayStr, 10)
@@ -246,6 +235,7 @@ export function useAnalytics() {
 
     for (let i = 0; i < txns.length; i += 1) {
       const txn = txns[i]
+      if (!txn) continue
       const amount = txn.convertedAmount
       total += amount
       if (amount > highest) {
@@ -258,7 +248,9 @@ export function useAnalytics() {
     amounts.sort((a, b) => a - b)
     const midIndex = Math.floor(count / 2)
     const median =
-      count % 2 === 1 ? amounts[midIndex] : (amounts[midIndex - 1] + amounts[midIndex]) / 2
+      count % 2 === 1
+        ? (amounts[midIndex] ?? 0)
+        : ((amounts[midIndex - 1] ?? 0) + (amounts[midIndex] ?? 0)) / 2
 
     return {
       totalSpending: total,
@@ -307,7 +299,13 @@ export function useAnalytics() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([monthKey, amount]) => {
         // Parse YYYY-MM and format as "Jan 2024"
-        const [year, month] = monthKey.split('-').map(Number)
+        const [yearString, monthString] = monthKey.split('-')
+        if (!yearString || !monthString) {
+          return { month: monthKey, amount }
+        }
+
+        const year = Number(yearString)
+        const month = Number(monthString)
         const formattedMonth = new Date(year, month - 1).toLocaleDateString('en-US', {
           month: 'short',
           year: 'numeric',
@@ -436,21 +434,20 @@ export function useAnalytics() {
       error.value = null
       try {
         // Fetch current user and set target currency from preferences
-        const userResponse = await UsersService.readUserMe()
-        const user = userResponse as UserPublicWithCurrency
+        const user = await UsersService.usersGetCurrentUser()
 
         // Validate and set target currency, falling back to 'ARS' if invalid
         const currencyFromProfile = normalizeCurrencyCode(user.preferred_currency ?? 'ARS')
         targetCurrency.value = isValidCurrency(currencyFromProfile) ? currencyFromProfile : 'ARS'
 
         // Fetch all transactions with pagination
-        const allTransactions: Transaction[] = []
+        const allTransactions: TransactionPublic[] = []
         const limit = 100
         let skip = 0
         let totalCount: number | null = null
 
         while (true) {
-          const response = await TransactionsService.listTransactions(skip, limit)
+          const response = await TransactionsService.transactionsListTransactions({ skip, limit })
           const { data, count } = response
 
           // Update total count from first response (null sentinel)
@@ -491,6 +488,7 @@ export function useAnalytics() {
 
         for (let i = 0; i < allTransactions.length; i += 1) {
           const txn = allTransactions[i]
+          if (!txn) continue
           const fromCurrency = normalizeCurrencyCode(txn.currency)
 
           if (fromCurrency === toCurrency) {
@@ -522,9 +520,14 @@ export function useAnalytics() {
 
             for (let i = 0; i < conversionResponse.results.length; i += 1) {
               const result = conversionResponse.results[i]
-              baseConverted[conversionIndices[i]].convertedAmount = parseDecimal(
-                result.converted_amount,
-              )
+              if (!result) continue
+              const targetIndex = conversionIndices[i]
+              if (targetIndex === undefined) continue
+
+              const target = baseConverted[targetIndex]
+              if (!target) continue
+
+              target.convertedAmount = parseDecimal(result.converted_amount)
             }
           } catch (conversionError) {
             console.warn(

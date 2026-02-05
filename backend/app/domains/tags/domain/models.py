@@ -12,6 +12,7 @@ class TagBase(SQLModel):
 
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     label: str = Field(max_length=200)
+    color: str | None = Field(default=None, max_length=7)
 
 
 # For creating new records
@@ -45,6 +46,7 @@ class TagUpdate(SQLModel):
     """Model for updating tag."""
 
     label: str | None = Field(default=None, max_length=200)
+    color: str | None = Field(default=None, max_length=7)
 
 
 # For paginated lists

@@ -14,14 +14,14 @@ export function useTransactions() {
     isLoading.value = true
     error.value = null
     try {
-      const response = await TransactionsService.listTransactions()
+      const response = await TransactionsService.transactionsListTransactions()
       // Sort by date descending (newest first)
       transactions.value = response.data.sort((a, b) => {
         return parseDateString(b.txn_date).getTime() - parseDateString(a.txn_date).getTime()
       })
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error fetching transactions:', err)
-      error.value = err.message || 'Failed to fetch transactions'
+      error.value = err instanceof Error ? err.message : 'Failed to fetch transactions'
       toast.add({
         severity: 'error',
         summary: 'Error',

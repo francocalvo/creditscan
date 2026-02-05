@@ -79,7 +79,7 @@ export function useStatements() {
 
     preferredCurrencyFetchInFlight = (async () => {
       try {
-        const userResponse = await UsersService.readUserMe()
+        const userResponse = await UsersService.usersGetCurrentUser()
         const user = userResponse as UserPublicWithCurrency
 
         const currencyFromProfile = normalizeCurrencyCode(user.preferred_currency ?? 'ARS')

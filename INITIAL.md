@@ -1,12 +1,37 @@
-I'll provide you a link to a Notion issue and point you to this place. You will
-do this:
+# Implement tags and rules engine frontend
 
-1. Do a git pull from main to ensure latest changes are here.
-2. Fetch and read the Notion task.
-3. Create a new branch and worktree under ~/worktrees/pf-app/ with a meaningful
-   name.
-4. Copy over the `ralph.yml`.
-5. Copy over the `PROMPT.md`.
-6. Copy the text in the issue as `INITIAL.md`.
+## User Story
+**As a** user,
+**I want to** create and manage tags and rules in the UI,
+**So that** I can automatically categorize my transactions.
 
-Ask no questions about doing this. Do.
+## Repo Notes
+- Tags API exists (`/api/v1/tags`). Current tag model is label-only (no color field).
+- Rules API does not exist yet (blocked on backend rules engine task).
+
+## Scope
+
+### Tags (Unblocked)
+- List tags
+- Create tag
+- Rename tag
+- Delete tag (with warning if in use)
+
+### Rules (Blocked)
+- Rule CRUD once `/api/v1/rules` exists
+- Rule editor for conditions (payee/description/amount) and actions (add tag)
+
+## Technical Implementation
+- Add a dedicated view (recommended): `frontend/src/views/TagsView.vue` (or Settings sub-page).
+- Add composables:
+  - `frontend/src/composables/useTags.ts` for tag CRUD
+  - `frontend/src/composables/useRules.ts` for rules CRUD (when backend exists)
+
+## Dependencies
+- Depends on backend "Create and finish tags and rule engine" for rules endpoints.
+
+## Acceptance Criteria
+- [ ] Tags CRUD fully functional
+- [ ] Rules UI enabled once backend endpoints exist
+- [ ] User can create a rule with conditions and tag action
+- [ ] Rules can be applied to new uploads and via manual re-apply

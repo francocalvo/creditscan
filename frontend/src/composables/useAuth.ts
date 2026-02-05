@@ -43,7 +43,7 @@ export default function useAuth() {
     refetch: refreshUser,
   } = useQuery<UserPublic | null, Error>({
     queryKey: ['currentUser'],
-    queryFn: () => UsersService.readUserMe(),
+    queryFn: () => UsersService.usersGetCurrentUser(),
     enabled: isLoggedIn(),
     staleTime: 5 * 60 * 1000, // Consider user data fresh for 5 minutes
     retry: false, // Don't retry on auth errors
@@ -51,7 +51,7 @@ export default function useAuth() {
 
   // Sign up mutation
   const signUp = useMutation({
-    mutationFn: (data: UserRegister) => UsersService.registerUser({ requestBody: data }),
+    mutationFn: (data: UserRegister) => UsersService.usersRegisterUser({ requestBody: data }),
     onSuccess: () => {
       router.push('/login')
     },
@@ -70,7 +70,7 @@ export default function useAuth() {
 
   // Login function
   const login = async (data: AccessToken) => {
-    const response = await LoginService.loginAccessToken({
+    const response = await LoginService.loginLoginAccessToken({
       formData: data,
     })
     localStorage.setItem('access_token', response.access_token)
@@ -107,7 +107,7 @@ export default function useAuth() {
   // Update password mutation
   const updatePassword = useMutation({
     mutationFn: (data: { current_password: string; new_password: string }) =>
-      UsersService.updatePasswordMe({ requestBody: data }),
+      UsersService.usersUpdateCurrentUserPassword({ requestBody: data }),
     onSuccess: () => {
       error.value = null
     },
@@ -127,7 +127,7 @@ export default function useAuth() {
 
   // Update user profile mutation
   const updateProfile = useMutation({
-    mutationFn: (data: any) => UsersService.updateUserMe({ requestBody: data }), // eslint-disable-line @typescript-eslint/no-explicit-any
+    mutationFn: (data: any) => UsersService.usersUpdateCurrentUser({ requestBody: data }), // eslint-disable-line @typescript-eslint/no-explicit-any
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] })
     },
@@ -147,7 +147,7 @@ export default function useAuth() {
 
   // Delete account mutation
   const deleteAccount = useMutation({
-    mutationFn: () => UsersService.deleteUserMe(),
+    mutationFn: () => UsersService.usersDeleteCurrentUser(),
     onSuccess: () => {
       localStorage.removeItem('access_token')
       setupApiAuth()
