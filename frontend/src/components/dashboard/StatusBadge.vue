@@ -45,18 +45,18 @@ const iconClass = statusIcons[props.status]
 }
 
 .status-paid {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--badge-paid-bg);
+  color: var(--badge-paid-text);
 }
 
 .status-pending {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--badge-pending-bg);
+  color: var(--badge-pending-text);
 }
 
 .status-overdue {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--badge-overdue-bg);
+  color: var(--badge-overdue-text);
 }
 </style>
 

@@ -608,7 +608,7 @@ onUnmounted(() => {
 
 .success-icon {
   font-size: 3rem;
-  color: #10b981;
+  color: var(--status-positive);
 }
 
 .success-title {
@@ -624,7 +624,7 @@ onUnmounted(() => {
 
 .error-icon {
   font-size: 3rem;
-  color: #ef4444;
+  color: var(--status-negative);
 }
 
 .error-title {

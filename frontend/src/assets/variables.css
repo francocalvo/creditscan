@@ -17,17 +17,83 @@
     --focus-ring-color: var(--p-focus-ring-color);
     --focus-ring-offset: var(--p-focus-ring-offset);
     --focus-ring-shadow: var(--p-focus-ring-shadow);
+
+    --surface-ground: var(--p-surface-100);
+    --surface-section: var(--p-surface-0);
+    --code-background: var(--p-surface-900);
+    --code-color: var(--p-surface-200);
+
+    --text-heading: var(--p-surface-900);
+    --text-body: var(--p-surface-700);
+    --text-muted: var(--p-surface-500);
+    --text-placeholder: var(--p-surface-400);
+    --text-faint: var(--p-surface-300);
+
+    --border-light: var(--p-surface-200);
+    --border-row: var(--p-surface-100);
+
+    --surface-raised: var(--p-surface-0);
+    --surface-muted: var(--p-surface-50);
+    --surface-subtle: var(--p-surface-100);
+
+    --badge-paid-bg: #d1fae5;
+    --badge-paid-text: #065f46;
+    --badge-pending-bg: #fef3c7;
+    --badge-pending-text: #92400e;
+    --badge-overdue-bg: #fee2e2;
+    --badge-overdue-text: #991b1b;
+
+    --status-positive: var(--p-green-500);
+    --status-negative: var(--p-red-500);
+
+    --chart-tooltip-bg: #1f2937;
+    --chart-tooltip-text: #f9fafb;
+    --chart-grid: var(--p-surface-100);
+    --chart-tick: var(--p-surface-500);
+    --chart-legend-text: var(--p-surface-700);
+    --chart-pie-border: var(--p-surface-0);
+
+    --spinner-track: var(--p-surface-100);
+    --spinner-head: var(--p-surface-900);
+
+    --overlay-bg: rgba(255, 255, 255, 0.8);
 }
 
 :root[class*='app-dark'] {
     --surface-ground: var(--p-surface-950);
+    --surface-section: var(--p-surface-900);
     --code-background: var(--p-surface-800);
     --code-color: var(--p-surface-100);
-}
 
-:root {
-    --surface-ground: var(--p-surface-100);
-    --code-background: var(--p-surface-900);
-    --code-color: var(--p-surface-200);
+    --text-heading: var(--p-surface-50);
+    --text-body: var(--p-surface-200);
+    --text-muted: var(--p-surface-400);
+    --text-placeholder: var(--p-surface-500);
+    --text-faint: var(--p-surface-600);
 
+    --border-light: var(--p-surface-700);
+    --border-row: var(--p-surface-800);
+
+    --surface-raised: var(--p-surface-900);
+    --surface-muted: var(--p-surface-800);
+    --surface-subtle: var(--p-surface-800);
+
+    --badge-paid-bg: rgba(16, 185, 129, 0.18);
+    --badge-paid-text: #6ee7b7;
+    --badge-pending-bg: rgba(245, 158, 11, 0.18);
+    --badge-pending-text: #fcd34d;
+    --badge-overdue-bg: rgba(239, 68, 68, 0.18);
+    --badge-overdue-text: #fca5a5;
+
+    --chart-tooltip-bg: var(--p-surface-800);
+    --chart-tooltip-text: var(--p-surface-50);
+    --chart-grid: var(--p-surface-800);
+    --chart-tick: var(--p-surface-400);
+    --chart-legend-text: var(--p-surface-300);
+    --chart-pie-border: var(--p-surface-900);
+
+    --spinner-track: var(--p-surface-700);
+    --spinner-head: var(--p-surface-100);
+
+    --overlay-bg: rgba(0, 0, 0, 0.6);
 }
