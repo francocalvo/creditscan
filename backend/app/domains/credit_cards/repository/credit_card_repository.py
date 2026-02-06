@@ -1,10 +1,13 @@
 """Credit card repository implementation."""
 
 import uuid
+from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 from sqlmodel import Session, func, select
 
+from app.domains.card_statements.domain.models import CardStatement
 from app.domains.credit_cards.domain.errors import CreditCardNotFoundError
 from app.domains.credit_cards.domain.models import (
     CreditCard,
@@ -69,11 +72,14 @@ class CreditCardRepository:
             return count  # type: ignore
         return 0
 
-    def update(self, card_id: uuid.UUID, card_data: CreditCardUpdate) -> CreditCard:
+    def update(
+        self, card_id: uuid.UUID, card_data: CreditCardUpdate, **kwargs: Any
+    ) -> CreditCard:
         """Update a credit card."""
         card = self.get_by_id(card_id)
 
         update_dict = card_data.model_dump(exclude_unset=True)
+        update_dict.update(kwargs)
         for field, value in update_dict.items():
             setattr(card, field, value)
 
@@ -87,6 +93,47 @@ class CreditCardRepository:
         card = self.get_by_id(card_id)
         self.db_session.delete(card)
         self.db_session.commit()
+
+    def get_outstanding_balance(self, card_id: uuid.UUID) -> Decimal:
+        """Calculate the outstanding balance for a credit card.
+
+        The outstanding balance is the sum of current_balance from all unpaid statements.
+        """
+        query = select(func.coalesce(func.sum(CardStatement.current_balance), 0)).where(
+            CardStatement.card_id == card_id,
+            CardStatement.is_fully_paid.is_(False),
+        )
+        result = self.db_session.exec(query).first()
+        return Decimal(result or 0)
+
+    def get_outstanding_balances(
+        self, card_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, Decimal]:
+        """Calculate the outstanding balance for multiple credit cards.
+
+        Returns a dictionary mapping card_id to outstanding_balance.
+        """
+        if not card_ids:
+            return {}
+
+        query = (
+            select(
+                CardStatement.card_id,
+                func.coalesce(func.sum(CardStatement.current_balance), 0),
+            )
+            .where(
+                CardStatement.card_id.in_(card_ids),
+                CardStatement.is_fully_paid.is_(False),
+            )
+            .group_by(CardStatement.card_id)
+        )
+        results = self.db_session.exec(query).all()
+
+        balances = {card_id: Decimal(0) for card_id in card_ids}
+        for card_id, balance in results:
+            balances[card_id] = Decimal(balance or 0)
+
+        return balances
 
 
 def provide(session: Session) -> CreditCardRepository:

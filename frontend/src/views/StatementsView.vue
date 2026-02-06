@@ -7,10 +7,11 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import AddCardModal from '@/components/AddCardModal.vue'
+import CreditCardTile from '@/components/cards/CreditCardTile.vue'
+import SetLimitModal from '@/components/cards/SetLimitModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
-import { getCardBackgroundColor } from '@/utils/cardColors'
 import type { CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -33,6 +34,8 @@ const {
   formatCurrency,
   formatDate,
   formatPeriod,
+  aggregateUtilization,
+  updateCardLimit,
 } = useStatements()
 
 const {
@@ -119,15 +122,17 @@ const monthlyChartOptions = {
       bodyColor: '#f9fafb',
       padding: 12,
       cornerRadius: 8,
-      displayColors: false,
-      callbacks: {
-        label: (context: unknown) => {
-          const value = context.parsed.y
-          return ` ${formatAnalyticsCurrency(value)}`
-        },
-      },
-    },
-  },
+	      displayColors: false,
+	      callbacks: {
+	        label: (context: { parsed?: { y?: number | string } }) => {
+	          const rawValue = context?.parsed?.y
+	          const value =
+	            typeof rawValue === 'number' || typeof rawValue === 'string' ? rawValue : 0
+	          return ` ${formatAnalyticsCurrency(value)}`
+	        },
+	      },
+	    },
+	  },
   scales: {
     x: {
       grid: {
@@ -146,16 +151,17 @@ const monthlyChartOptions = {
         color: '#f3f4f6',
         borderDash: [5, 5],
       },
-      ticks: {
-        color: '#6b7280',
-        font: {
-          size: 12,
-        },
-        callback: (value: unknown) => formatAnalyticsCurrency(value),
-      },
-    },
-  },
-}
+	      ticks: {
+	        color: '#6b7280',
+	        font: {
+	          size: 12,
+	        },
+	        callback: (value: unknown) =>
+	          formatAnalyticsCurrency(typeof value === 'number' || typeof value === 'string' ? value : 0),
+	      },
+	    },
+	  },
+	}
 
 /**
  * Color palette for tag chart segments.
@@ -213,38 +219,38 @@ const tagChartData = computed(() => {
 const tagChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'right' as const,
-      labels: {
-        color: '#374151',
-        font: {
-          size: 12,
+	plugins: {
+	  legend: {
+	      position: 'right' as 'right' | 'bottom',
+	      labels: {
+	        color: '#374151',
+	        font: {
+	          size: 12,
         },
         padding: 15,
         usePointStyle: true,
         pointStyle: 'circle',
       },
     },
-    tooltip: {
+	    tooltip: {
       backgroundColor: '#1f2937',
       titleColor: '#f9fafb',
       bodyColor: '#f9fafb',
       padding: 12,
       cornerRadius: 8,
       displayColors: true,
-      callbacks: {
-        label: (context: unknown) => {
-          const dataIndex = context.dataIndex
-          const item = spendingByTag.value[dataIndex]
-          if (!item) return ''
-          const percentage = item.percentage.toFixed(1)
-          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
-        },
-      },
-    },
-  },
-}
+	      callbacks: {
+	        label: (context: { dataIndex?: number }) => {
+	          const dataIndex = typeof context?.dataIndex === 'number' ? context.dataIndex : -1
+	          const item = spendingByTag.value[dataIndex]
+	          if (!item) return ''
+	          const percentage = item.percentage.toFixed(1)
+	          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+	        },
+	      },
+	    },
+	  },
+	}
 
 // Computed options that respond to screen size
 const isMobile = ref(false)
@@ -267,7 +273,7 @@ onMounted(() => {
 watch(
   isMobile,
   (mobile) => {
-    tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as 'bottom' | 'right'
+    tagChartOptions.plugins.legend.position = mobile ? 'bottom' : 'right'
   },
   { immediate: true },
 )
@@ -289,7 +295,17 @@ const isTransitioningModals = ref(false)
 // Add Card modal state
 const showAddCardModal = ref(false)
 
-const cardMenuRef = ref()
+// Set Limit modal state (for Step06)
+const showSetLimitModal = ref(false)
+const cardForLimitEdit = ref<CreditCard | null>(null)
+
+// Handler for opening set limit modal
+const handleSetLimit = (card: CreditCard) => {
+  cardForLimitEdit.value = card
+  showSetLimitModal.value = true
+}
+
+const cardMenuRef = ref<{ toggle: (event: Event) => void } | null>(null)
 const selectedCardForMenu = ref<CreditCard | null>(null)
 
 /**
@@ -320,7 +336,7 @@ const handleDeleteCard = async (card: CreditCard | null) => {
 
   try {
     await deleteCard(card.id)
-    await fetchStatements()
+    await Promise.all([fetchStatements(), fetchBalance()])
     toast.add({
       severity: 'success',
       summary: 'Card Deleted',
@@ -351,7 +367,7 @@ const cardMenuItems = computed<MenuItem[]>(() => [
 
 const toggleCardMenu = (event: Event, card: CreditCard) => {
   selectedCardForMenu.value = card
-  cardMenuRef.value.toggle(event)
+  cardMenuRef.value?.toggle(event)
 }
 
 watch(showDetailModal, (isVisible) => {
@@ -428,11 +444,6 @@ const activeCards = computed(() => {
   return cards.value.length
 })
 
-const creditUtilization = computed(() => {
-  // We don't have credit limit data yet, so we can't compute utilization.
-  return 'N/A'
-})
-
 // Filter statements based on search and status
 const filteredStatements = computed(() => {
   let filtered = statementsWithCard.value
@@ -466,17 +477,6 @@ const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]
   if (!statement.card) return 'Unknown Card'
   const brandName = statement.card.brand.charAt(0).toUpperCase() + statement.card.brand.slice(1)
   return `${statement.card.bank} ${brandName} ••${statement.card.last4}`
-}
-
-const getCardBrandIcon = (brand?: string): string => {
-  const icons: Record<string, string> = {
-    visa: 'pi pi-credit-card',
-    mastercard: 'pi pi-credit-card',
-    amex: 'pi pi-credit-card',
-    discover: 'pi pi-credit-card',
-    other: 'pi pi-credit-card',
-  }
-  return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
 // Get latest balance for a card
@@ -583,6 +583,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   fetchStatements()
   fetchBalance()
 }
+
+// Handler for set limit modal save success
+const handleLimitSaved = () => {
+  if (!cardForLimitEdit.value) return
+  // Show success toast
+  toast.add({
+    severity: 'success',
+    summary: 'Credit Limit Updated',
+    detail: `Limit updated for ${cardForLimitEdit.value.bank} ••${cardForLimitEdit.value.last4}`,
+    life: 3000,
+  })
+  // Clear card reference
+  cardForLimitEdit.value = null
+}
 </script>
 
 <template>
@@ -612,8 +626,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
       <MetricCard
         title="Credit Utilization"
-        :value="creditUtilization"
-        subtitle="Requires credit limits"
+        :value="
+          aggregateUtilization.value === null
+            ? 'N/A'
+            : aggregateUtilization.value.toFixed(1) + '%'
+        "
+        :subtitle="
+          aggregateUtilization.totalCount === 0
+            ? 'No cards'
+            : aggregateUtilization.missingCount === aggregateUtilization.totalCount
+            ? 'Requires credit limits'
+            : aggregateUtilization.missingCount === 0
+            ? ''
+            : `${aggregateUtilization.missingCount} of ${aggregateUtilization.totalCount} cards missing limits`
+        "
         icon="pi pi-trending-up"
       />
     </div>
@@ -718,7 +744,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
         </div>
       </div>
 
-      <div v-if="isLoading || isBalanceLoading" class="loading-state">
+      <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <p>Loading cards...</p>
       </div>
@@ -726,46 +752,21 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       <div v-else class="cards-grid">
         <!-- Add Card Placeholder (always shown as first item) -->
         <AddCardPlaceholder @click="openAddCardModal" />
-        <div
-          v-for="card in cards"
-          :key="card.id"
-          class="card-item-large"
-          :style="{ background: getCardBackgroundColor(card.bank) }"
-        >
-          <div class="card-header-section">
-            <div class="card-brand-icon">
-              <i :class="getCardBrandIcon(card.brand)"></i>
-            </div>
-            <button
-              type="button"
-              class="card-menu-trigger"
-              @click.stop="toggleCardMenu($event, card)"
-              aria-label="Card options"
-            >
-              <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
-            </button>
-          </div>
-
-          <div class="card-body">
-            <div class="card-number">•••• •••• •••• {{ card.last4 }}</div>
-            <div class="card-details-row">
-              <div class="card-detail">
-                <div class="detail-label">Bank</div>
-                <div class="detail-value">{{ card.bank }}</div>
-              </div>
-              <div class="card-detail">
-                <div class="detail-label">Brand</div>
-                <div class="detail-value">{{ card.brand.toUpperCase() }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card-footer-section">
-            <div class="card-stat">
-              <div class="stat-label">Current Balance</div>
-              <div class="stat-value">{{ formatCurrency(getCardLatestBalance(card.id)) }}</div>
-            </div>
-          </div>
+        <div v-for="card in cards" :key="card.id" class="card-grid-item">
+          <button
+            type="button"
+            class="card-menu-trigger"
+            @click.stop="toggleCardMenu($event, card)"
+            aria-label="Card options"
+          >
+            <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+          </button>
+          <CreditCardTile
+            :card="card"
+            :current-balance="getCardLatestBalance(card.id)"
+            :format-currency="formatCurrency"
+            @set-limit="handleSetLimit"
+          />
         </div>
       </div>
 
@@ -1025,6 +1026,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       @card-created="handleCardCreated"
     />
 
+    <!-- Set Limit Modal -->
+    <SetLimitModal
+      v-model="showSetLimitModal"
+      :card="cardForLimitEdit"
+      :on-save="updateCardLimit"
+      @saved="handleLimitSaved"
+    />
+
     <!-- Toast notifications -->
     <Toast />
   </div>
@@ -1280,131 +1289,45 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
+  align-items: stretch;
 }
 
-.card-item-large {
-  border-radius: 16px;
-  padding: 24px;
-  color: white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-  cursor: pointer;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-item-large:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.card-header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.card-brand-icon {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
+.cards-grid > * {
+  min-width: 0;
 }
 
 .card-menu-trigger {
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-  background: transparent;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
   border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s;
 }
 
 .card-menu-trigger:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.65);
 }
 
 .card-menu-trigger:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline: 2px solid rgba(255, 255, 255, 0.95);
   outline-offset: 2px;
 }
 
-.card-body {
-  flex: 1;
-  margin-bottom: 24px;
-}
-
-.card-number {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  margin-bottom: 20px;
-  font-family: 'Courier New', monospace;
-}
-
-.card-details-row {
-  display: flex;
-  gap: 32px;
-}
-
-.card-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.card-footer-section {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.card-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
+.card-grid-item {
+  position: relative;
+  min-width: 0;
 }
 
 /* Placeholder Section */

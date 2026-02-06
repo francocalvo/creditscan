@@ -51,6 +51,10 @@ describe('useCreditCards', () => {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1234',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
       alias: 'Personal',
     }
 
@@ -142,6 +146,10 @@ describe('useCreditCards', () => {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1111',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
     }
     const card2: CreditCard = {
       id: 'card-2',
@@ -149,6 +157,10 @@ describe('useCreditCards', () => {
       bank: 'Other Bank',
       brand: CardBrand.MASTERCARD,
       last4: '2222',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
     }
 
     mockFetch.mockResolvedValueOnce({
@@ -185,6 +197,10 @@ describe('useCreditCards', () => {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1111',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
     }
 
     mockFetch.mockResolvedValueOnce({

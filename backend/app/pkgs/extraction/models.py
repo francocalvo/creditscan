@@ -55,6 +55,7 @@ class ExtractedStatement(BaseModel):
     previous_balance: list[Money] = []
     current_balance: list[Money]
     minimum_payment: list[Money] = []
+    credit_limit: Money | None = None
     transactions: list[ExtractedTransaction]
 
 

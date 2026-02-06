@@ -14,8 +14,20 @@ Follow these indications:
   transaction, like "ARG(1/12)", where the parenthesis show that is the current
   installment and total installments.
 - The start date of the next cycle has to always be greater than the end date of
-  the current cycle. If it's the same, probably the start date of the next cycle
-  is the _next_ date after the end of the current cycle.
+  the current cycle. If it's the same, probably the start date of the next date
+  after the end of the current cycle.
+- Look explicitly for credit-limit concepts and headings, including:
+  "Límite de crédito", "Credit Limit", "Límite disponible", "Línea de crédito".
+- Return the value in the schema field `credit_limit` as a Money object: amount
+  as a plain number (no symbols/thousand separators) and currency as a 3-letter
+  ISO code.
+- Prefer the total line/limit amount (not "available credit") when both are
+  present; if only an "available" value is present and it's not clearly the
+  total limit, return null rather than guessing.
+- Return null if no credible limit value is present.
+- Infer currency from the statement context (balances/transactions) when
+  possible; otherwise pick the most likely 3-letter code from nearby currency
+  markers.
 
 JSON Schema:
 """
@@ -103,6 +115,14 @@ EXTRACTION_SCHEMA: dict[str, object] = {
                     "amount": {"type": "number"},
                     "currency": {"type": "string", "minLength": 3, "maxLength": 3},
                 },
+            },
+        },
+        "credit_limit": {
+            "type": ["object", "null"],
+            "required": ["amount", "currency"],
+            "properties": {
+                "amount": {"type": "number"},
+                "currency": {"type": "string", "minLength": 3, "maxLength": 3},
             },
         },
         "transactions": {

@@ -17,6 +17,10 @@ export interface CreditCard {
   bank: string
   brand: CardBrand
   last4: string
+  credit_limit: number | null
+  limit_last_updated_at: string | null
+  limit_source: 'manual' | 'statement' | null
+  outstanding_balance: number
   alias?: string
 }
 
@@ -31,6 +35,42 @@ export interface CreditCardCreate {
 export interface CreditCardsResponse {
   data: CreditCard[]
   count: number
+}
+
+type CreditCardApi = Omit<CreditCard, 'credit_limit' | 'outstanding_balance'> & {
+  credit_limit: number | string | null
+  outstanding_balance: number | string
+}
+
+type CreditCardsResponseApi = Omit<CreditCardsResponse, 'data'> & {
+  data: CreditCardApi[]
+}
+
+const toFiniteNumberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
+const toFiniteNumber = (value: unknown, fallback: number): number => {
+  return toFiniteNumberOrNull(value) ?? fallback
+}
+
+const normalizeCard = (card: CreditCardApi): CreditCard => {
+  return {
+    ...card,
+    credit_limit: toFiniteNumberOrNull(card.credit_limit),
+    outstanding_balance: toFiniteNumber(card.outstanding_balance, 0),
+  }
 }
 
 export function useCreditCards() {
@@ -70,8 +110,8 @@ export function useCreditCards() {
         throw new Error(`Failed to fetch credit cards: ${response.statusText}`)
       }
 
-      const data: CreditCardsResponse = await response.json()
-      cards.value = data.data
+      const data: CreditCardsResponseApi = await response.json()
+      cards.value = data.data.map(normalizeCard)
     } catch (e) {
       error.value = e instanceof Error ? e : new Error('Failed to fetch credit cards')
       console.error('Error fetching credit cards:', e)
@@ -155,7 +195,8 @@ export function useCreditCards() {
         throw new Error(message)
       }
 
-      const createdCard: CreditCard = await response.json()
+      const createdCardApi: CreditCardApi = await response.json()
+      const createdCard: CreditCard = normalizeCard(createdCardApi)
       await fetchCards()
       return createdCard
     } catch (e) {

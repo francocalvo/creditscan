@@ -47,9 +47,15 @@ export const confirmPasswordRules = (
 export const handleError = (err: ApiError) => {
   const { showErrorToast } = useCustomToast()
   const errDetail = (err.body as Record<string, unknown>)?.detail
-  let errorMessage = errDetail || 'Something went wrong.'
+  let errorMessage = typeof errDetail === 'string' ? errDetail : 'Something went wrong.'
   if (Array.isArray(errDetail) && errDetail.length > 0) {
-    errorMessage = errDetail[0].msg
+    const first = errDetail[0]
+    if (typeof first === 'object' && first !== null && 'msg' in first) {
+      const msg = (first as { msg?: unknown }).msg
+      if (typeof msg === 'string' && msg.trim()) {
+        errorMessage = msg
+      }
+    }
   }
   showErrorToast(errorMessage)
 }

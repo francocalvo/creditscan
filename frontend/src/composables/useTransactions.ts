@@ -21,7 +21,7 @@ export function useTransactions() {
       })
     } catch (err) {
       console.error('Error fetching transactions:', err)
-      error.value = err.message || 'Failed to fetch transactions'
+      error.value = err instanceof Error ? err.message : 'Failed to fetch transactions'
       toast.add({
         severity: 'error',
         summary: 'Error',

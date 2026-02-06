@@ -31,7 +31,10 @@ class CreditCardService:
     def get_card(self, card_id: uuid.UUID) -> CreditCardPublic:
         """Get a credit card by ID."""
         card = self.repository.get_by_id(card_id)
-        return CreditCardPublic.model_validate(card)
+        balance = self.repository.get_outstanding_balance(card_id)
+        public_card = CreditCardPublic.model_validate(card)
+        public_card.outstanding_balance = balance
+        return public_card
 
     def list_cards(
         self, skip: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
@@ -40,8 +43,17 @@ class CreditCardService:
         cards = self.repository.list(skip=skip, limit=limit, filters=filters)
         count = self.repository.count(filters=filters)
 
+        card_ids = [c.id for c in cards]
+        balances = self.repository.get_outstanding_balances(card_ids)
+
+        data = []
+        for card in cards:
+            public_card = CreditCardPublic.model_validate(card)
+            public_card.outstanding_balance = balances.get(card.id, 0)
+            data.append(public_card)
+
         return CreditCardsPublic(
-            data=[CreditCardPublic.model_validate(c) for c in cards],
+            data=data,
             count=count,
         )
 
@@ -49,8 +61,23 @@ class CreditCardService:
         self, card_id: uuid.UUID, card_data: CreditCardUpdate
     ) -> CreditCardPublic:
         """Update a credit card."""
-        card = self.repository.update(card_id, card_data)
-        return CreditCardPublic.model_validate(card)
+        from datetime import UTC, datetime
+
+        from app.domains.credit_cards.domain.models import LimitSource
+
+        extra_updates = {}
+        if (
+            "credit_limit" in card_data.model_fields_set
+            and card_data.credit_limit is not None
+        ):
+            extra_updates["limit_source"] = LimitSource.MANUAL
+            extra_updates["limit_last_updated_at"] = datetime.now(UTC)
+
+        card = self.repository.update(card_id, card_data, **extra_updates)
+        balance = self.repository.get_outstanding_balance(card_id)
+        public_card = CreditCardPublic.model_validate(card)
+        public_card.outstanding_balance = balance
+        return public_card
 
     def delete_card(self, card_id: uuid.UUID) -> None:
         """Delete a credit card."""

@@ -73,11 +73,15 @@ const userMenuItems = ref<MenuItem[]>([
 // User initials for avatar
 const userInitials = computed(() => {
   if (!authStore.user?.full_name) return 'U'
-  const names = authStore.user.full_name.split(' ')
-  if (names.length >= 2) {
-    return `${names[0][0]}${names[1][0]}`.toUpperCase()
+  const names = authStore.user.full_name.trim().split(/\s+/).filter(Boolean)
+  const firstInitial = names[0]?.[0]
+  const secondInitial = names[1]?.[0]
+
+  if (firstInitial && secondInitial) {
+    return `${firstInitial}${secondInitial}`.toUpperCase()
   }
-  return authStore.user.full_name[0].toUpperCase()
+
+  return firstInitial?.toUpperCase() ?? 'U'
 })
 
 // Upload statement modal state

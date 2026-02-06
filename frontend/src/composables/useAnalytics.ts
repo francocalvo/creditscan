@@ -132,7 +132,12 @@ export function useAnalytics() {
     // Try YYYY-MM-DD format (date-only from backend)
     const dateOnlyMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
     if (dateOnlyMatch) {
-      const [, yearStr, monthStr, dayStr] = dateOnlyMatch
+      const yearStr = dateOnlyMatch[1]
+      const monthStr = dateOnlyMatch[2]
+      const dayStr = dateOnlyMatch[3]
+      if (!yearStr || !monthStr || !dayStr) {
+        return null
+      }
       const year = parseInt(yearStr, 10)
       const month = parseInt(monthStr, 10) - 1 // Months are 0-indexed in JS
       const day = parseInt(dayStr, 10)
@@ -245,7 +250,7 @@ export function useAnalytics() {
     const amounts: number[] = new Array(txns.length)
 
     for (let i = 0; i < txns.length; i += 1) {
-      const txn = txns[i]
+      const txn = txns[i]!
       const amount = txn.convertedAmount
       total += amount
       if (amount > highest) {
@@ -258,7 +263,9 @@ export function useAnalytics() {
     amounts.sort((a, b) => a - b)
     const midIndex = Math.floor(count / 2)
     const median =
-      count % 2 === 1 ? amounts[midIndex] : (amounts[midIndex - 1] + amounts[midIndex]) / 2
+      count % 2 === 1
+        ? amounts[midIndex]!
+        : (amounts[midIndex - 1]! + amounts[midIndex]!) / 2
 
     return {
       totalSpending: total,
@@ -307,7 +314,18 @@ export function useAnalytics() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([monthKey, amount]) => {
         // Parse YYYY-MM and format as "Jan 2024"
-        const [year, month] = monthKey.split('-').map(Number)
+        const parts = monthKey.split('-')
+        const yearPart = parts[0]
+        const monthPart = parts[1]
+        if (!yearPart || !monthPart) {
+          return {
+            month: monthKey,
+            amount,
+          }
+        }
+
+        const year = Number(yearPart)
+        const month = Number(monthPart)
         const formattedMonth = new Date(year, month - 1).toLocaleDateString('en-US', {
           month: 'short',
           year: 'numeric',
@@ -491,6 +509,7 @@ export function useAnalytics() {
 
         for (let i = 0; i < allTransactions.length; i += 1) {
           const txn = allTransactions[i]
+          if (!txn) continue
           const fromCurrency = normalizeCurrencyCode(txn.currency)
 
           if (fromCurrency === toCurrency) {
@@ -522,9 +541,13 @@ export function useAnalytics() {
 
             for (let i = 0; i < conversionResponse.results.length; i += 1) {
               const result = conversionResponse.results[i]
-              baseConverted[conversionIndices[i]].convertedAmount = parseDecimal(
-                result.converted_amount,
-              )
+              const txnIndex = conversionIndices[i]
+              if (!result || txnIndex === undefined) continue
+
+              const targetTxn = baseConverted[txnIndex]
+              if (!targetTxn) continue
+
+              targetTxn.convertedAmount = parseDecimal(result.converted_amount)
             }
           } catch (conversionError) {
             console.warn(
