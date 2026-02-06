@@ -645,7 +645,7 @@ export const $ConditionField = {
 
 export const $ConditionOperator = {
   type: 'string',
-  enum: ['contains', 'equals', 'gt', 'lt', 'before', 'after', 'between'],
+  enum: ['contains', 'equals', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between'],
   title: 'ConditionOperator',
   description: 'Operators for condition matching.',
 } as const

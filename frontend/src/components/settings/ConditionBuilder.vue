@@ -41,8 +41,10 @@ const textOperators = [
 
 const amountOperators = [
   { label: 'Equals', value: 'equals' },
-  { label: 'Greater than', value: 'gt' },
-  { label: 'Less than', value: 'lt' },
+  { label: 'Greater than (>)', value: 'gt' },
+  { label: 'Greater or equal (>=)', value: 'gte' },
+  { label: 'Less than (<)', value: 'lt' },
+  { label: 'Less or equal (<=)', value: 'lte' },
   { label: 'Between', value: 'between' },
 ]
 
@@ -292,8 +294,15 @@ function updateSecondaryValue(index: number, value: string | number | Date | nul
 <template>
   <div class="condition-builder">
     <div v-for="(condition, index) in conditions" :key="index" class="condition-row">
-      <!-- Logical operator (AND) shown before all but first condition -->
-      <span v-if="index > 0" class="logical-operator">AND</span>
+      <!-- Logical operator toggle shown before all but first condition -->
+      <button
+        v-if="index > 0"
+        type="button"
+        class="logical-operator-toggle"
+        @click="updateCondition(index, { logical_operator: condition.logical_operator === 'OR' ? 'AND' : 'OR' })"
+      >
+        {{ condition.logical_operator || 'AND' }}
+      </button>
 
       <!-- Field dropdown -->
       <Dropdown
@@ -424,12 +433,24 @@ function updateSecondaryValue(index: number, value: string | number | Date | nul
   flex-wrap: wrap;
 }
 
-.logical-operator {
-  font-size: 0.875rem;
+.logical-operator-toggle {
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: #4f46e5;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-width: 40px;
+  text-align: center;
+}
+
+.logical-operator-toggle:hover {
+  background: #e0e7ff;
 }
 
 .value-input {

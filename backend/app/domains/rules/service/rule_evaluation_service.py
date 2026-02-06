@@ -115,6 +115,14 @@ class RuleEvaluationService:
                 return False
             return field_value > parsed
 
+        if operator == ConditionOperator.GTE:
+            if not isinstance(field_value, Decimal):
+                return False
+            parsed = self._parse_amount(condition.value)
+            if parsed is None:
+                return False
+            return field_value >= parsed
+
         if operator == ConditionOperator.LT:
             if not isinstance(field_value, Decimal):
                 return False
@@ -122,6 +130,14 @@ class RuleEvaluationService:
             if parsed is None:
                 return False
             return field_value < parsed
+
+        if operator == ConditionOperator.LTE:
+            if not isinstance(field_value, Decimal):
+                return False
+            parsed = self._parse_amount(condition.value)
+            if parsed is None:
+                return False
+            return field_value <= parsed
 
         # Date operators: BEFORE, AFTER, BETWEEN
         if operator == ConditionOperator.BEFORE:

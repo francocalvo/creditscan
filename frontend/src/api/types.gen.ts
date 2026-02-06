@@ -129,7 +129,7 @@ export type ConditionField = 'payee' | 'description' | 'amount' | 'date'
 /**
  * Operators for condition matching.
  */
-export type ConditionOperator = 'contains' | 'equals' | 'gt' | 'lt' | 'before' | 'after' | 'between'
+export type ConditionOperator = 'contains' | 'equals' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after' | 'between'
 
 /**
  * Model for creating credit card.

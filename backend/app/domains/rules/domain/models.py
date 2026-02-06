@@ -24,7 +24,9 @@ class ConditionOperator(str, Enum):
     EQUALS = "equals"
     # Numeric operators
     GT = "gt"
+    GTE = "gte"
     LT = "lt"
+    LTE = "lte"
     # Date operators
     BEFORE = "before"
     AFTER = "after"
