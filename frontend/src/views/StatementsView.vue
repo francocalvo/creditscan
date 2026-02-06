@@ -89,6 +89,17 @@ const enrichedTransactions = computed(() => {
 // Transaction filter state
 const selectedCardId = ref<string | null>(null)
 const selectedTagId = ref<string | null>(null)
+const txnSearchQuery = ref('')
+const txnDebouncedSearch = ref('')
+let txnDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(txnSearchQuery, (val) => {
+  if (txnDebounceTimer) clearTimeout(txnDebounceTimer)
+  txnDebounceTimer = setTimeout(() => {
+    txnDebouncedSearch.value = val
+  }, 300)
+})
+
 const txnCurrentPage = ref(0)
 const txnPageSize = ref(20)
 
@@ -116,6 +127,15 @@ const tagFilterOptions = computed(() => {
 const txnFiltered = computed(() => {
   let result = enrichedTransactions.value
 
+  const query = txnDebouncedSearch.value.toLowerCase().trim()
+  if (query) {
+    result = result.filter(
+      (txn) =>
+        txn.payee.toLowerCase().includes(query) ||
+        txn.description.toLowerCase().includes(query),
+    )
+  }
+
   if (selectedCardId.value) {
     result = result.filter((txn) => txn.card?.id === selectedCardId.value)
   }
@@ -137,7 +157,7 @@ const paginatedTransactions = computed(() => {
 })
 
 // Reset page when filters change
-watch([selectedCardId, selectedTagId], () => {
+watch([selectedCardId, selectedTagId, txnDebouncedSearch], () => {
   txnCurrentPage.value = 0
 })
 
@@ -1052,8 +1072,22 @@ const handleLimitSaved = () => {
         </div>
       </div>
 
-      <!-- Filter Bar -->
+      <!-- Search & Filter Bar -->
       <div class="txn-filters">
+        <div class="txn-search-box">
+          <i class="pi pi-search txn-search-icon"></i>
+          <input
+            v-model="txnSearchQuery"
+            type="text"
+            class="txn-search-input"
+            placeholder="Search by payee or description..."
+          />
+          <i
+            v-if="txnSearchQuery"
+            class="pi pi-times txn-search-clear"
+            @click="txnSearchQuery = ''"
+          ></i>
+        </div>
         <Dropdown
           v-model="selectedCardId"
           :options="cardFilterOptions"
@@ -1093,6 +1127,10 @@ const handleLimitSaved = () => {
           </template>
         </Dropdown>
       </div>
+
+      <p v-if="!isTransactionsLoading && txnDebouncedSearch" class="txn-results-count">
+        {{ totalFiltered }} result{{ totalFiltered !== 1 ? 's' : '' }} for "{{ txnDebouncedSearch }}"
+      </p>
 
       <div class="table-container">
         <div v-if="isTransactionsLoading" class="loading-state">
@@ -1166,7 +1204,8 @@ const handleLimitSaved = () => {
         />
 
         <div v-else-if="!isTransactionsLoading" class="empty-state">
-          <p>No transactions found</p>
+          <p v-if="txnDebouncedSearch || selectedCardId || selectedTagId">No transactions match your filters</p>
+          <p v-else>No transactions found</p>
         </div>
       </div>
     </div>
@@ -1893,8 +1932,57 @@ const handleLimitSaved = () => {
   margin-bottom: 16px;
 }
 
+.txn-search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 0 16px;
+}
+
+.txn-search-icon {
+  font-size: 14px;
+  color: var(--text-placeholder);
+}
+
+.txn-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 12px 0;
+  font-size: 15px;
+  background: transparent;
+  color: var(--text-heading);
+}
+
+.txn-search-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.txn-search-clear {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.txn-search-clear:hover {
+  color: var(--text-heading);
+}
+
 .txn-filter-dropdown {
   min-width: 200px;
+}
+
+.txn-results-count {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
 }
 
 .tag-filter-option {
