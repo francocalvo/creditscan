@@ -84,8 +84,8 @@ const enrichedTransactions = computed(() => {
  * Creates a new object when spendingByMonth changes to ensure proper reactivity.
  */
 const monthlyChartData = computed(() => {
-  // eslint-disable-next-line no-unused-expressions
-  isDark.value // reactive dependency for theme changes
+   
+  void isDark.value // reactive dependency for theme changes
   if (!spendingByMonth.value || spendingByMonth.value.length === 0) {
     return {
       labels: [],
@@ -119,8 +119,8 @@ const monthlyChartData = computed(() => {
  * Configured for responsive layout with area fill.
  */
 const monthlyChartOptions = computed(() => {
-  // eslint-disable-next-line no-unused-expressions
-  isDark.value // reactive dependency for theme changes
+   
+  void isDark.value // reactive dependency for theme changes
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -202,8 +202,8 @@ const tagChartColors = [
  * Applies colors from palette, cycling if more categories than colors available.
  */
 const tagChartData = computed(() => {
-  // eslint-disable-next-line no-unused-expressions
-  isDark.value // reactive dependency for theme changes
+   
+  void isDark.value // reactive dependency for theme changes
   if (!spendingByTag.value || spendingByTag.value.length === 0) {
     return {
       labels: [],
@@ -232,8 +232,8 @@ const tagChartData = computed(() => {
  * Legend moves to bottom on mobile screens for better space utilization.
  */
 const tagChartOptions = computed(() => {
-  // eslint-disable-next-line no-unused-expressions
-  isDark.value // reactive dependency for theme changes
+   
+  void isDark.value // reactive dependency for theme changes
   return {
     responsive: true,
     maintainAspectRatio: false,
