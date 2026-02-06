@@ -31,6 +31,12 @@ describe('useTags', () => {
     vi.clearAllMocks()
     mockFetch.mockReset()
     localStorage.clear()
+
+    // Reset shared module-level state
+    const { tags, error, hasFetched } = useTags()
+    tags.value = []
+    error.value = null
+    hasFetched.value = false
   })
 
   describe('createTag', () => {

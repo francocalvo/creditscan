@@ -25,11 +25,13 @@ export interface TagsResponse {
   count: number
 }
 
+// Module-level shared state (singleton across all consumers)
+const tags = ref<Tag[]>([])
+const isLoading = ref(false)
+const error = ref<Error | null>(null)
+const hasFetched = ref(false)
+
 export function useTags() {
-  const tags = ref<Tag[]>([])
-  const isLoading = ref(false)
-  const error = ref<Error | null>(null)
-  const hasFetched = ref(false)
 
   const tagsMap = computed<Map<string, Tag>>(() => {
     return new Map(tags.value.map((tag) => [tag.tag_id, tag]))

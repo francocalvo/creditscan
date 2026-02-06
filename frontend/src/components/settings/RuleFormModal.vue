@@ -24,7 +24,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const { createRule, updateRule } = useRules()
-const { tags } = useTags()
+const { tags, fetchTags } = useTags()
 
 // Form state
 const name = ref('')
@@ -149,6 +149,7 @@ watch(
   () => props.visible,
   (newVisible) => {
     if (newVisible) {
+      fetchTags()
       resetForm()
       if (props.rule) {
         populateForm(props.rule)
