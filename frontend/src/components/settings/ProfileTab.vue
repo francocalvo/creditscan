@@ -102,8 +102,8 @@ const handleSave = async () => {
 }
 
 .profile-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
   border-radius: 12px;
   padding: 24px;
   max-width: 600px;
@@ -112,7 +112,7 @@ const handleSave = async () => {
 .card-title {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-color);
   margin: 0 0 24px 0;
 }
 
@@ -124,20 +124,20 @@ const handleSave = async () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-color);
   margin-bottom: 6px;
 }
 
 .field-value {
   font-size: 15px;
-  color: #111827;
+  color: var(--text-color);
   padding: 8px 0;
 }
 
 .field-hint {
   display: block;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin-top: 4px;
 }
 
@@ -150,6 +150,6 @@ const handleSave = async () => {
   gap: 12px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--surface-border);
 }
 </style>

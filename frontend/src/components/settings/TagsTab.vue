@@ -231,7 +231,7 @@ function handleFormSaved(): void {
 .tab-title {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-color);
   margin: 0;
 }
 
@@ -241,7 +241,7 @@ function handleFormSaved(): void {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 .loading-icon {
@@ -260,27 +260,27 @@ function handleFormSaved(): void {
 
 .empty-icon {
   font-size: 48px;
-  color: #d1d5db;
+  color: var(--surface-border);
   margin-bottom: 16px;
 }
 
 .empty-state h4 {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-color);
   margin: 0 0 8px 0;
 }
 
 .empty-state p {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin: 0 0 24px 0;
   max-width: 300px;
 }
 
 .tags-table-container {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -295,18 +295,18 @@ function handleFormSaved(): void {
   padding: 12px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--surface-ground);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 .tags-table td {
   padding: 12px 16px;
   font-size: 14px;
-  color: #111827;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 .tags-table tr:last-child td {
@@ -314,7 +314,7 @@ function handleFormSaved(): void {
 }
 
 .tags-table tr:hover td {
-  background: #f9fafb;
+  background: var(--surface-ground);
 }
 
 .col-color {

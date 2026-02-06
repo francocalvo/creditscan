@@ -313,7 +313,7 @@ function selectColor(color: string): void {
 }
 
 .color-swatch--selected {
-  border-color: #111827;
+  border-color: var(--text-color);
 }
 
 .color-swatch i {
@@ -324,7 +324,7 @@ function selectColor(color: string): void {
 
 .tag-preview {
   padding: 0.75rem;
-  background: #f9fafb;
+  background: var(--surface-ground);
   border-radius: 8px;
   display: flex;
   align-items: center;

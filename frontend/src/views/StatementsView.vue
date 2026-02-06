@@ -543,10 +543,12 @@ const filteredStatements = computed(() => {
   return filtered
 })
 
+const transactionsInitialized = ref(false)
+
 async function fetchTransactionsAndTags() {
   await fetchTransactions()
   if (transactions.value.length > 0) {
-    fetchTagsForTransactions(transactions.value.map((t) => t.id))
+    await fetchTagsForTransactions(transactions.value.map((t) => t.id))
   }
 }
 
@@ -559,8 +561,20 @@ onMounted(() => {
   fetchStatements()
   fetchBalance()
   fetchTags()
-  fetchTransactionsAndTags()
 })
+
+// Lazy-load transactions only when the tab is opened
+watch(
+  activeTab,
+  async (newTab) => {
+    if (newTab !== 'transactions') return
+    if (transactionsInitialized.value) return
+
+    transactionsInitialized.value = true
+    await fetchTransactionsAndTags()
+  },
+  { immediate: true },
+)
 
 const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]) => {
   if (!statement.card) return 'Unknown Card'

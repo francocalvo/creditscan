@@ -436,11 +436,11 @@ function updateSecondaryValue(index: number, value: string | number | Date | nul
 .logical-operator-toggle {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #4f46e5;
+  color: var(--primary-color);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
   border-radius: 4px;
   padding: 2px 8px;
   cursor: pointer;
@@ -450,7 +450,7 @@ function updateSecondaryValue(index: number, value: string | number | Date | nul
 }
 
 .logical-operator-toggle:hover {
-  background: #e0e7ff;
+  background: var(--surface-hover);
 }
 
 .value-input {
@@ -464,7 +464,7 @@ function updateSecondaryValue(index: number, value: string | number | Date | nul
 
 .between-separator {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-color-secondary);
 }
 
 /* PrimeVue overrides for smaller dropdowns in this component */

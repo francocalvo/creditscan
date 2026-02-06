@@ -59,13 +59,13 @@ const tabs = [
 .section-title {
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-color);
   margin: 0 0 8px 0;
 }
 
 .section-subtitle {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--text-color-secondary);
   margin: 0;
 }
 

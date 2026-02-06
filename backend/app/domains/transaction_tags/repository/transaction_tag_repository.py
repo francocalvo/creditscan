@@ -51,6 +51,18 @@ class TransactionTagRepository:
         result = self.db_session.exec(query)
         return list(result)
 
+    def list_by_transactions(
+        self, transaction_ids: list[uuid.UUID]
+    ) -> list[TransactionTag]:
+        """List all tags for multiple transactions in a single query."""
+        if not transaction_ids:
+            return []
+        query = select(TransactionTag).where(
+            TransactionTag.transaction_id.in_(transaction_ids)  # type: ignore[union-attr]
+        )
+        result = self.db_session.exec(query)
+        return list(result)
+
     def list_by_tag(self, tag_id: uuid.UUID) -> list[TransactionTag]:
         """List all transactions for a tag."""
         query = select(TransactionTag).where(TransactionTag.tag_id == tag_id)
