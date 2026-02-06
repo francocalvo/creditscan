@@ -33,8 +33,8 @@ defineProps<Props>()
 
 <style scoped>
 .metric-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   padding: 24px;
   transition: box-shadow 0.2s;
@@ -53,19 +53,19 @@ defineProps<Props>()
 
 .metric-title {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .metric-icon {
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--text-placeholder);
 }
 
 .metric-value {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-heading);
   margin-bottom: 8px;
 }
 
@@ -81,19 +81,19 @@ defineProps<Props>()
 }
 
 .change-positive {
-  color: #10b981;
+  color: var(--status-positive);
 }
 
 .change-negative {
-  color: #ef4444;
+  color: var(--status-negative);
 }
 
 .change-neutral {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .metric-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 </style>

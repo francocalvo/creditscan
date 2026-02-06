@@ -108,7 +108,8 @@ function onDrop(event: DragEvent): void {
 
   const files = event.dataTransfer?.files
   if (files && files.length > 0) {
-    validateAndEmit(files[0])
+    const file = files[0]
+    if (file) validateAndEmit(file)
   }
 
   // Reset input value to allow re-selecting same file
@@ -152,7 +153,8 @@ function onFileSelect(event: Event): void {
   const files = target.files
 
   if (files && files.length > 0) {
-    validateAndEmit(files[0])
+    const file = files[0]
+    if (file) validateAndEmit(file)
   }
 
   // Reset input value to allow re-selecting same file

@@ -29,6 +29,7 @@ export interface CardStatement {
   current_balance: number | null
   minimum_payment: number | null
   is_fully_paid: boolean
+  backend_status?: string
 }
 
 export interface StatementsResponse {
@@ -42,11 +43,18 @@ export type StatementStatus = 'paid' | 'pending' | 'overdue'
 export interface StatementWithCard extends CardStatement {
   status: StatementStatus
   card?: CreditCard
+  needsReview: boolean
 }
 
 export interface UserBalance {
   total_balance: number
   monthly_balance: number
+}
+
+export interface AggregateUtilization {
+  value: number | null
+  missingCount: number
+  totalCount: number
 }
 
 export function useStatements() {
@@ -56,7 +64,7 @@ export function useStatements() {
   const isBalanceLoading = ref(false)
   const error = ref<Error | null>(null)
 
-  const { cards, fetchCards: fetchCreditCards } = useCreditCards()
+  const { cards, fetchCards: fetchCreditCards, deleteCard } = useCreditCards()
 
   const targetCurrency = ref('ARS')
   let preferredCurrencyFetchInFlight: Promise<void> | null = null
@@ -135,9 +143,15 @@ export function useStatements() {
           ...statement,
           status: getStatementStatus(statement),
           card,
+          needsReview: statement.backend_status === 'pending_review',
         }
       })
       .sort((a, b) => {
+        // Review-needed statements float to the top
+        if (a.needsReview !== b.needsReview) {
+          return a.needsReview ? -1 : 1
+        }
+
         const statusDiff = statusRank[a.status] - statusRank[b.status]
         if (statusDiff !== 0) return statusDiff
 
@@ -191,7 +205,9 @@ export function useStatements() {
       }
 
       const data: StatementsResponse = await response.json()
-      statements.value = data.data
+      statements.value = (data.data as (CardStatement & { status?: string })[]).map(
+        ({ status, ...rest }) => ({ ...rest, backend_status: status }),
+      )
     } catch (e) {
       error.value = e instanceof Error ? e : new Error('Failed to fetch statements')
       console.error('Error fetching statements:', e)
@@ -240,6 +256,65 @@ export function useStatements() {
 
     return `${start.toLocaleDateString('en-US', { month: 'short' })} - ${end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
   }
+
+  /**
+   * Computes aggregate credit utilization across all cards.
+   *
+   * Rules:
+   * - A card limit is "present" only when credit_limit is a finite number > 0
+   * - If all cards are missing limits, returns null value
+   * - Otherwise, imputes missing limits with the average of known limits
+   * - Utilization = (total outstanding_balance / total limits) * 100
+   *
+   * @returns AggregateUtilization with value (percent or null), missingCount, totalCount
+   */
+  const aggregateUtilization = computed<AggregateUtilization>(() => {
+    const allCards = cards.value
+    const totalCount = allCards.length
+
+    // No cards: return null value
+    if (totalCount === 0) {
+      return {
+        value: null,
+        missingCount: 0,
+        totalCount: 0,
+      }
+    }
+
+    // Find cards with valid limits (finite and > 0)
+    const cardsWithLimits = allCards.filter(
+      (card) => card.credit_limit !== null && card.credit_limit > 0 && Number.isFinite(card.credit_limit)
+    )
+    const missingCount = totalCount - cardsWithLimits.length
+
+    // All cards missing limits: return null value
+    if (cardsWithLimits.length === 0) {
+      return {
+        value: null,
+        missingCount,
+        totalCount,
+      }
+    }
+
+    // Calculate average of known limits
+    const avgLimit = cardsWithLimits.reduce((sum, card) => sum + card.credit_limit!, 0) / cardsWithLimits.length
+
+    // Sum outstanding balance across all cards
+    const totalBalance = allCards.reduce((sum, card) => sum + card.outstanding_balance, 0)
+
+    // Sum limits, imputing missing limits with average
+    const totalLimit =
+      cardsWithLimits.reduce((sum, card) => sum + card.credit_limit!, 0) + missingCount * avgLimit
+
+    // Calculate utilization percent (keep as unrounded number for formatting)
+    const value = (totalBalance / totalLimit) * 100
+
+    return {
+      value,
+      missingCount,
+      totalCount,
+    }
+  })
 
   const fetchBalance = async () => {
     isBalanceLoading.value = true
@@ -346,6 +421,7 @@ export function useStatements() {
       current_balance: number | null
       minimum_payment: number | null
       is_fully_paid: boolean
+      status: string
     }>,
   ) => {
     error.value = null
@@ -377,16 +453,81 @@ export function useStatements() {
 
       const updatedStatement = await response.json()
 
-      // Update local statements array
+      // Update local statements array, remapping API status to backend_status
       const index = statements.value.findIndex((s) => s.id === statementId)
       if (index !== -1) {
-        statements.value[index] = { ...statements.value[index], ...updatedStatement }
+        const { status: apiStatus, ...rest } = updatedStatement
+        statements.value[index] = {
+          ...statements.value[index],
+          ...rest,
+          backend_status: apiStatus ?? statements.value[index].backend_status,
+        }
       }
 
       return updatedStatement
     } catch (e) {
       error.value = e instanceof Error ? e : new Error('Failed to update statement')
       console.error('Error updating statement:', e)
+      throw error.value
+    }
+  }
+
+  /**
+   * Updates a credit card's credit limit.
+   *
+   * @param cardId - The ID of the credit card to update
+   * @param creditLimit - The new credit limit value (must be > 0)
+   * @returns Promise that resolves on successful update
+   * @throws Error if the API request fails
+   */
+  const updateCardLimit = async (cardId: string, creditLimit: number) => {
+    error.value = null
+
+    try {
+      const token =
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'PATCH',
+              url: `/api/v1/credit-cards/${cardId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
+
+      const url = `${OpenAPI.BASE}/api/v1/credit-cards/${cardId}`
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credit_limit: creditLimit }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+
+        // Handle FastAPI validation error format (detail can be string or array)
+        let errorMessage = `Failed to update credit limit: ${response.statusText}`
+        if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((err: { msg?: string; [key: string]: unknown }) => err.msg || String(err)).join(', ')
+          }
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const updatedCard = await response.json()
+
+      // Refresh credit cards so cards ref in StatementsView updates
+      await fetchCreditCards()
+
+      return updatedCard
+    } catch (e) {
+      error.value = e instanceof Error ? e : new Error('Failed to update credit limit')
+      console.error('Error updating credit limit:', e)
       throw error.value
     }
   }
@@ -403,8 +544,11 @@ export function useStatements() {
     fetchBalance,
     createPayment,
     updateStatement,
+    updateCardLimit,
+    deleteCard,
     formatCurrency,
     formatDate,
     formatPeriod,
+    aggregateUtilization,
   }
 }

@@ -29,19 +29,19 @@
   font-size: 64px;
   display: block;
   margin-bottom: 32px;
-  color: #d1d5db;
+  color: var(--text-faint);
 }
 
 .placeholder-content h1 {
   font-size: 36px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-heading);
   margin: 0 0 16px 0;
 }
 
 .placeholder-content p {
   font-size: 18px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin: 0;
 }
 </style>

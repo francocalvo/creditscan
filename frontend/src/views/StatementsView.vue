@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 import { useStatements } from '@/composables/useStatements'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
@@ -7,19 +8,22 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import AddCardModal from '@/components/AddCardModal.vue'
+import CreditCardTile from '@/components/cards/CreditCardTile.vue'
+import SetLimitModal from '@/components/cards/SetLimitModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useTransactionTags } from '@/composables/useTransactionTags'
 import { useTags } from '@/composables/useTags'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
-import { getCardBackgroundColor } from '@/utils/cardColors'
-import { getCardWithLast4 } from '@/composables/useCreditCards'
+import { getCardWithLast4, type CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
 import Dropdown from 'primevue/dropdown'
 import Chart from 'primevue/chart'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import AddCardPlaceholder from '@/components/AddCardPlaceholder.vue'
 
 const {
@@ -30,10 +34,13 @@ const {
   isBalanceLoading,
   fetchStatements,
   fetchBalance,
+  deleteCard,
   createPayment,
   formatCurrency,
   formatDate,
   formatPeriod,
+  aggregateUtilization,
+  updateCardLimit,
 } = useStatements()
 
 const {
@@ -61,6 +68,12 @@ const {
   topMerchants,
   formatCurrency: formatAnalyticsCurrency,
 } = useAnalytics()
+
+const { isDark } = useTheme()
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const enrichedTransactions = computed(() => {
   return transactions.value.map((txn) => {
@@ -133,6 +146,8 @@ watch([selectedCardId, selectedTagId], () => {
  * Creates a new object when spendingByMonth changes to ensure proper reactivity.
  */
 const monthlyChartData = computed(() => {
+   
+  void isDark.value // reactive dependency for theme changes
   if (!spendingByMonth.value || spendingByMonth.value.length === 0) {
     return {
       labels: [],
@@ -154,7 +169,7 @@ const monthlyChartData = computed(() => {
         pointRadius: 4,
         pointHoverRadius: 6,
         pointBackgroundColor: '#3b82f6',
-        pointBorderColor: '#ffffff',
+        pointBorderColor: getCssVar('--chart-pie-border'),
         pointBorderWidth: 2,
       },
     ],
@@ -165,56 +180,63 @@ const monthlyChartData = computed(() => {
  * Chart options for monthly spending line chart.
  * Configured for responsive layout with area fill.
  */
-const monthlyChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false,
-    },
-    tooltip: {
-      backgroundColor: '#1f2937',
-      titleColor: '#f9fafb',
-      bodyColor: '#f9fafb',
-      padding: 12,
-      cornerRadius: 8,
-      displayColors: false,
-      callbacks: {
-        label: (context: unknown) => {
-          const value = context.parsed.y
-          return ` ${formatAnalyticsCurrency(value)}`
-        },
-      },
-    },
-  },
-  scales: {
-    x: {
-      grid: {
+const monthlyChartOptions = computed(() => {
+   
+  void isDark.value // reactive dependency for theme changes
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
         display: false,
       },
-      ticks: {
-        color: '#6b7280',
-        font: {
-          size: 12,
+      tooltip: {
+        backgroundColor: getCssVar('--chart-tooltip-bg'),
+        titleColor: getCssVar('--chart-tooltip-text'),
+        bodyColor: getCssVar('--chart-tooltip-text'),
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: false,
+        callbacks: {
+          label: (context: { parsed?: { y?: number | string } }) => {
+            const rawValue = context?.parsed?.y
+            const value =
+              typeof rawValue === 'number' || typeof rawValue === 'string' ? rawValue : 0
+            return ` ${formatAnalyticsCurrency(value)}`
+          },
         },
       },
     },
-    y: {
-      beginAtZero: true,
-      grid: {
-        color: '#f3f4f6',
-        borderDash: [5, 5],
-      },
-      ticks: {
-        color: '#6b7280',
-        font: {
-          size: 12,
+    scales: {
+      x: {
+        grid: {
+          display: false,
         },
-        callback: (value: unknown) => formatAnalyticsCurrency(value),
+        ticks: {
+          color: getCssVar('--chart-tick'),
+          font: {
+            size: 12,
+          },
+        },
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: getCssVar('--chart-grid'),
+          borderDash: [5, 5],
+        },
+        ticks: {
+          color: getCssVar('--chart-tick'),
+          font: {
+            size: 12,
+          },
+          callback: (value: unknown) =>
+            formatAnalyticsCurrency(typeof value === 'number' || typeof value === 'string' ? value : 0),
+        },
       },
     },
-  },
-}
+  }
+})
 
 /**
  * Color palette for tag chart segments.
@@ -242,6 +264,8 @@ const tagChartColors = [
  * Applies colors from palette, cycling if more categories than colors available.
  */
 const tagChartData = computed(() => {
+   
+  void isDark.value // reactive dependency for theme changes
   if (!spendingByTag.value || spendingByTag.value.length === 0) {
     return {
       labels: [],
@@ -258,7 +282,7 @@ const tagChartData = computed(() => {
           (_, index) => tagChartColors[index % tagChartColors.length],
         ),
         borderWidth: 2,
-        borderColor: '#ffffff',
+        borderColor: getCssVar('--chart-pie-border'),
       },
     ],
   }
@@ -269,41 +293,45 @@ const tagChartData = computed(() => {
  * Configured for responsive layout with legend on the right side.
  * Legend moves to bottom on mobile screens for better space utilization.
  */
-const tagChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'right' as const,
-      labels: {
-        color: '#374151',
-        font: {
-          size: 12,
-        },
-        padding: 15,
-        usePointStyle: true,
-        pointStyle: 'circle',
-      },
-    },
-    tooltip: {
-      backgroundColor: '#1f2937',
-      titleColor: '#f9fafb',
-      bodyColor: '#f9fafb',
-      padding: 12,
-      cornerRadius: 8,
-      displayColors: true,
-      callbacks: {
-        label: (context: unknown) => {
-          const dataIndex = context.dataIndex
-          const item = spendingByTag.value[dataIndex]
-          if (!item) return ''
-          const percentage = item.percentage.toFixed(1)
-          return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+const tagChartOptions = computed(() => {
+   
+  void isDark.value // reactive dependency for theme changes
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: (isMobile.value ? 'bottom' : 'right') as 'right' | 'bottom',
+        labels: {
+          color: getCssVar('--chart-legend-text'),
+          font: {
+            size: 12,
+          },
+          padding: 15,
+          usePointStyle: true,
+          pointStyle: 'circle',
         },
       },
+      tooltip: {
+        backgroundColor: getCssVar('--chart-tooltip-bg'),
+        titleColor: getCssVar('--chart-tooltip-text'),
+        bodyColor: getCssVar('--chart-tooltip-text'),
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        callbacks: {
+          label: (context: { dataIndex?: number }) => {
+            const dataIndex = typeof context?.dataIndex === 'number' ? context.dataIndex : -1
+            const item = spendingByTag.value[dataIndex]
+            if (!item) return ''
+            const percentage = item.percentage.toFixed(1)
+            return ` ${item.tag}: ${formatAnalyticsCurrency(item.amount)} (${percentage}%)`
+          },
+        },
+      },
     },
-  },
-}
+  }
+})
 
 // Computed options that respond to screen size
 const isMobile = ref(false)
@@ -319,17 +347,6 @@ onMounted(() => {
     window.removeEventListener('resize', checkScreenSize)
   })
 })
-
-// Adjust pie chart legend position based on screen size
-// Note: We use type assertion here because Chart.js position types don't
-// allow dynamic switching between 'right' and 'bottom' at runtime
-watch(
-  isMobile,
-  (mobile) => {
-    tagChartOptions.plugins.legend.position = (mobile ? 'bottom' : 'right') as 'bottom' | 'right'
-  },
-  { immediate: true },
-)
 
 const toast = useToast()
 
@@ -347,6 +364,81 @@ const isTransitioningModals = ref(false)
 
 // Add Card modal state
 const showAddCardModal = ref(false)
+
+// Set Limit modal state (for Step06)
+const showSetLimitModal = ref(false)
+const cardForLimitEdit = ref<CreditCard | null>(null)
+
+// Handler for opening set limit modal
+const handleSetLimit = (card: CreditCard) => {
+  cardForLimitEdit.value = card
+  showSetLimitModal.value = true
+}
+
+const cardMenuRef = ref<{ toggle: (event: Event) => void } | null>(null)
+const selectedCardForMenu = ref<CreditCard | null>(null)
+
+/**
+ * Count the number of statements associated with a given card.
+ * @param cardId - The ID of the card to count statements for
+ * @returns The number of statements associated with the card
+ */
+const getCardStatementCount = (cardId: string): number => {
+  return statementsWithCard.value.filter((s) => s.card_id === cardId).length
+}
+
+const handleDeleteCard = async (card: CreditCard | null) => {
+  if (!card) return
+
+  // Count statements associated with this card
+  const statementCount = getCardStatementCount(card.id)
+
+  // Build confirmation message based on statement count
+  let confirmMessage: string
+  if (statementCount > 0) {
+    confirmMessage = `This card has ${statementCount} statement(s). Deleting it will also remove all associated statements. Continue?`
+  } else {
+    confirmMessage = `Delete ${card.bank} card ending in ${card.last4}?`
+  }
+
+  const confirmed = window.confirm(confirmMessage)
+  if (!confirmed) return
+
+  try {
+    await deleteCard(card.id)
+    await Promise.all([fetchStatements(), fetchBalance()])
+    toast.add({
+      severity: 'success',
+      summary: 'Card Deleted',
+      detail: 'Card deleted successfully',
+      life: 3000,
+    })
+    selectedCardForMenu.value = null
+  } catch (error) {
+    console.error('Failed to delete card:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: 'Failed to delete card',
+      life: 5000,
+    })
+  }
+}
+
+const cardMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: 'Delete',
+    icon: 'pi pi-trash',
+    command: () => {
+      void handleDeleteCard(selectedCardForMenu.value)
+    },
+  },
+])
+
+const toggleCardMenu = (event: Event, card: CreditCard) => {
+  selectedCardForMenu.value = card
+  cardMenuRef.value?.toggle(event)
+}
 
 watch(showDetailModal, (isVisible) => {
   if (!isVisible) detailStartInEditMode.value = false
@@ -422,9 +514,8 @@ const activeCards = computed(() => {
   return cards.value.length
 })
 
-const creditUtilization = computed(() => {
-  // We don't have credit limit data yet, so we can't compute utilization.
-  return 'N/A'
+const reviewCount = computed(() => {
+  return statementsWithCard.value.filter((s) => s.needsReview).length
 })
 
 // Filter statements based on search and status
@@ -443,7 +534,9 @@ const filteredStatements = computed(() => {
     })
   }
 
-  if (filterStatus.value !== 'all') {
+  if (filterStatus.value === 'needs_review') {
+    filtered = filtered.filter((s) => s.needsReview)
+  } else if (filterStatus.value !== 'all') {
     filtered = filtered.filter((s) => s.status === filterStatus.value)
   }
 
@@ -473,17 +566,6 @@ const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]
   if (!statement.card) return 'Unknown Card'
   const brandName = statement.card.brand.charAt(0).toUpperCase() + statement.card.brand.slice(1)
   return `${statement.card.bank} ${brandName} ••${statement.card.last4}`
-}
-
-const getCardBrandIcon = (brand?: string): string => {
-  const icons: Record<string, string> = {
-    visa: 'pi pi-credit-card',
-    mastercard: 'pi pi-credit-card',
-    amex: 'pi pi-credit-card',
-    discover: 'pi pi-credit-card',
-    other: 'pi pi-credit-card',
-  }
-  return icons[brand || 'other'] || 'pi pi-credit-card'
 }
 
 // Get latest balance for a card
@@ -590,6 +672,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   fetchStatements()
   fetchBalance()
 }
+
+// Handler for set limit modal save success
+const handleLimitSaved = () => {
+  if (!cardForLimitEdit.value) return
+  // Show success toast
+  toast.add({
+    severity: 'success',
+    summary: 'Credit Limit Updated',
+    detail: `Limit updated for ${cardForLimitEdit.value.bank} ••${cardForLimitEdit.value.last4}`,
+    life: 3000,
+  })
+  // Clear card reference
+  cardForLimitEdit.value = null
+}
 </script>
 
 <template>
@@ -599,7 +695,9 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       <MetricCard
         title="Total Balance"
         :value="totalBalance"
-        subtitle="All unpaid statements"
+        :subtitle="reviewCount > 0
+          ? `${reviewCount} statement(s) need review`
+          : 'All unpaid statements'"
         icon="pi pi-dollar"
       />
 
@@ -619,8 +717,20 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
       <MetricCard
         title="Credit Utilization"
-        :value="creditUtilization"
-        subtitle="Requires credit limits"
+        :value="
+          aggregateUtilization.value === null
+            ? 'N/A'
+            : aggregateUtilization.value.toFixed(1) + '%'
+        "
+        :subtitle="
+          aggregateUtilization.totalCount === 0
+            ? 'No cards'
+            : aggregateUtilization.missingCount === aggregateUtilization.totalCount
+            ? 'Requires credit limits'
+            : aggregateUtilization.missingCount === 0
+            ? ''
+            : `${aggregateUtilization.missingCount} of ${aggregateUtilization.totalCount} cards missing limits`
+        "
         icon="pi pi-trending-up"
       />
     </div>
@@ -655,6 +765,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
           </button>
           <select v-model="filterStatus" class="filter-select">
             <option value="all">All</option>
+            <option value="needs_review">Needs Review</option>
             <option value="paid">Paid</option>
             <option value="pending">Pending</option>
             <option value="overdue">Overdue</option>
@@ -690,7 +801,13 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
                 {{ formatDate(statement.due_date) }}
               </td>
               <td>
-                <StatusBadge :status="statement.status" />
+                <div class="status-cell">
+                  <StatusBadge :status="statement.status" />
+                  <span v-if="statement.needsReview" class="review-tag">
+                    <i class="pi pi-exclamation-circle"></i>
+                    Needs Review
+                  </span>
+                </div>
               </td>
               <td>
                 <div class="action-buttons">
@@ -725,7 +842,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
         </div>
       </div>
 
-      <div v-if="isLoading || isBalanceLoading" class="loading-state">
+      <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <p>Loading cards...</p>
       </div>
@@ -733,43 +850,25 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       <div v-else class="cards-grid">
         <!-- Add Card Placeholder (always shown as first item) -->
         <AddCardPlaceholder @click="openAddCardModal" />
-        <div
-          v-for="card in cards"
-          :key="card.id"
-          class="card-item-large"
-          :style="{ background: getCardBackgroundColor(card.bank) }"
-        >
-          <div class="card-header-section">
-            <div class="card-brand-icon">
-              <i :class="getCardBrandIcon(card.brand)"></i>
-            </div>
-            <div class="card-menu">
-              <i class="pi pi-ellipsis-v"></i>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div class="card-number">•••• •••• •••• {{ card.last4 }}</div>
-            <div class="card-details-row">
-              <div class="card-detail">
-                <div class="detail-label">Bank</div>
-                <div class="detail-value">{{ card.bank }}</div>
-              </div>
-              <div class="card-detail">
-                <div class="detail-label">Brand</div>
-                <div class="detail-value">{{ card.brand.toUpperCase() }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card-footer-section">
-            <div class="card-stat">
-              <div class="stat-label">Current Balance</div>
-              <div class="stat-value">{{ formatCurrency(getCardLatestBalance(card.id)) }}</div>
-            </div>
-          </div>
+        <div v-for="card in cards" :key="card.id" class="card-grid-item">
+          <button
+            type="button"
+            class="card-menu-trigger"
+            @click.stop="toggleCardMenu($event, card)"
+            aria-label="Card options"
+          >
+            <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+          </button>
+          <CreditCardTile
+            :card="card"
+            :current-balance="getCardLatestBalance(card.id)"
+            :format-currency="formatCurrency"
+            @set-limit="handleSetLimit"
+          />
         </div>
       </div>
+
+      <Menu ref="cardMenuRef" :model="cardMenuItems" popup />
     </div>
 
     <!-- Analytics Section -->
@@ -883,7 +982,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
           <div v-if="spendingByTag.length === 0" class="chart-card">
             <div class="chart-container">
               <div class="chart-empty-state">
-                <i class="pi pi-tags" style="font-size: 2rem; color: #9ca3af"></i>
+                <i class="pi pi-tags chart-empty-icon"></i>
                 <p>No tag data for selected period</p>
               </div>
             </div>
@@ -900,7 +999,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
           <!-- Top Merchants List (Step 15) -->
           <div class="chart-card">
             <div v-if="topMerchants.length === 0" class="chart-empty-state">
-              <i class="pi pi-store" style="font-size: 2rem; color: #9ca3af"></i>
+              <i class="pi pi-store chart-empty-icon"></i>
               <p>No merchant data for selected period</p>
             </div>
             <div v-else class="chart-container">
@@ -1091,6 +1190,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
       @card-created="handleCardCreated"
     />
 
+    <!-- Set Limit Modal -->
+    <SetLimitModal
+      v-model="showSetLimitModal"
+      :card="cardForLimitEdit"
+      :on-save="updateCardLimit"
+      @saved="handleLimitSaved"
+    />
+
     <!-- Toast notifications -->
     <Toast />
   </div>
@@ -1126,13 +1233,13 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 .section-title {
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-heading);
   margin: 0 0 8px 0;
 }
 
 .section-subtitle {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -1149,15 +1256,15 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 0 16px;
 }
 
 .search-icon {
   font-size: 14px;
-  color: #9ca3af;
+  color: var(--text-placeholder);
 }
 
 .search-input {
@@ -1166,6 +1273,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   outline: none;
   padding: 12px 0;
   font-size: 15px;
+  background: transparent;
+  color: var(--text-heading);
 }
 
 .filter-controls {
@@ -1175,22 +1284,24 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .filter-button {
   padding: 12px 16px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
+  color: var(--text-body);
   transition: all 0.2s;
 }
 
 .filter-button:hover {
-  background: #f9fafb;
+  background: var(--surface-muted);
 }
 
 .filter-select {
   padding: 12px 16px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
+  color: var(--text-body);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
@@ -1201,8 +1312,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 /* Table */
 .table-container {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -1213,8 +1324,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 }
 
 .statements-table thead {
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .statements-table th {
@@ -1222,13 +1333,13 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   text-align: left;
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .statements-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-row);
   transition: background-color 0.2s;
 }
 
@@ -1237,18 +1348,18 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 }
 
 .statements-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--surface-muted);
 }
 
 .statements-table td {
   padding: 20px;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .card-cell {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .balance-cell {
@@ -1264,7 +1375,31 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .calendar-icon {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--text-placeholder);
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.review-tag i {
+  font-size: 11px;
 }
 
 .action-buttons {
@@ -1276,18 +1411,18 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 .action-button {
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-light);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-button:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--surface-muted);
+  border-color: var(--text-faint);
 }
 
 .action-button:disabled {
@@ -1313,14 +1448,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #f3f4f6;
-  border-top-color: #111827;
+  border: 3px solid var(--spinner-track);
+  border-top-color: var(--spinner-head);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 16px;
@@ -1336,7 +1471,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 .empty-state {
   padding: 80px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Cards Section */
@@ -1346,121 +1481,49 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
+  align-items: stretch;
 }
 
-.card-item-large {
-  border-radius: 16px;
-  padding: 24px;
-  color: white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+.cards-grid > * {
+  min-width: 0;
+}
+
+.card-menu-trigger {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-item-large:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.card-header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.card-brand-icon {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-}
-
-.card-menu {
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
   transition: background 0.2s;
 }
 
-.card-menu:hover {
-  background: rgba(255, 255, 255, 0.1);
+.card-menu-trigger:hover {
+  background: rgba(15, 23, 42, 0.65);
 }
 
-.card-body {
-  flex: 1;
-  margin-bottom: 24px;
+.card-menu-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 2px;
 }
 
-.card-number {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  margin-bottom: 20px;
-  font-family: 'Courier New', monospace;
+.card-grid-item {
+  position: relative;
+  min-width: 0;
 }
 
-.card-details-row {
-  display: flex;
-  gap: 32px;
-}
-
-.card-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.card-footer-section {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.card-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
+.card-grid-item :deep(.card-top-row) {
+  padding-right: 36px;
 }
 
 /* Placeholder Section */
@@ -1478,19 +1541,19 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   font-size: 48px;
   display: block;
   margin-bottom: 24px;
-  color: #d1d5db;
+  color: var(--text-faint);
 }
 
 .placeholder-content h3 {
   font-size: 24px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-heading);
   margin: 0 0 12px 0;
 }
 
 .placeholder-content p {
   font-size: 15px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -1543,11 +1606,11 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .bank-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .card-brand {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -1593,8 +1656,8 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 }
 
 .chart-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -1613,7 +1676,7 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .chart-wrapper {
@@ -1640,18 +1703,23 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .chart-empty-state i {
   font-size: 48px;
   margin-bottom: 12px;
-  color: #d1d5db;
+  color: var(--text-faint);
+}
+
+.chart-empty-icon {
+  font-size: 2rem;
+  color: var(--text-placeholder);
 }
 
 .chart-placeholder {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 32px;
   text-align: center;
@@ -1666,13 +1734,13 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .chart-placeholder p {
   margin: 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Merchants List Styles */
@@ -1687,13 +1755,13 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--surface-muted);
   border-radius: 8px;
   transition: background-color 0.2s ease;
 }
 
 .merchant-item:hover {
-  background: #f3f4f6;
+  background: var(--surface-subtle);
 }
 
 .merchant-rank {
@@ -1719,18 +1787,18 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
 
 .merchant-name {
   font-weight: 500;
-  color: #111827;
+  color: var(--text-heading);
   font-size: 14px;
 }
 
 .merchant-count {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .merchant-amount {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
   font-size: 14px;
   text-align: right;
 }
@@ -1739,14 +1807,14 @@ const handleCardCreated = (card: { bank: string; last4: string }) => {
   font-size: 48px;
   display: block;
   margin-bottom: 16px;
-  color: #ef4444;
+  color: var(--status-negative);
 }
 
 .empty-icon {
   font-size: 48px;
   display: block;
   margin-bottom: 16px;
-  color: #d1d5db;
+  color: var(--text-faint);
 }
 
 /* Responsive adjustments for analytics */

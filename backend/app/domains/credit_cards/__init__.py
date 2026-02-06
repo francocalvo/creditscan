@@ -10,6 +10,7 @@ from .domain import (
     CreditCardsPublic,
     CreditCardUpdate,
     InvalidCreditCardDataError,
+    LimitSource,
 )
 from .repository import CreditCardRepository
 from .service import CreditCardService
@@ -26,4 +27,5 @@ __all__ = [
     "CreditCardRepository",
     "CreditCardService",
     "InvalidCreditCardDataError",
+    "LimitSource",
 ]

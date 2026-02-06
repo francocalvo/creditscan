@@ -38,7 +38,7 @@ const handleTabClick = (tabId: string) => {
 .tab-navigation {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
   margin-bottom: 32px;
 }
 
@@ -46,7 +46,7 @@ const handleTabClick = (tabId: string) => {
   padding: 12px 20px;
   font-size: 15px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -57,11 +57,11 @@ const handleTabClick = (tabId: string) => {
 }
 
 .tab-button:hover {
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .tab-button.active {
-  color: #111827;
-  border-bottom-color: #111827;
+  color: var(--text-heading);
+  border-bottom-color: var(--text-heading);
 }
 </style>

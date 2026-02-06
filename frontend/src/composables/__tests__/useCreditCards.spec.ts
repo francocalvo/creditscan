@@ -51,6 +51,10 @@ describe('useCreditCards', () => {
       bank: 'Test Bank',
       brand: CardBrand.VISA,
       last4: '1234',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
       alias: 'Personal',
     }
 
@@ -131,5 +135,86 @@ describe('useCreditCards', () => {
 
     expect(error.value?.message).toBe('Invalid card data')
   })
-})
 
+  it('DELETEs /api/v1/credit-cards/{id} and removes card from state on 204', async () => {
+    const { OpenAPI } = await import('@/api')
+    vi.mocked(OpenAPI.TOKEN).mockResolvedValueOnce('access-token')
+
+    const card1: CreditCard = {
+      id: 'card-1',
+      user_id: 'user-123',
+      bank: 'Test Bank',
+      brand: CardBrand.VISA,
+      last4: '1111',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
+    }
+    const card2: CreditCard = {
+      id: 'card-2',
+      user_id: 'user-123',
+      bank: 'Other Bank',
+      brand: CardBrand.MASTERCARD,
+      last4: '2222',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
+    }
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+    })
+
+    const { deleteCard, cards } = useCreditCards()
+    cards.value = [card1, card2]
+
+    await deleteCard('card-1')
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.example.com/api/v1/credit-cards/card-1',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer access-token',
+          'Content-Type': 'application/json',
+        },
+      })
+    )
+
+    expect(cards.value).toEqual([card2])
+  })
+
+  it('throws on delete error and preserves state', async () => {
+    const { OpenAPI } = await import('@/api')
+    vi.mocked(OpenAPI.TOKEN).mockResolvedValueOnce('access-token')
+
+    const card1: CreditCard = {
+      id: 'card-1',
+      user_id: 'user-123',
+      bank: 'Test Bank',
+      brand: CardBrand.VISA,
+      last4: '1111',
+      credit_limit: null,
+      limit_last_updated_at: null,
+      limit_source: null,
+      outstanding_balance: 0,
+    }
+
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ detail: 'Cannot delete card' }),
+    })
+
+    const { deleteCard, cards, error } = useCreditCards()
+    cards.value = [card1]
+
+    await expect(deleteCard('card-1')).rejects.toThrow('Cannot delete card')
+
+    expect(cards.value).toEqual([card1])
+    expect(error.value?.message).toBe('Cannot delete card')
+  })
+})

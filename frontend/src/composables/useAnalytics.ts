@@ -121,7 +121,9 @@ export function useAnalytics() {
       const yearStr = dateOnlyMatch[1]
       const monthStr = dateOnlyMatch[2]
       const dayStr = dateOnlyMatch[3]
-      if (!yearStr || !monthStr || !dayStr) return null
+      if (!yearStr || !monthStr || !dayStr) {
+        return null
+      }
       const year = parseInt(yearStr, 10)
       const month = parseInt(monthStr, 10) - 1 // Months are 0-indexed in JS
       const day = parseInt(dayStr, 10)
@@ -234,8 +236,7 @@ export function useAnalytics() {
     const amounts: number[] = new Array(txns.length)
 
     for (let i = 0; i < txns.length; i += 1) {
-      const txn = txns[i]
-      if (!txn) continue
+      const txn = txns[i]!
       const amount = txn.convertedAmount
       total += amount
       if (amount > highest) {
@@ -249,8 +250,8 @@ export function useAnalytics() {
     const midIndex = Math.floor(count / 2)
     const median =
       count % 2 === 1
-        ? (amounts[midIndex] ?? 0)
-        : ((amounts[midIndex - 1] ?? 0) + (amounts[midIndex] ?? 0)) / 2
+        ? amounts[midIndex]!
+        : (amounts[midIndex - 1]! + amounts[midIndex]!) / 2
 
     return {
       totalSpending: total,
@@ -299,13 +300,18 @@ export function useAnalytics() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([monthKey, amount]) => {
         // Parse YYYY-MM and format as "Jan 2024"
-        const [yearString, monthString] = monthKey.split('-')
-        if (!yearString || !monthString) {
-          return { month: monthKey, amount }
+        const parts = monthKey.split('-')
+        const yearPart = parts[0]
+        const monthPart = parts[1]
+        if (!yearPart || !monthPart) {
+          return {
+            month: monthKey,
+            amount,
+          }
         }
 
-        const year = Number(yearString)
-        const month = Number(monthString)
+        const year = Number(yearPart)
+        const month = Number(monthPart)
         const formattedMonth = new Date(year, month - 1).toLocaleDateString('en-US', {
           month: 'short',
           year: 'numeric',
@@ -520,14 +526,13 @@ export function useAnalytics() {
 
             for (let i = 0; i < conversionResponse.results.length; i += 1) {
               const result = conversionResponse.results[i]
-              if (!result) continue
-              const targetIndex = conversionIndices[i]
-              if (targetIndex === undefined) continue
+              const txnIndex = conversionIndices[i]
+              if (!result || txnIndex === undefined) continue
 
-              const target = baseConverted[targetIndex]
-              if (!target) continue
+              const targetTxn = baseConverted[txnIndex]
+              if (!targetTxn) continue
 
-              target.convertedAmount = parseDecimal(result.converted_amount)
+              targetTxn.convertedAmount = parseDecimal(result.converted_amount)
             }
           } catch (conversionError) {
             console.warn(

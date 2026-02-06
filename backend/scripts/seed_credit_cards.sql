@@ -84,21 +84,43 @@ card_data AS (
         user_id,
         bank,
         brand::cardbrand,
-        last4
+        last4,
+        credit_limit::numeric(32,2) AS credit_limit,
+        'ARS' AS default_currency
     FROM user_data,
     (VALUES
-        ('ICBC', 'MASTERCARD', '4521'),
-        ('ICBC', 'VISA', '7832'),
-        ('Santander', 'VISA', '3456'),
-        ('Santander', 'AMEX', '9012'),
-        ('BBVA', 'MASTERCARD', '6789'),
-        ('BBVA', 'VISA', '2345'),
-        ('MercadoPago', 'MASTERCARD', '8901'),
-        ('Galicia', 'VISA', '5678')
-    ) AS cards(bank, brand, last4)
+        ('ICBC', 'MASTERCARD', '4521', 1800000),
+        ('ICBC', 'VISA', '7832', 1250000),
+        ('Santander', 'VISA', '3456', 1500000),
+        ('Santander', 'AMEX', '9012', 2200000),
+        ('BBVA', 'MASTERCARD', '6789', 1100000),
+        ('BBVA', 'VISA', '2345', 950000),
+        ('MercadoPago', 'MASTERCARD', '8901', 700000),
+        ('Galicia', 'VISA', '5678', 1300000)
+    ) AS cards(bank, brand, last4, credit_limit)
 )
-INSERT INTO credit_card (id, user_id, bank, brand, last4)
-SELECT id, user_id, bank, brand, last4 FROM card_data;
+INSERT INTO credit_card (
+    id,
+    user_id,
+    bank,
+    brand,
+    last4,
+    default_currency,
+    credit_limit,
+    limit_source,
+    limit_last_updated_at
+)
+SELECT
+    id,
+    user_id,
+    bank,
+    brand,
+    last4,
+    default_currency,
+    credit_limit,
+    'manual',
+    NOW()
+FROM card_data;
 
 -- =============================================================================
 -- INSERT STATEMENTS (48 total: 8 cards * 6 months)
@@ -108,7 +130,8 @@ WITH user_data AS (
     SELECT id AS user_id FROM "user" WHERE email = :'user_email'
 ),
 cards AS (
-    SELECT cc.id AS card_id, cc.bank, cc.brand
+    SELECT cc.id AS card_id, cc.bank, cc.brand,
+           row_number() OVER (ORDER BY cc.bank, cc.brand) AS card_num
     FROM credit_card cc
     JOIN user_data u ON cc.user_id = u.user_id
 ),
@@ -133,12 +156,15 @@ statement_data AS (
         0.00 AS minimum_payment,
         -- Current month (offset 0) is not paid, past months are fully paid
         CASE WHEN m.m_offset = 0 THEN false ELSE true END AS is_fully_paid,
+        'ARS' AS currency,
+        -- Santander AMEX current month statement is PENDING_REVIEW, rest are COMPLETE
+        CASE WHEN m.m_offset = 0 AND c.bank = 'Santander' AND c.brand::text = 'AMEX' THEN 'PENDING_REVIEW'::statementstatus ELSE 'COMPLETE'::statementstatus END AS status,
         CASE WHEN m.m_offset = 0 THEN 'current' ELSE 'past' END AS month_type
     FROM cards c
     CROSS JOIN months m
 )
-INSERT INTO card_statement (id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid)
-SELECT id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid
+INSERT INTO card_statement (id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid, currency, status)
+SELECT id, card_id, period_start, period_end, close_date, due_date, previous_balance, current_balance, minimum_payment, is_fully_paid, currency, status
 FROM statement_data;
 
 -- =============================================================================
@@ -387,6 +413,7 @@ SELECT
     cc.brand::text,
     cs.period_start,
     cs.is_fully_paid,
+    cs.status,
     cs.current_balance,
     cs.minimum_payment
 FROM card_statement cs

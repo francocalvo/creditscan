@@ -1,5 +1,5 @@
 <script setup lang="ts">
- import { ref, computed, onMounted, onUnmounted } from 'vue'
+ import { ref, computed } from 'vue'
  import { useRouter } from 'vue-router'
  import { useAuthStore } from '@/stores/auth'
  import type { MenuItem } from 'primevue/menuitem'
@@ -11,36 +11,15 @@
  import logoLight from '@/assets/logo.svg'
  import logoDark from '@/assets/logo-dark.svg'
  import UploadStatementModal from '@/components/UploadStatementModal.vue'
+ import { useTheme } from '@/composables/useTheme'
 
 // Default layout for authenticated users
 const router = useRouter()
 const authStore = useAuthStore()
 
-// Dark mode detection
-const isDarkMode = ref(document.documentElement.classList.contains('my-app-dark'))
-const logoSrc = computed(() => (isDarkMode.value ? logoDark : logoLight))
-
-const updateDarkMode = () => {
-  isDarkMode.value = document.documentElement.classList.contains('my-app-dark')
-}
-
-onMounted(() => {
-  // Create a MutationObserver to watch for class changes on the document element
-  const observer = new MutationObserver(updateDarkMode)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
-  // Store observer for cleanup
-  ;(window as { __darkModeObserver?: MutationObserver }).__darkModeObserver = observer
-})
-
-onUnmounted(() => {
-  // Clean up observer
-  const observer = (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
-  if (observer) {
-    observer.disconnect()
-    delete (window as { __darkModeObserver?: MutationObserver }).__darkModeObserver
-  }
-})
+// Dark mode
+const { isDark, toggleTheme, icon: themeIcon } = useTheme()
+const logoSrc = computed(() => (isDark.value ? logoDark : logoLight))
 
 // User menu toggle
 const userMenu = ref()
@@ -73,11 +52,15 @@ const userMenuItems = ref<MenuItem[]>([
 // User initials for avatar
 const userInitials = computed(() => {
   if (!authStore.user?.full_name) return 'U'
-  const names = authStore.user.full_name.split(' ')
-  if (names.length >= 2) {
-    return `${names[0][0]}${names[1][0]}`.toUpperCase()
+  const names = authStore.user.full_name.trim().split(/\s+/).filter(Boolean)
+  const firstInitial = names[0]?.[0]
+  const secondInitial = names[1]?.[0]
+
+  if (firstInitial && secondInitial) {
+    return `${firstInitial}${secondInitial}`.toUpperCase()
   }
-  return authStore.user.full_name[0].toUpperCase()
+
+  return firstInitial?.toUpperCase() ?? 'U'
 })
 
 // Upload statement modal state
@@ -101,10 +84,6 @@ const navigateToStatement = (statementId: string) => {
   router.push(`/statements/${statementId}`)
 }
 
-// Dark mode toggle
-const toggleDarkMode = () => {
-  document.documentElement.classList.toggle('my-app-dark')
-}
 </script>
 
 <template>
@@ -128,8 +107,8 @@ const toggleDarkMode = () => {
           />
 
           <Button
-            icon="pi pi-moon"
-            @click="toggleDarkMode"
+            :icon="themeIcon"
+            @click="toggleTheme"
             class="p-button-rounded p-button-text"
             aria-label="Toggle Dark Mode"
           />
@@ -262,7 +241,7 @@ const toggleDarkMode = () => {
 .user-avatar {
   cursor: pointer;
   background-color: var(--primary-color);
-  color: white;
+  color: var(--primary-contrast-color);
   font-weight: 600;
   transition:
     transform 0.2s,
