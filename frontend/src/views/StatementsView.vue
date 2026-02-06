@@ -444,6 +444,10 @@ const activeCards = computed(() => {
   return cards.value.length
 })
 
+const reviewCount = computed(() => {
+  return statementsWithCard.value.filter((s) => s.needsReview).length
+})
+
 // Filter statements based on search and status
 const filteredStatements = computed(() => {
   let filtered = statementsWithCard.value
@@ -460,7 +464,9 @@ const filteredStatements = computed(() => {
     })
   }
 
-  if (filterStatus.value !== 'all') {
+  if (filterStatus.value === 'needs_review') {
+    filtered = filtered.filter((s) => s.needsReview)
+  } else if (filterStatus.value !== 'all') {
     filtered = filtered.filter((s) => s.status === filterStatus.value)
   }
 
@@ -606,7 +612,9 @@ const handleLimitSaved = () => {
       <MetricCard
         title="Total Balance"
         :value="totalBalance"
-        subtitle="All unpaid statements"
+        :subtitle="reviewCount > 0
+          ? `${reviewCount} statement(s) need review`
+          : 'All unpaid statements'"
         icon="pi pi-dollar"
       />
 
@@ -674,6 +682,7 @@ const handleLimitSaved = () => {
           </button>
           <select v-model="filterStatus" class="filter-select">
             <option value="all">All</option>
+            <option value="needs_review">Needs Review</option>
             <option value="paid">Paid</option>
             <option value="pending">Pending</option>
             <option value="overdue">Overdue</option>
@@ -709,7 +718,13 @@ const handleLimitSaved = () => {
                 {{ formatDate(statement.due_date) }}
               </td>
               <td>
-                <StatusBadge :status="statement.status" />
+                <div class="status-cell">
+                  <StatusBadge :status="statement.status" />
+                  <span v-if="statement.needsReview" class="review-tag">
+                    <i class="pi pi-exclamation-circle"></i>
+                    Needs Review
+                  </span>
+                </div>
               </td>
               <td>
                 <div class="action-buttons">
@@ -1208,6 +1223,30 @@ const handleLimitSaved = () => {
 .calendar-icon {
   font-size: 13px;
   color: #9ca3af;
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.review-tag i {
+  font-size: 11px;
 }
 
 .action-buttons {

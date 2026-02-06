@@ -75,6 +75,22 @@ const { fetchTagsForTransactions, getTagIdsForTransaction, reset: resetTransacti
 const isEditMode = ref(false)
 const isSaving = ref(false)
 const saveError = ref<Error | null>(null)
+const isMarkingReviewed = ref(false)
+
+const handleMarkAsReviewed = async () => {
+  if (!props.statement) return
+
+  isMarkingReviewed.value = true
+  try {
+    const updatedStatement = await updateStatementApi(props.statement.id, { status: 'complete' })
+    emit('statement-updated', updatedStatement)
+  } catch (e) {
+    saveError.value = e instanceof Error ? e : new Error('Failed to mark statement as reviewed')
+    console.error('Error marking statement as reviewed:', e)
+  } finally {
+    isMarkingReviewed.value = false
+  }
+}
 
 // Form state
 const editedStatement = ref<Partial<CardStatement> | null>(null)
@@ -778,7 +794,13 @@ const handleCancel = () => {
           <p class="card-info">{{ cardDisplay }}</p>
           <p class="period">{{ formattedPeriod }}</p>
         </div>
-        <StatusBadge :status="statement.status" />
+        <div class="header-badges">
+          <StatusBadge :status="statement.status" />
+          <span v-if="statement.needsReview" class="review-tag">
+            <i class="pi pi-exclamation-circle"></i>
+            Needs Review
+          </span>
+        </div>
       </div>
     </template>
 
@@ -786,6 +808,32 @@ const handleCancel = () => {
       <!-- Save Error Message -->
       <Message v-if="saveError" severity="error" :closable="true" class="save-error" @close="saveError = null">
         {{ saveError.message }}
+      </Message>
+
+      <!-- Review Banner -->
+      <Message
+        v-if="statement.needsReview && !isEditMode"
+        severity="warn"
+        :closable="false"
+        class="review-banner"
+      >
+        <div class="review-banner-content">
+          <div>
+            <strong>This statement needs manual review.</strong>
+            <p class="review-banner-text">
+              It may contain errors or incomplete data from the PDF import. Please verify the details and mark as reviewed when done.
+            </p>
+          </div>
+          <Button
+            label="Mark as Reviewed"
+            icon="pi pi-check"
+            size="small"
+            severity="warn"
+            :loading="isMarkingReviewed"
+            :disabled="isMarkingReviewed"
+            @click="handleMarkAsReviewed"
+          />
+        </div>
       </Message>
 
       <!-- Saving Overlay -->
@@ -1340,6 +1388,47 @@ const handleCancel = () => {
 
 .save-error {
   margin-bottom: 0;
+}
+
+.review-banner {
+  margin-bottom: 0;
+}
+
+.review-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.review-banner-text {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.813rem;
+  font-weight: 400;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.review-tag i {
+  font-size: 11px;
 }
 
 .saving-overlay {

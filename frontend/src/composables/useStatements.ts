@@ -29,6 +29,7 @@ export interface CardStatement {
   current_balance: number | null
   minimum_payment: number | null
   is_fully_paid: boolean
+  backend_status?: string
 }
 
 export interface StatementsResponse {
@@ -42,6 +43,7 @@ export type StatementStatus = 'paid' | 'pending' | 'overdue'
 export interface StatementWithCard extends CardStatement {
   status: StatementStatus
   card?: CreditCard
+  needsReview: boolean
 }
 
 export interface UserBalance {
@@ -141,9 +143,15 @@ export function useStatements() {
           ...statement,
           status: getStatementStatus(statement),
           card,
+          needsReview: statement.backend_status === 'pending_review',
         }
       })
       .sort((a, b) => {
+        // Review-needed statements float to the top
+        if (a.needsReview !== b.needsReview) {
+          return a.needsReview ? -1 : 1
+        }
+
         const statusDiff = statusRank[a.status] - statusRank[b.status]
         if (statusDiff !== 0) return statusDiff
 
@@ -197,7 +205,9 @@ export function useStatements() {
       }
 
       const data: StatementsResponse = await response.json()
-      statements.value = data.data
+      statements.value = (data.data as (CardStatement & { status?: string })[]).map(
+        ({ status, ...rest }) => ({ ...rest, backend_status: status }),
+      )
     } catch (e) {
       error.value = e instanceof Error ? e : new Error('Failed to fetch statements')
       console.error('Error fetching statements:', e)
@@ -411,6 +421,7 @@ export function useStatements() {
       current_balance: number | null
       minimum_payment: number | null
       is_fully_paid: boolean
+      status: string
     }>,
   ) => {
     error.value = null
@@ -442,10 +453,15 @@ export function useStatements() {
 
       const updatedStatement = await response.json()
 
-      // Update local statements array
+      // Update local statements array, remapping API status to backend_status
       const index = statements.value.findIndex((s) => s.id === statementId)
       if (index !== -1) {
-        statements.value[index] = { ...statements.value[index], ...updatedStatement }
+        const { status: apiStatus, ...rest } = updatedStatement
+        statements.value[index] = {
+          ...statements.value[index],
+          ...rest,
+          backend_status: apiStatus ?? statements.value[index].backend_status,
+        }
       }
 
       return updatedStatement
