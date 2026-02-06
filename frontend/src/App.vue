@@ -2,10 +2,9 @@
 import { RouterView, useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import { computed } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 
-function toggleDarkMode() {
-  document.documentElement.classList.toggle('my-app-dark');
-}
+const { toggleTheme, icon } = useTheme()
 
 const route = useRoute()
 const isAuthPage = computed(() => {
@@ -16,7 +15,7 @@ const isAuthPage = computed(() => {
 <template>
   <div class="app-container" :class="{ 'auth-page': isAuthPage }">
     <div v-if="isAuthPage" class="theme-toggle">
-      <Button icon="pi pi-moon" @click="toggleDarkMode()" class="p-button-rounded p-button-text" aria-label="Toggle Dark Mode" />
+      <Button :icon="icon" @click="toggleTheme()" class="p-button-rounded p-button-text" aria-label="Toggle Dark Mode" />
     </div>
       <RouterView />
   </div>

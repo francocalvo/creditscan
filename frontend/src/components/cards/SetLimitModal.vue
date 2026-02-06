@@ -193,7 +193,7 @@ const handleClose = () => {
 
 .card-identity {
   padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
   margin-bottom: 8px;
 }
 
@@ -203,7 +203,7 @@ const handleClose = () => {
   gap: 8px;
   font-size: 15px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .card-bank {
@@ -211,7 +211,7 @@ const handleClose = () => {
 }
 
 .card-last4 {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .error-message {
@@ -227,7 +227,7 @@ const handleClose = () => {
 .form-label {
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .input-field {
@@ -236,7 +236,7 @@ const handleClose = () => {
 
 .form-hint {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .button-group {
