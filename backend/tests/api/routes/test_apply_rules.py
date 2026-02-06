@@ -412,10 +412,22 @@ def test_apply_rules_multiple_tags_per_rule(
 # --- Edge Cases ---
 
 
-def test_apply_rules_empty_request(
-    client: TestClient, normal_user_token_headers: dict[str, str]
+def test_apply_rules_empty_request_applies_to_all(
+    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
-    """Test applying rules with empty request."""
+    """Test applying rules with empty request applies to all user transactions."""
+    user = get_authenticated_user(db)
+    card = create_test_credit_card(db, user.id)
+    statement = create_test_statement(db, card.id)
+    create_test_transaction(
+        db,
+        statement.id,
+        payee="Amazon Purchase",
+        description="Buy from Amazon",
+    )
+    tag = create_test_tag(db, user.id)
+    create_test_rule_with_condition(db, user.id, tag.tag_id, value="amazon")
+
     request_data = ApplyRulesRequest()
     r = client.post(
         f"{settings.API_V1_STR}/rules/apply",
@@ -425,9 +437,8 @@ def test_apply_rules_empty_request(
 
     assert r.status_code == 200
     response = ApplyRulesResponse(**r.json())
-    assert response.transactions_processed == 0
-    assert response.tags_applied == 0
-    assert len(response.details) == 0
+    assert response.transactions_processed >= 1
+    assert response.tags_applied >= 1
 
 
 def test_apply_rules_no_matching_rules(

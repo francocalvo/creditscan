@@ -92,9 +92,10 @@ class ApplyRulesUseCase:
                 limit=10000,
             )
         else:
-            # No scope defined, return empty response
-            return ApplyRulesResponse(
-                transactions_processed=0, tags_applied=0, details=[]
+            # No scope defined: apply to all user transactions
+            transactions = self.transaction_repo.list_for_user(
+                user_id=user_id,
+                limit=10000,
             )
 
         # Step 3: Process each transaction

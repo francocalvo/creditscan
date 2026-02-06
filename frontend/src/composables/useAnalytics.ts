@@ -1,23 +1,9 @@
 import { ref, computed } from 'vue'
-import type { Transaction } from '@/api/transactions'
-import { UsersService } from '@/api'
-import { TransactionsService } from '@/api/transactions'
+import type { TransactionPublic } from '@/api'
+import { UsersService, TransactionsService } from '@/api'
 import { convertCurrencyBatch, parseDecimal, type CurrencyConversionRequest } from '@/api/currency'
 import { useTags } from '@/composables/useTags'
 import { useTransactionTags } from '@/composables/useTransactionTags'
-
-/**
- * Extended user type with preferred_currency field.
- * Used as a workaround until SDK types are regenerated.
- */
-type UserPublicWithCurrency = {
-  email: string
-  is_active?: boolean
-  is_superuser?: boolean
-  full_name?: string | null
-  id: string
-  preferred_currency?: string | null
-}
 
 /**
  * Date filter preset options for analytics queries.
@@ -65,7 +51,7 @@ export interface TopMerchant {
  * Extends the base Transaction type with a convertedAmount field
  * that holds the amount in the target currency for consistent aggregation.
  */
-export interface ConvertedTransaction extends Transaction {
+export interface ConvertedTransaction extends TransactionPublic {
   convertedAmount: number
 }
 
@@ -89,7 +75,7 @@ export interface ConvertedTransaction extends Transaction {
  */
 export function useAnalytics() {
   // State
-  const transactions = ref<Transaction[]>([])
+  const transactions = ref<TransactionPublic[]>([])
   const convertedTransactions = ref<ConvertedTransaction[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -454,21 +440,20 @@ export function useAnalytics() {
       error.value = null
       try {
         // Fetch current user and set target currency from preferences
-        const userResponse = await UsersService.readUserMe()
-        const user = userResponse as UserPublicWithCurrency
+        const user = await UsersService.usersGetCurrentUser()
 
         // Validate and set target currency, falling back to 'ARS' if invalid
         const currencyFromProfile = normalizeCurrencyCode(user.preferred_currency ?? 'ARS')
         targetCurrency.value = isValidCurrency(currencyFromProfile) ? currencyFromProfile : 'ARS'
 
         // Fetch all transactions with pagination
-        const allTransactions: Transaction[] = []
+        const allTransactions: TransactionPublic[] = []
         const limit = 100
         let skip = 0
         let totalCount: number | null = null
 
         while (true) {
-          const response = await TransactionsService.listTransactions(skip, limit)
+          const response = await TransactionsService.transactionsListTransactions({ skip, limit })
           const { data, count } = response
 
           // Update total count from first response (null sentinel)

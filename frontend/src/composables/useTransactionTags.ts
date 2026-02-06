@@ -1,9 +1,9 @@
 /**
  * Composable for fetching tag mappings for transactions.
  *
- * Fetches tag IDs for multiple transactions in parallel. Failures are handled
- * gracefully by returning empty arrays for transactions that couldn't be fetched.
- * This ensures that tag display errors don't prevent the rest of the UI from rendering.
+ * Fetches tag IDs for multiple transactions in a single batch request.
+ * Uses the POST /api/v1/transaction-tags/batch endpoint to avoid
+ * making one request per transaction.
  */
 import { ref } from 'vue'
 import { OpenAPI } from '@/api'
@@ -19,16 +19,11 @@ export function useTransactionTags() {
   const isLoading = ref(false)
 
   /**
-   * Fetches tag IDs for multiple transactions in parallel.
-   *
-   * Fetches tag mappings for all provided transaction IDs simultaneously.
-   * Failures are silent - transactions that fail to fetch will have an empty
-   * array of tags instead of throwing errors.
+   * Fetches tag IDs for multiple transactions in a single batch request.
    *
    * @param transactionIds - Array of transaction IDs to fetch tags for
    */
   const fetchTagsForTransactions = async (transactionIds: string[]): Promise<void> => {
-    // Early return if no transaction IDs to fetch
     if (transactionIds.length === 0) {
       return
     }
@@ -39,69 +34,42 @@ export function useTransactionTags() {
       const token =
         typeof OpenAPI.TOKEN === 'function'
           ? await OpenAPI.TOKEN({
-              method: 'GET',
-              url: '/api/v1/transaction-tags',
+              method: 'POST',
+              url: '/api/v1/transaction-tags/batch',
             } as ApiRequestOptions<string>)
           : OpenAPI.TOKEN || ''
 
-      // Create fetch promises for each transaction ID
-      // Each promise returns both the transaction ID and the response for proper mapping
-      const fetchPromises = transactionIds.map(async (txnId) => {
-        const url = `${OpenAPI.BASE}/api/v1/transaction-tags/transaction/${txnId}`
+      const url = `${OpenAPI.BASE}/api/v1/transaction-tags/batch`
 
-        try {
-          const response = await fetch(url, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
-
-          return { txnId, response }
-        } catch (error) {
-          // Return the transaction ID with a failed response object
-          return {
-            txnId,
-            response: null,
-            error: error instanceof Error ? error : new Error('Failed to fetch transaction tags'),
-          }
-        }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transaction_ids: transactionIds }),
       })
 
-      // Execute all fetches in parallel
-      const results = await Promise.allSettled(fetchPromises)
-
-      // Process results: store tag IDs for successful fetches, empty array for failures
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          const { txnId, response, error } = result.value
-
-          // Check for error from fetch itself
-          if (error || response === null) {
-            tagsByTransaction.value.set(txnId, [])
-            continue
-          }
-
-          // Check for HTTP error response
-          if (response.ok) {
-            try {
-              const data: TransactionTagMapping[] = await response.json()
-              const tagIds = data.map((mapping) => mapping.tag_id)
-              tagsByTransaction.value.set(txnId, tagIds)
-            } catch {
-              // Failed to parse response - store empty array (graceful failure)
-              tagsByTransaction.value.set(txnId, [])
-            }
-          } else {
-            // Non-ok response - store empty array (graceful failure)
-            tagsByTransaction.value.set(txnId, [])
-          }
-        } else {
-          // Promise rejected - store empty array (graceful failure)
-          // We can't get the transaction ID from a rejected promise without additional tracking
-          // This is acceptable as the transaction won't be displayed with tags
-        }
+      if (!response.ok) {
+        console.error('Failed to fetch transaction tags:', response.statusText)
+        return
       }
+
+      const data: TransactionTagMapping[] = await response.json()
+
+      // Initialize all requested transactions with empty arrays
+      for (const txnId of transactionIds) {
+        tagsByTransaction.value.set(txnId, [])
+      }
+
+      // Group tag IDs by transaction
+      for (const mapping of data) {
+        const existing = tagsByTransaction.value.get(mapping.transaction_id) || []
+        existing.push(mapping.tag_id)
+        tagsByTransaction.value.set(mapping.transaction_id, existing)
+      }
+    } catch (error) {
+      console.error('Error fetching transaction tags:', error)
     } finally {
       isLoading.value = false
     }

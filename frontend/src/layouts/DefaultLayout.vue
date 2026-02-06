@@ -33,7 +33,7 @@ const userMenuItems = ref<MenuItem[]>([
     label: 'Settings',
     icon: 'pi pi-cog',
     command: () => {
-      router.push('/settings')
+      router.push('/preferences')
     },
   },
   {

@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import DECIMAL, Column
+from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
 
@@ -56,7 +57,13 @@ class CreditCard(CreditCardBase, table=True):
         default=None, sa_column=Column(DECIMAL(precision=32, scale=2), nullable=True)
     )
     limit_last_updated_at: datetime | None = Field(default=None)
-    limit_source: LimitSource | None = Field(default=None, max_length=20)
+    limit_source: LimitSource | None = Field(
+        default=None,
+        sa_column=Column(
+            SAEnum(LimitSource, values_callable=lambda e: [m.value for m in e]),
+            nullable=True,
+        ),
+    )
 
 
 # Public API response model

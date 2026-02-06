@@ -11,12 +11,16 @@ import AddCardModal from '@/components/AddCardModal.vue'
 import CreditCardTile from '@/components/cards/CreditCardTile.vue'
 import SetLimitModal from '@/components/cards/SetLimitModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
+import { useTransactionTags } from '@/composables/useTransactionTags'
+import { useTags } from '@/composables/useTags'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
-import type { CreditCard } from '@/composables/useCreditCards'
+import { getCardWithLast4, type CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import Paginator from 'primevue/paginator'
+import Dropdown from 'primevue/dropdown'
 import Chart from 'primevue/chart'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
@@ -46,6 +50,9 @@ const {
   formatCurrency: formatTransactionCurrency,
   formatDate: formatTransactionDate,
 } = useTransactions()
+
+const { fetchTagsForTransactions, getTagIdsForTransaction } = useTransactionTags()
+const { tags, fetchTags, getTagById } = useTags()
 
 const {
   isLoading: isAnalyticsLoading,
@@ -77,6 +84,61 @@ const enrichedTransactions = computed(() => {
       status: statement?.status || 'pending',
     }
   })
+})
+
+// Transaction filter state
+const selectedCardId = ref<string | null>(null)
+const selectedTagId = ref<string | null>(null)
+const txnCurrentPage = ref(0)
+const txnPageSize = ref(20)
+
+const cardFilterOptions = computed(() => {
+  return [
+    { label: 'All Cards', value: null },
+    ...cards.value.map((card) => ({
+      label: getCardWithLast4(card),
+      value: card.id,
+    })),
+  ]
+})
+
+const tagFilterOptions = computed(() => {
+  return [
+    { label: 'All Tags', value: null, color: null },
+    ...tags.value.map((tag) => ({
+      label: tag.label,
+      value: tag.tag_id,
+      color: tag.color || '#6B7280',
+    })),
+  ]
+})
+
+const txnFiltered = computed(() => {
+  let result = enrichedTransactions.value
+
+  if (selectedCardId.value) {
+    result = result.filter((txn) => txn.card?.id === selectedCardId.value)
+  }
+
+  if (selectedTagId.value) {
+    result = result.filter((txn) =>
+      getTagIdsForTransaction(txn.id).includes(selectedTagId.value!),
+    )
+  }
+
+  return result
+})
+
+const totalFiltered = computed(() => txnFiltered.value.length)
+
+const paginatedTransactions = computed(() => {
+  const start = txnCurrentPage.value * txnPageSize.value
+  return txnFiltered.value.slice(start, start + txnPageSize.value)
+})
+
+// Reset page when filters change
+watch([selectedCardId, selectedTagId], () => {
+  txnCurrentPage.value = 0
 })
 
 /**
@@ -481,11 +543,38 @@ const filteredStatements = computed(() => {
   return filtered
 })
 
+const transactionsInitialized = ref(false)
+
+async function fetchTransactionsAndTags() {
+  await fetchTransactions()
+  if (transactions.value.length > 0) {
+    await fetchTagsForTransactions(transactions.value.map((t) => t.id))
+  }
+}
+
+function handlePageChange(event: { page: number; rows: number }) {
+  txnPageSize.value = event.rows
+  txnCurrentPage.value = event.page
+}
+
 onMounted(() => {
   fetchStatements()
   fetchBalance()
-  fetchTransactions()
+  fetchTags()
 })
+
+// Lazy-load transactions only when the tab is opened
+watch(
+  activeTab,
+  async (newTab) => {
+    if (newTab !== 'transactions') return
+    if (transactionsInitialized.value) return
+
+    transactionsInitialized.value = true
+    await fetchTransactionsAndTags()
+  },
+  { immediate: true },
+)
 
 const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]) => {
   if (!statement.card) return 'Unknown Card'
@@ -963,25 +1052,68 @@ const handleLimitSaved = () => {
         </div>
       </div>
 
+      <!-- Filter Bar -->
+      <div class="txn-filters">
+        <Dropdown
+          v-model="selectedCardId"
+          :options="cardFilterOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Cards"
+          class="txn-filter-dropdown"
+        />
+        <Dropdown
+          v-model="selectedTagId"
+          :options="tagFilterOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Tags"
+          class="txn-filter-dropdown"
+        >
+          <template #option="{ option }">
+            <div class="tag-filter-option">
+              <span
+                v-if="option.color"
+                class="tag-dot"
+                :style="{ backgroundColor: option.color }"
+              ></span>
+              {{ option.label }}
+            </div>
+          </template>
+          <template #value="slotProps">
+            <div v-if="slotProps.value != null" class="tag-filter-option">
+              <span
+                v-if="tagFilterOptions.find(o => o.value === slotProps.value)?.color"
+                class="tag-dot"
+                :style="{ backgroundColor: tagFilterOptions.find(o => o.value === slotProps.value)?.color || undefined }"
+              ></span>
+              {{ tagFilterOptions.find(o => o.value === slotProps.value)?.label }}
+            </div>
+            <span v-else>All Tags</span>
+          </template>
+        </Dropdown>
+      </div>
+
       <div class="table-container">
         <div v-if="isTransactionsLoading" class="loading-state">
           <div class="spinner"></div>
           <p>Loading transactions...</p>
         </div>
 
-        <table v-else-if="enrichedTransactions.length > 0" class="statements-table">
+        <table v-else-if="paginatedTransactions.length > 0" class="statements-table">
           <thead>
             <tr>
               <th>Date</th>
               <th>Card</th>
+              <th>Payee</th>
               <th>Description</th>
-              <th>Category</th>
+              <th>Tags</th>
               <th>Amount</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="transaction in enrichedTransactions" :key="transaction.id">
+            <tr v-for="transaction in paginatedTransactions" :key="transaction.id">
               <td class="date-cell">
                 <i class="pi pi-calendar calendar-icon"></i>
                 {{ formatTransactionDate(transaction.txn_date) }}
@@ -993,11 +1125,25 @@ const handleLimitSaved = () => {
                 </div>
                 <span v-else>-</span>
               </td>
+              <td>{{ transaction.payee || '-' }}</td>
               <td>{{ transaction.description }}</td>
               <td>
-                <span v-if="transaction.category" class="category-badge">
-                  {{ transaction.category }}
-                </span>
+                <div v-if="getTagIdsForTransaction(transaction.id).length > 0" class="tags-cell">
+                  <span
+                    v-for="tagId in getTagIdsForTransaction(transaction.id).slice(0, 3)"
+                    :key="tagId"
+                    class="tag-chip"
+                    :style="{ backgroundColor: getTagById(tagId)?.color || '#6B7280' }"
+                  >
+                    {{ getTagById(tagId)?.label || 'Unknown' }}
+                  </span>
+                  <span
+                    v-if="getTagIdsForTransaction(transaction.id).length > 3"
+                    class="tag-chip tag-chip--overflow"
+                  >
+                    +{{ getTagIdsForTransaction(transaction.id).length - 3 }}
+                  </span>
+                </div>
                 <span v-else>-</span>
               </td>
               <td class="balance-cell">
@@ -1010,7 +1156,16 @@ const handleLimitSaved = () => {
           </tbody>
         </table>
 
-        <div v-else class="empty-state">
+        <Paginator
+          v-if="totalFiltered > 0"
+          :rows="txnPageSize"
+          :totalRecords="totalFiltered"
+          :first="txnCurrentPage * txnPageSize"
+          :rowsPerPageOptions="[10, 20, 50]"
+          @page="handlePageChange"
+        />
+
+        <div v-else-if="!isTransactionsLoading" class="empty-state">
           <p>No transactions found</p>
         </div>
       </div>
@@ -1708,6 +1863,61 @@ const handleLimitSaved = () => {
     overflow-x: auto;
     white-space: nowrap;
     padding-bottom: 8px;
+  }
+}
+
+.tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.tag-chip--overflow {
+  background-color: #9ca3af;
+}
+
+/* Transaction Filters */
+.txn-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.txn-filter-dropdown {
+  min-width: 200px;
+}
+
+.tag-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tag-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .txn-filters {
+    flex-direction: column;
+  }
+
+  .txn-filter-dropdown {
+    min-width: unset;
+    width: 100%;
   }
 }
 </style>

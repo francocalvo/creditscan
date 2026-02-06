@@ -28,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await LoginService.loginAccessToken({
+      const response = await LoginService.loginLoginAccessToken({
         formData: {
           username: credentials.username,
           password: credentials.password
@@ -65,7 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     loading.value = true
     try {
-      user.value = await UsersService.readUserMe()
+      user.value = await UsersService.usersGetCurrentUser()
       return user.value
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -91,7 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const newUser = await UsersService.registerUser({ requestBody: userData })
+      const newUser = await UsersService.usersRegisterUser({ requestBody: userData })
       return newUser
     } catch (err) {
       error.value = err instanceof Error ? err : new Error('Registration failed')
@@ -108,7 +108,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      user.value = await UsersService.updateUserMe({ requestBody: userData })
+      user.value = await UsersService.usersUpdateCurrentUser({ requestBody: userData })
       return user.value
     } catch (err) {
       error.value = err instanceof Error ? err : new Error('Profile update failed')
@@ -125,7 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      await UsersService.updatePasswordMe({
+      await UsersService.usersUpdateCurrentUserPassword({
         requestBody: {
           current_password: oldPassword,
           new_password: newPassword,
