@@ -8,7 +8,7 @@ updating the upload job status.
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session
 
@@ -220,7 +220,7 @@ async def process_upload_job(
                 job_id,
                 UploadJobStatus.COMPLETED,
                 statement_id=statement.id,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             logger.info(f"Job {job_id} completed successfully")
 
@@ -245,7 +245,7 @@ async def process_upload_job(
                 UploadJobStatus.PARTIAL,
                 statement_id=statement.id,
                 error_message=extraction_result.error,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             logger.info(f"Job {job_id} completed with partial data")
 
@@ -264,7 +264,7 @@ async def process_upload_job(
             job_id,
             UploadJobStatus.FAILED,
             error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
         )
 
     except CurrencyConversionError as e:
@@ -273,7 +273,7 @@ async def process_upload_job(
             job_id,
             UploadJobStatus.FAILED,
             error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
         )
 
     except Exception as e:
@@ -282,7 +282,7 @@ async def process_upload_job(
             job_id,
             UploadJobStatus.FAILED,
             error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
         )
 
     finally:

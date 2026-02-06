@@ -1,7 +1,7 @@
 """Upload job repository implementation."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
@@ -98,7 +98,7 @@ class UploadJobRepository:
         """
         job = self.get_by_id(job_id)
         job.status = status
-        job.updated_at = datetime.now(timezone.utc)
+        job.updated_at = datetime.now(UTC)
 
         # Update optional fields if provided
         for key, value in kwargs.items():
@@ -131,7 +131,7 @@ class UploadJobRepository:
         """
         from datetime import timedelta
 
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+        cutoff = datetime.now(UTC) - timedelta(minutes=minutes)
         query = select(UploadJob).where(
             UploadJob.status == UploadJobStatus.PROCESSING,
             UploadJob.updated_at < cutoff,

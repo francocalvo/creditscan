@@ -1,7 +1,7 @@
 """Tests for apply rules API endpoint."""
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -130,7 +130,7 @@ def create_test_rule_with_condition(
         user_id=user_id,
         name="Test Rule",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(rule)
     db.flush()
@@ -272,7 +272,7 @@ def test_apply_rules_multiple_rules_match(
         user_id=user.id,
         name="Amazon Rule",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(rule1)
     db.flush()
@@ -296,7 +296,7 @@ def test_apply_rules_multiple_rules_match(
         user_id=user.id,
         name="Purchase Rule",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(rule2)
     db.flush()
@@ -361,7 +361,7 @@ def test_apply_rules_multiple_tags_per_rule(
         user_id=user.id,
         name="Amazon Rule",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(rule)
     db.flush()
@@ -490,7 +490,7 @@ def test_apply_rules_no_active_rules(
         user_id=user.id,
         name="Inactive Rule",
         is_active=False,  # Inactive!
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(rule)
     db.flush()
@@ -626,7 +626,7 @@ def test_apply_rules_skips_soft_deleted_tags(
 
     # Create tag and soft-delete it
     tag = TagRepository(db).create(TagCreate(user_id=user.id, label="deleted-tag"))
-    tag.deleted_at = datetime.now(timezone.utc)
+    tag.deleted_at = datetime.now(UTC)
     db.add(tag)
     db.flush()
 

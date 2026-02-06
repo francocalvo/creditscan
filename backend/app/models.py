@@ -31,6 +31,15 @@ from app.domains.credit_cards.domain.models import (  # noqa
     CreditCardUpdate,
 )
 
+# Currency domain models (table=True: ExchangeRate)
+from app.domains.currency.domain.models import (  # noqa
+    BatchCurrencyConversionRequest,
+    BatchCurrencyConversionResponse,
+    CurrencyConversionRequest,
+    CurrencyConversionResponse,
+    ExchangeRate,
+)
+
 # Payment models (table=True: Payment)
 from app.domains.payments.domain.models import (  # noqa
     Payment,
@@ -187,6 +196,11 @@ __all__ = [
     "RulesPublic",
     "RuleUpdate",
     "TransactionMatch",
+    "ExchangeRate",
+    "CurrencyConversionRequest",
+    "CurrencyConversionResponse",
+    "BatchCurrencyConversionRequest",
+    "BatchCurrencyConversionResponse",
 ]
 
 
