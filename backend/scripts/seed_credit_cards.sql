@@ -99,7 +99,7 @@ card_data AS (
     ) AS cards(bank, brand, last4, credit_limit)
 )
 INSERT INTO credit_card (id, user_id, bank, brand, last4, credit_limit, limit_source, limit_last_updated_at)
-SELECT id, user_id, bank, brand, last4, credit_limit, 'manual', NOW() FROM card_data;
+SELECT id, user_id, bank, brand, last4, credit_limit, 'MANUAL', NOW() FROM card_data;
 
 -- =============================================================================
 -- INSERT STATEMENTS (48 total: 8 cards * 6 months)

@@ -569,7 +569,7 @@ const handleLimitSaved = () => {
             : aggregateUtilization.missingCount === aggregateUtilization.totalCount
             ? 'Requires credit limits'
             : aggregateUtilization.missingCount === 0
-            ? 'All cards have limits'
+            ? ''
             : `${aggregateUtilization.missingCount} of ${aggregateUtilization.totalCount} cards missing limits`
         "
         icon="pi pi-trending-up"
@@ -676,7 +676,7 @@ const handleLimitSaved = () => {
         </div>
       </div>
 
-      <div v-if="isLoading || isBalanceLoading" class="loading-state">
+      <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <p>Loading cards...</p>
       </div>
