@@ -7,12 +7,11 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import PaymentModal from '@/components/PaymentModal.vue'
 import StatementDetailModal from '@/components/StatementDetailModal.vue'
 import AddCardModal from '@/components/AddCardModal.vue'
-import CardUtilization from '@/components/cards/CardUtilization.vue'
+import CreditCardTile from '@/components/cards/CreditCardTile.vue'
 import SetLimitModal from '@/components/cards/SetLimitModal.vue'
 import { useTransactions } from '@/composables/useTransactions'
 import { useAnalytics } from '@/composables/useAnalytics'
 import { parseDateString } from '@/utils/date'
-import { getCardBackgroundColor } from '@/utils/cardColors'
 import type { CreditCard } from '@/composables/useCreditCards'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -412,17 +411,6 @@ const getStatementCardDisplay = (statement: (typeof statementsWithCard.value)[0]
   return `${statement.card.bank} ${brandName} ••${statement.card.last4}`
 }
 
-const getCardBrandIcon = (brand?: string): string => {
-  const icons: Record<string, string> = {
-    visa: 'pi pi-credit-card',
-    mastercard: 'pi pi-credit-card',
-    amex: 'pi pi-credit-card',
-    discover: 'pi pi-credit-card',
-    other: 'pi pi-credit-card',
-  }
-  return icons[brand || 'other'] || 'pi pi-credit-card'
-}
-
 // Get latest balance for a card
 const getCardLatestBalance = (cardId: string) => {
   const cardStatements = statementsWithCard.value
@@ -696,48 +684,14 @@ const handleLimitSaved = () => {
       <div v-else class="cards-grid">
         <!-- Add Card Placeholder (always shown as first item) -->
         <AddCardPlaceholder @click="openAddCardModal" />
-        <div
+        <CreditCardTile
           v-for="card in cards"
           :key="card.id"
-          class="card-item-large"
-          :style="{ background: getCardBackgroundColor(card.bank) }"
-        >
-          <div class="card-header-section">
-            <div class="card-brand-icon">
-              <i :class="getCardBrandIcon(card.brand)"></i>
-            </div>
-            <div class="card-menu">
-              <i class="pi pi-ellipsis-v"></i>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div class="card-number">•••• •••• •••• {{ card.last4 }}</div>
-            <div class="card-details-row">
-              <div class="card-detail">
-                <div class="detail-label">Bank</div>
-                <div class="detail-value">{{ card.bank }}</div>
-              </div>
-              <div class="card-detail">
-                <div class="detail-label">Brand</div>
-                <div class="detail-value">{{ card.brand.toUpperCase() }}</div>
-              </div>
-            </div>
-          </div>
-
-          <CardUtilization
-            :card="card"
-            :format-currency="formatCurrency"
-            @set-limit="handleSetLimit"
-          />
-
-          <div class="card-footer-section">
-            <div class="card-stat">
-              <div class="stat-label">Current Balance</div>
-              <div class="stat-value">{{ formatCurrency(getCardLatestBalance(card.id)) }}</div>
-            </div>
-          </div>
-        </div>
+          :card="card"
+          :current-balance="getCardLatestBalance(card.id)"
+          :format-currency="formatCurrency"
+          @set-limit="handleSetLimit"
+        />
       </div>
     </div>
 
@@ -1257,121 +1211,13 @@ const handleLimitSaved = () => {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
+  align-items: stretch;
 }
 
-.card-item-large {
-  border-radius: 16px;
-  padding: 24px;
-  color: white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-  cursor: pointer;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-item-large:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.card-header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.card-brand-icon {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-}
-
-.card-menu {
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.card-menu:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.card-body {
-  flex: 1;
-  margin-bottom: 24px;
-}
-
-.card-number {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  margin-bottom: 20px;
-  font-family: 'Courier New', monospace;
-}
-
-.card-details-row {
-  display: flex;
-  gap: 32px;
-}
-
-.card-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.card-footer-section {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.card-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
+.cards-grid > * {
+  min-width: 0;
 }
 
 /* Placeholder Section */

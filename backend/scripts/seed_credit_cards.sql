@@ -84,21 +84,22 @@ card_data AS (
         user_id,
         bank,
         brand::cardbrand,
-        last4
+        last4,
+        credit_limit::numeric(32,2) AS credit_limit
     FROM user_data,
     (VALUES
-        ('ICBC', 'MASTERCARD', '4521'),
-        ('ICBC', 'VISA', '7832'),
-        ('Santander', 'VISA', '3456'),
-        ('Santander', 'AMEX', '9012'),
-        ('BBVA', 'MASTERCARD', '6789'),
-        ('BBVA', 'VISA', '2345'),
-        ('MercadoPago', 'MASTERCARD', '8901'),
-        ('Galicia', 'VISA', '5678')
-    ) AS cards(bank, brand, last4)
+        ('ICBC', 'MASTERCARD', '4521', 1800000),
+        ('ICBC', 'VISA', '7832', 1250000),
+        ('Santander', 'VISA', '3456', 1500000),
+        ('Santander', 'AMEX', '9012', 2200000),
+        ('BBVA', 'MASTERCARD', '6789', 1100000),
+        ('BBVA', 'VISA', '2345', 950000),
+        ('MercadoPago', 'MASTERCARD', '8901', 700000),
+        ('Galicia', 'VISA', '5678', 1300000)
+    ) AS cards(bank, brand, last4, credit_limit)
 )
-INSERT INTO credit_card (id, user_id, bank, brand, last4)
-SELECT id, user_id, bank, brand, last4 FROM card_data;
+INSERT INTO credit_card (id, user_id, bank, brand, last4, credit_limit, limit_source, limit_last_updated_at)
+SELECT id, user_id, bank, brand, last4, credit_limit, 'manual', NOW() FROM card_data;
 
 -- =============================================================================
 -- INSERT STATEMENTS (48 total: 8 cards * 6 months)
