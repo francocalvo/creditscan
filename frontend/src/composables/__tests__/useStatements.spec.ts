@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ref, computed } from 'vue'
-import { useStatements, type CreditCard } from '@/composables/useStatements'
+import type { CreditCard } from '@/composables/useStatements'
+import type { CardBrand } from '@/composables/useCreditCards'
 
 // Mock useCreditCards
 vi.mock('@/composables/useCreditCards', () => ({
@@ -33,42 +34,6 @@ vi.mock('@/api', () => ({
 }))
 
 describe('useStatements - aggregateUtilization', () => {
-  const mockCards: CreditCard[] = [
-    {
-      id: '1',
-      user_id: 'user1',
-      bank: 'Bank A',
-      brand: 'visa' as any,
-      last4: '1234',
-      credit_limit: 600000,
-      limit_last_updated_at: '2024-01-01T00:00:00',
-      limit_source: 'manual',
-      outstanding_balance: 150000,
-    },
-    {
-      id: '2',
-      user_id: 'user1',
-      bank: 'Bank B',
-      brand: 'mastercard' as any,
-      last4: '5678',
-      credit_limit: 400000,
-      limit_last_updated_at: '2024-01-01T00:00:00',
-      limit_source: 'manual',
-      outstanding_balance: 0,
-    },
-    {
-      id: '3',
-      user_id: 'user1',
-      bank: 'Bank C',
-      brand: 'amex' as any,
-      last4: '9012',
-      credit_limit: null,
-      limit_last_updated_at: null,
-      limit_source: null,
-      outstanding_balance: 50000,
-    },
-  ]
-
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -127,7 +92,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: null,
         limit_last_updated_at: null,
@@ -138,7 +103,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: null,
         limit_last_updated_at: null,
@@ -197,7 +162,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: 600000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -208,7 +173,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: 200000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -268,7 +233,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: 600000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -279,7 +244,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: 400000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -290,7 +255,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '3',
         user_id: 'user1',
         bank: 'Bank C',
-        brand: 'amex' as any,
+        brand: 'amex' as CardBrand,
         last4: '9012',
         credit_limit: null,
         limit_last_updated_at: null,
@@ -352,7 +317,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: 0,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -363,7 +328,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: -100,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -422,7 +387,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: 600000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -433,7 +398,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: 400000,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -490,7 +455,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '1',
         user_id: 'user1',
         bank: 'Bank A',
-        brand: 'visa' as any,
+        brand: 'visa' as CardBrand,
         last4: '1234',
         credit_limit: Infinity,
         limit_last_updated_at: '2024-01-01T00:00:00',
@@ -501,7 +466,7 @@ describe('useStatements - aggregateUtilization', () => {
         id: '2',
         user_id: 'user1',
         bank: 'Bank B',
-        brand: 'mastercard' as any,
+        brand: 'mastercard' as CardBrand,
         last4: '5678',
         credit_limit: NaN,
         limit_last_updated_at: '2024-01-01T00:00:00',

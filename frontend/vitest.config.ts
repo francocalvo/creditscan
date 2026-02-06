@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   plugins: [vue() as any],
   test: {
     globals: true,

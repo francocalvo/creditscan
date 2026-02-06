@@ -124,7 +124,7 @@ const monthlyChartOptions = {
       cornerRadius: 8,
 	      displayColors: false,
 	      callbacks: {
-	        label: (context: any) => {
+	        label: (context: { parsed?: { y?: number | string } }) => {
 	          const rawValue = context?.parsed?.y
 	          const value =
 	            typeof rawValue === 'number' || typeof rawValue === 'string' ? rawValue : 0
@@ -240,7 +240,7 @@ const tagChartOptions = {
       cornerRadius: 8,
       displayColors: true,
 	      callbacks: {
-	        label: (context: any) => {
+	        label: (context: { dataIndex?: number }) => {
 	          const dataIndex = typeof context?.dataIndex === 'number' ? context.dataIndex : -1
 	          const item = spendingByTag.value[dataIndex]
 	          if (!item) return ''

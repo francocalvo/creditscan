@@ -108,10 +108,10 @@ export const getFormData = (options: ApiRequestOptions): FormData | undefined =>
   return undefined
 }
 
-type Resolver<T> = (options: ApiRequestOptions<any>) => Promise<T>
+type Resolver<T> = (options: ApiRequestOptions) => Promise<T>
 
 export const resolve = async <T>(
-  options: ApiRequestOptions<any>,
+  options: ApiRequestOptions,
   resolver?: T | Resolver<T>,
 ): Promise<T | undefined> => {
   if (typeof resolver === 'function') {

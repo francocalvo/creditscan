@@ -33,7 +33,7 @@ function createCard(overrides: Partial<CreditCard> = {}): CreditCard {
   }
 }
 
-function createWrapper(props: any = {}) {
+function createWrapper(props: Partial<{ card: CreditCard; formatCurrency: (n: number) => string }> = {}) {
   return mount(CardUtilization, {
     props: {
       card: createCard(),
@@ -221,7 +221,7 @@ describe('CardUtilization', () => {
       const wrapper = createWrapper({
         card: createCard({
           credit_limit: 500000,
-          outstanding_balance: null as any,
+          outstanding_balance: null as unknown as number,
         }),
       })
 
