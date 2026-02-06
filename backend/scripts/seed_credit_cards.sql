@@ -157,8 +157,8 @@ statement_data AS (
         -- Current month (offset 0) is not paid, past months are fully paid
         CASE WHEN m.m_offset = 0 THEN false ELSE true END AS is_fully_paid,
         'ARS' AS currency,
-        -- Only one current month statement is PENDING_REVIEW, rest are COMPLETE
-        CASE WHEN m.m_offset = 0 AND c.card_num = 1 THEN 'PENDING_REVIEW'::statementstatus ELSE 'COMPLETE'::statementstatus END AS status,
+        -- Santander AMEX current month statement is PENDING_REVIEW, rest are COMPLETE
+        CASE WHEN m.m_offset = 0 AND c.bank = 'Santander' AND c.brand::text = 'AMEX' THEN 'PENDING_REVIEW'::statementstatus ELSE 'COMPLETE'::statementstatus END AS status,
         CASE WHEN m.m_offset = 0 THEN 'current' ELSE 'past' END AS month_type
     FROM cards c
     CROSS JOIN months m
@@ -413,6 +413,7 @@ SELECT
     cc.brand::text,
     cs.period_start,
     cs.is_fully_paid,
+    cs.status,
     cs.current_balance,
     cs.minimum_payment
 FROM card_statement cs
