@@ -85,6 +85,9 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
+      # Inside Docker network, Garage is reachable by service name.
+      # Keep root .env as localhost for local uvicorn workflows.
+      S3_ENDPOINT_URL: "http://garage:3900"
 
   mailcatcher:
     image: schickling/mailcatcher

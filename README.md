@@ -81,7 +81,7 @@ cd creditscan
 antigravity .
 
 # Start containers
-docker compose watch
+bash scripts/dev-watch.sh
 ```
 
 4. (Optional) If we are doing frontend, we could do this:
