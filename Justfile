@@ -18,3 +18,5 @@ clean:
 garage-bootstrap:
     bash scripts/garage-bootstrap.sh
 
+watch:
+    bash scripts/dev-watch.sh

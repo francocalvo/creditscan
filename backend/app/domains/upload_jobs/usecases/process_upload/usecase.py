@@ -12,7 +12,10 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session
 
-from app.domains.card_statements.domain.models import CardStatementPublic
+from app.domains.card_statements.domain.models import (
+    CardStatementPublic,
+    StatementStatus,
+)
 from app.domains.credit_cards.domain.models import CreditCardPublic
 from app.domains.credit_cards.usecases.get_card import provide as provide_get_card
 from app.domains.credit_cards.usecases.get_card.usecase import GetCreditCardUseCase
@@ -22,6 +25,7 @@ from app.domains.transactions.domain.models import TransactionPublic
 from app.domains.upload_jobs.domain.errors import (
     CurrencyConversionError,
     ExtractionError,
+    UploadJobNotFoundError,
 )
 from app.domains.upload_jobs.domain.models import UploadJobStatus
 from app.domains.upload_jobs.repository import provide as provide_repository
@@ -32,6 +36,10 @@ from app.pkgs.extraction import provide as provide_extraction
 from app.pkgs.extraction.models import ExtractionResult
 
 logger = logging.getLogger(__name__)
+BALANCE_MISMATCH_REVIEW_MESSAGE = (
+    "Current balance does not match the sum of transactions. "
+    "Please review and edit transactions."
+)
 
 
 async def _import_with_atomic_service(
@@ -169,8 +177,8 @@ async def process_upload_job(
             try:
                 job_service.update_status(job_id, UploadJobStatus.PROCESSING)
                 break
-            except Exception as e:
-                if "not found" in str(e).lower() and attempt < max_retries - 1:
+            except UploadJobNotFoundError:
+                if attempt < max_retries - 1:
                     logger.warning(
                         f"Job {job_id} not found, retrying in {retry_delay}s "
                         f"(attempt {attempt + 1}/{max_retries})"
@@ -179,7 +187,15 @@ async def process_upload_job(
                     # Refresh the session to get latest data
                     session.expire_all()
                 else:
-                    raise
+                    logger.warning(
+                        "Aborting background processing for missing job %s "
+                        "after %s retries",
+                        job_id,
+                        max_retries,
+                    )
+                    return
+            except Exception:
+                raise
 
         # Get card for default currency and user_id
         card: CreditCardPublic = get_card_usecase.execute(card_id)
@@ -214,15 +230,29 @@ async def process_upload_job(
                 target_currency=target_currency,
                 file_path=file_path,
             )
+            is_pending_review = statement.status == StatementStatus.PENDING_REVIEW
 
             # Update job status BEFORE applying rules (rules may commit)
-            job_service.update_status(
-                job_id,
-                UploadJobStatus.COMPLETED,
-                statement_id=statement.id,
-                completed_at=datetime.now(UTC),
-            )
-            logger.info(f"Job {job_id} completed successfully")
+            if is_pending_review:
+                job_service.update_status(
+                    job_id,
+                    UploadJobStatus.PARTIAL,
+                    statement_id=statement.id,
+                    error_message=BALANCE_MISMATCH_REVIEW_MESSAGE,
+                    completed_at=datetime.now(UTC),
+                )
+                logger.info(
+                    "Job %s completed with pending review due to balance mismatch",
+                    job_id,
+                )
+            else:
+                job_service.update_status(
+                    job_id,
+                    UploadJobStatus.COMPLETED,
+                    statement_id=statement.id,
+                    completed_at=datetime.now(UTC),
+                )
+                logger.info(f"Job {job_id} completed successfully")
 
             # Apply rules to new transactions (non-blocking, after job status update)
             _apply_rules_to_statement(session, user_id, statement.id)
@@ -260,30 +290,48 @@ async def process_upload_job(
 
     except ExtractionError as e:
         logger.error(f"Extraction error for job {job_id}: {e}")
-        job_service.update_status(
-            job_id,
-            UploadJobStatus.FAILED,
-            error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(UTC),
-        )
+        try:
+            job_service.update_status(
+                job_id,
+                UploadJobStatus.FAILED,
+                error_message=_get_sanitized_error_message(e),
+                completed_at=datetime.now(UTC),
+            )
+        except UploadJobNotFoundError:
+            logger.warning(
+                "Cannot mark job %s as failed after extraction error: job not found",
+                job_id,
+            )
 
     except CurrencyConversionError as e:
         logger.error(f"Currency conversion error for job {job_id}: {e}")
-        job_service.update_status(
-            job_id,
-            UploadJobStatus.FAILED,
-            error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(UTC),
-        )
+        try:
+            job_service.update_status(
+                job_id,
+                UploadJobStatus.FAILED,
+                error_message=_get_sanitized_error_message(e),
+                completed_at=datetime.now(UTC),
+            )
+        except UploadJobNotFoundError:
+            logger.warning(
+                "Cannot mark job %s as failed after currency error: job not found",
+                job_id,
+            )
 
     except Exception as e:
         logger.exception(f"Unexpected error processing job {job_id}: {e}")
-        job_service.update_status(
-            job_id,
-            UploadJobStatus.FAILED,
-            error_message=_get_sanitized_error_message(e),
-            completed_at=datetime.now(UTC),
-        )
+        try:
+            job_service.update_status(
+                job_id,
+                UploadJobStatus.FAILED,
+                error_message=_get_sanitized_error_message(e),
+                completed_at=datetime.now(UTC),
+            )
+        except UploadJobNotFoundError:
+            logger.warning(
+                "Cannot mark job %s as failed after unexpected error: job not found",
+                job_id,
+            )
 
     finally:
         session.close()

@@ -5,10 +5,12 @@
 * Start the local stack with Docker Compose:
 
 ```bash
-docker compose watch
+bash scripts/dev-watch.sh
 ```
 
-If you're using the included Garage (S3-compatible) service, run the bootstrap once after starting the stack (and anytime you wipe volumes). This applies the Garage layout and (optionally) imports the S3 key + grants bucket permissions:
+This command is safe to run every time. It starts Garage, applies layout/bucket permissions, and ensures local S3 credentials are valid in `.env` before launching `docker compose watch`.
+
+If needed, you can still run Garage bootstrap manually:
 
 ```bash
 ./scripts/garage-bootstrap.sh
@@ -99,7 +101,7 @@ The domain `localhost.tiangolo.com` is a special domain that is configured (with
 After you update it, run again:
 
 ```bash
-docker compose watch
+bash scripts/dev-watch.sh
 ```
 
 When deploying, for example in production, the main Traefik is configured outside of the Docker Compose files. For local development, there's an included Traefik in `docker-compose.override.yml`, just to let you test that the domains work as expected, for example with `api.localhost.tiangolo.com` and `dashboard.localhost.tiangolo.com`.
@@ -117,7 +119,7 @@ They also use some additional configurations taken from environment variables se
 After changing variables, make sure you restart the stack:
 
 ```bash
-docker compose watch
+bash scripts/dev-watch.sh
 ```
 
 ## The .env file

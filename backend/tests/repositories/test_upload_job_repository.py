@@ -19,6 +19,7 @@ from app.domains.upload_jobs.domain.models import (
 )
 from app.domains.upload_jobs.repository import provide
 from app.models import CardBrand, User, UserCreate
+from app.pkgs.database import get_db_session
 
 
 def create_test_user(db: Session) -> User:
@@ -126,6 +127,34 @@ class TestUploadJobRepositoryCreate:
 
         assert job.id is not None
         assert job.user_id == user_2.id
+
+    def test_create_commits_when_session_already_in_transaction(self, db: Session):
+        """Create should persist even after prior reads opened a transaction."""
+        repo = provide(db)
+        user = create_test_user(db)
+        card = create_test_credit_card(db, user.id)
+
+        # Prior read opens a transaction in SQLAlchemy's autobegin mode.
+        _ = repo.get_by_file_hash("missing-hash", user.id)
+
+        create_data = UploadJobCreate(
+            user_id=user.id,
+            card_id=card.id,
+            file_hash="tx-open-hash-123",
+            file_path="statements/user123/tx-open.pdf",
+            file_size=2048,
+        )
+        created_job = repo.create(create_data)
+
+        # Verify from an independent session that the row is committed.
+        other_session = get_db_session()
+        try:
+            other_repo = provide(other_session)
+            persisted_job = other_repo.get_by_id(created_job.id)
+            assert persisted_job.id == created_job.id
+            assert persisted_job.file_hash == "tx-open-hash-123"
+        finally:
+            other_session.close()
 
 
 class TestUploadJobRepositoryGetById:

@@ -1,4 +1,37 @@
-"""Extraction prompt and JSON schema for LLM-based statement parsing."""
+"""Prompts and JSON schemas for OCR + statement extraction."""
+
+OCR_PROMPT = """You are an OCR extraction engine.
+Read the attached PDF and return ONLY a valid JSON object with this shape:
+{
+  "pages": [
+    {"page": 1, "text": "..."}
+  ]
+}
+
+Rules:
+- Preserve page numbering (1-based).
+- Preserve line breaks as they appear in the document.
+- Do not summarize, translate, or normalize values.
+- If a page is blank or unreadable, return empty text for that page.
+"""
+
+OCR_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "required": ["pages"],
+    "properties": {
+        "pages": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["page", "text"],
+                "properties": {
+                    "page": {"type": "integer", "minimum": 1},
+                    "text": {"type": "string"},
+                },
+            },
+        }
+    },
+}
 
 EXTRACTION_PROMPT = """Fill the following JSON Schema from the PDF attached. ONLY answer with the JSON.
 Don't add any text nor comments. Check very carefully for all the required data
@@ -28,6 +61,9 @@ Follow these indications:
 - Infer currency from the statement context (balances/transactions) when
   possible; otherwise pick the most likely 3-letter code from nearby currency
   markers.
+
+If you see there is a transaction like "ULTIMO PAGO", "PAGO RECIBIDO", "SU PAGO
+EN PESOS", etc. which is negative, is an old payment and SHOULD NOT be conisdered.
 
 JSON Schema:
 """

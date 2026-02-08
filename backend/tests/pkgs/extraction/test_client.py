@@ -2,7 +2,7 @@
 
 import asyncio
 import base64
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -36,9 +36,9 @@ class TestOpenRouterClient:
         pdf_bytes = b"test pdf content"
         expected_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-        mock_response.raise_for_status = AsyncMock()
+        mock_response.raise_for_status = MagicMock()
 
         async def run_test():
             with patch("httpx.AsyncClient") as mock_client_class:
@@ -68,9 +68,9 @@ class TestOpenRouterClient:
         client = OpenRouterClient(api_key="test-key")
         pdf_bytes = b"test pdf"
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-        mock_response.raise_for_status = AsyncMock()
+        mock_response.raise_for_status = MagicMock()
 
         async def run_test():
             with patch("httpx.AsyncClient") as mock_client_class:
@@ -104,9 +104,9 @@ class TestOpenRouterClient:
         client = OpenRouterClient(api_key="sk-test-123")
         pdf_bytes = b"test pdf"
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-        mock_response.raise_for_status = AsyncMock()
+        mock_response.raise_for_status = MagicMock()
 
         async def run_test():
             with patch("httpx.AsyncClient") as mock_client_class:
@@ -146,8 +146,6 @@ class TestOpenRouterClient:
                 }
             ],
         }
-
-        from unittest.mock import MagicMock
 
         mock_response = MagicMock()
         mock_response.json.return_value = expected_response
@@ -204,8 +202,6 @@ class TestOpenRouterClient:
         client = OpenRouterClient(api_key="test-key")
         pdf_bytes = b"test pdf"
 
-        from unittest.mock import MagicMock
-
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Rate limit exceeded",
@@ -237,9 +233,9 @@ class TestOpenRouterClient:
         client = OpenRouterClient(api_key="test-key")
         pdf_bytes = b"test pdf"
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-        mock_response.raise_for_status = AsyncMock()
+        mock_response.raise_for_status = MagicMock()
 
         async def run_test():
             with patch("httpx.AsyncClient") as mock_client_class:
@@ -257,5 +253,65 @@ class TestOpenRouterClient:
                 )
 
                 mock_client_class.assert_called_once_with(timeout=60.0)
+
+        asyncio.run(run_test())
+
+    def test_complete_with_text_sends_correct_request_format(self):
+        """Test that complete_with_text() sends text-only request format."""
+        client = OpenRouterClient(api_key="test-key")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
+
+        async def run_test():
+            with patch("httpx.AsyncClient") as mock_client_class:
+                mock_client = AsyncMock()
+                mock_client.__aenter__.return_value = mock_client
+                mock_client.__aexit__.return_value = None
+                mock_client.post.return_value = mock_response
+                mock_client_class.return_value = mock_client
+
+                await client.complete_with_text(
+                    model="google/gemini-pro-1.5",
+                    prompt="OCR_TEXT...",
+                )
+
+                call_args = mock_client.post.call_args
+                url = call_args.args[0]
+                payload = call_args.kwargs["json"]
+
+                assert url == "https://openrouter.ai/api/v1/chat/completions"
+                assert payload["model"] == "google/gemini-pro-1.5"
+                assert payload["messages"][0]["role"] == "user"
+                assert payload["messages"][0]["content"] == "OCR_TEXT..."
+
+        asyncio.run(run_test())
+
+    def test_complete_with_pdf_supports_response_format(self):
+        """Test that complete_with_pdf() forwards response_format when provided."""
+        client = OpenRouterClient(api_key="test-key")
+        pdf_bytes = b"test pdf"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
+
+        async def run_test():
+            with patch("httpx.AsyncClient") as mock_client_class:
+                mock_client = AsyncMock()
+                mock_client.__aenter__.return_value = mock_client
+                mock_client.__aexit__.return_value = None
+                mock_client.post.return_value = mock_response
+                mock_client_class.return_value = mock_client
+
+                await client.complete_with_pdf(
+                    model="test-model",
+                    prompt="test prompt",
+                    pdf_bytes=pdf_bytes,
+                    response_format={"type": "json_object"},
+                )
+
+                call_args = mock_client.post.call_args
+                payload = call_args.kwargs["json"]
+                assert payload["response_format"] == {"type": "json_object"}
 
         asyncio.run(run_test())

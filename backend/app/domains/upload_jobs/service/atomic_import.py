@@ -50,6 +50,27 @@ class AtomicImportService:
         self.session = session
         self.currency_service = provide_currency()
 
+    def _transaction_context(self):
+        """Return a transaction context compatible with the current session state.
+
+        If the session already has an active transaction, use a savepoint to avoid
+        nested root transaction errors. Otherwise, start a regular transaction.
+        """
+        if self.session.in_transaction():
+            return self.session.begin_nested()
+        return self.session.begin()
+
+    @staticmethod
+    def _has_balance_mismatch(
+        current_balance: Decimal | None,
+        transactions_total: Decimal,
+        tolerance: Decimal = Decimal("0.01"),
+    ) -> bool:
+        """Return True when current balance differs from transactions total."""
+        if current_balance is None:
+            return False
+        return abs(current_balance - transactions_total) > tolerance
+
     async def import_statement_atomic(
         self,
         data: ExtractedStatement,
@@ -73,7 +94,7 @@ class AtomicImportService:
             Tuple of (created statement, list of created transactions)
         """
         # Use explicit transaction boundary for true atomicity
-        with self.session.begin():
+        with self._transaction_context():
             # Convert balances to target currency
             previous_balance = await self.currency_service.convert_balance(
                 data.previous_balance or [], target_currency
@@ -84,6 +105,25 @@ class AtomicImportService:
             minimum_payment = await self.currency_service.convert_balance(
                 data.minimum_payment or [], target_currency
             )
+            transaction_money = [txn.amount for txn in data.transactions]
+            transactions_total = (
+                await self.currency_service.convert_balance(
+                    transaction_money, target_currency
+                )
+                if transaction_money
+                else Decimal("0")
+            )
+            statement_status = StatementStatus.COMPLETE
+            if self._has_balance_mismatch(current_balance, transactions_total):
+                statement_status = StatementStatus.PENDING_REVIEW
+                logger.warning(
+                    "Statement balance mismatch detected: "
+                    "card_id=%s current_balance=%s transactions_total=%s currency=%s",
+                    card_id,
+                    current_balance,
+                    transactions_total,
+                    target_currency,
+                )
 
             # Fetch card for potential limit update
             card = self.session.get(CreditCard, card_id)
@@ -103,7 +143,7 @@ class AtomicImportService:
                 current_balance=current_balance,
                 minimum_payment=minimum_payment,
                 currency=target_currency,
-                status=StatementStatus.COMPLETE,
+                status=statement_status,
                 source_file_path=source_file_path,
             )
             self.session.add(statement)
@@ -166,7 +206,7 @@ class AtomicImportService:
             Tuple of (created statement, list of created transactions)
         """
         # Use explicit transaction boundary for true atomicity
-        with self.session.begin():
+        with self._transaction_context():
             # Safely extract period dates
             period = partial_data.get("period", {})
             period_start = self._extract_date(period.get("start"))
