@@ -3,7 +3,6 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.domains.upload_jobs.domain.errors import (
@@ -15,6 +14,7 @@ from app.domains.upload_jobs.domain.models import (
     UploadJobCreate,
     UploadJobStatus,
 )
+from app.pkgs.database import get_db_session
 
 
 class UploadJobRepository:
@@ -26,27 +26,27 @@ class UploadJobRepository:
 
     def create(self, data: UploadJobCreate) -> UploadJob:
         """Create a new upload job."""
-        job = UploadJob.model_validate(data)
+        existing_job = self.get_by_file_hash(data.file_hash, data.user_id)
+        if existing_job:
+            raise DuplicateFileError(
+                f"File with hash {data.file_hash} already exists for this user",
+                existing_job.id,
+            )
 
-        # Use a nested transaction (savepoint) if the session is already in a transaction
-        # This ensures that a rollback only affects this operation, not the entire transaction
-        if self.db_session.in_transaction():
-            nested = self.db_session.begin_nested()
-        else:
-            nested = None
+        job = UploadJob.model_validate(data)
 
         self.db_session.add(job)
         try:
-            if nested:
-                nested.commit()
-            else:
-                self.db_session.commit()
+            # Always commit so the job is visible to the background worker
+            # immediately after the upload endpoint returns.
+            self.db_session.commit()
             self.db_session.refresh(job)
-        except IntegrityError as e:
-            if nested:
-                nested.rollback()
-            else:
-                self.db_session.rollback()
+        except Exception as e:
+            self.db_session.rollback()
+            # The failed insert object can stay attached and trigger autoflush on reads.
+            # Detach it before querying for the existing duplicate row.
+            if job in self.db_session:
+                self.db_session.expunge(job)
             # Check if it's the unique constraint violation on (user_id, file_hash)
             error_str = str(e).lower()
             if (
@@ -55,7 +55,18 @@ class UploadJobRepository:
                 or "unique constraint" in error_str
             ):
                 # Find the existing job
-                existing = self.get_by_file_hash(data.file_hash, data.user_id)
+                with self.db_session.no_autoflush:
+                    existing = self.get_by_file_hash(data.file_hash, data.user_id)
+                if not existing:
+                    # Fallback for edge cases where the current session cannot
+                    # resolve the duplicate row after rollback.
+                    lookup_session = get_db_session()
+                    try:
+                        existing = UploadJobRepository(lookup_session).get_by_file_hash(
+                            data.file_hash, data.user_id
+                        )
+                    finally:
+                        lookup_session.close()
                 if existing:
                     raise DuplicateFileError(
                         f"File with hash {data.file_hash} already exists for this user",

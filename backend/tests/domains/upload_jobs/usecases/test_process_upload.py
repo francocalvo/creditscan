@@ -24,10 +24,12 @@ from app.domains.transactions.domain.models import (
 from app.domains.upload_jobs.domain.errors import (
     CurrencyConversionError,
     ExtractionError,
+    UploadJobNotFoundError,
 )
 from app.domains.upload_jobs.domain.models import UploadJobStatus
 from app.domains.upload_jobs.service.atomic_import import AtomicImportService
 from app.domains.upload_jobs.usecases.process_upload.usecase import (
+    BALANCE_MISMATCH_REVIEW_MESSAGE,
     _apply_rules_to_statement,
     _get_sanitized_error_message,
     _import_with_atomic_service,
@@ -130,7 +132,10 @@ def mock_card():
     )
 
 
-def _mock_statement(statement_id=None):
+def _mock_statement(
+    statement_id=None,
+    status: StatementStatus = StatementStatus.COMPLETE,
+):
     """Create a mock statement."""
     return CardStatementPublic(
         id=statement_id or uuid.uuid4(),
@@ -144,7 +149,7 @@ def _mock_statement(statement_id=None):
         minimum_payment=Decimal("10.00"),
         is_fully_paid=False,
         currency="ARS",
-        status=StatementStatus.COMPLETE,
+        status=status,
         source_file_path="statements/test.pdf",
     )
 
@@ -230,6 +235,63 @@ class TestSanitizedErrorMessages:
 
 class TestAtomicImport:
     """Test suite for atomic import functionality."""
+
+    def test_has_balance_mismatch_detects_difference(self, atomic_import_service):
+        """Balance mismatch helper should detect non-trivial differences."""
+        assert (
+            atomic_import_service._has_balance_mismatch(
+                Decimal("100.00"), Decimal("99.00")
+            )
+            is True
+        )
+        assert (
+            atomic_import_service._has_balance_mismatch(
+                Decimal("100.00"), Decimal("100.00")
+            )
+            is False
+        )
+        assert (
+            atomic_import_service._has_balance_mismatch(
+                Decimal("100.00"), Decimal("100.005")
+            )
+            is False
+        )
+
+    def test_transaction_context_uses_begin_when_no_active_transaction(
+        self, atomic_import_service
+    ):
+        """Given: session without active transaction
+        When: _transaction_context() is requested
+        Then: a root transaction context is returned
+        """
+        begin_ctx = Mock()
+        atomic_import_service.session.in_transaction = Mock(return_value=False)
+        atomic_import_service.session.begin = Mock(return_value=begin_ctx)
+        atomic_import_service.session.begin_nested = Mock()
+
+        ctx = atomic_import_service._transaction_context()
+
+        assert ctx is begin_ctx
+        atomic_import_service.session.begin.assert_called_once()
+        atomic_import_service.session.begin_nested.assert_not_called()
+
+    def test_transaction_context_uses_savepoint_when_transaction_is_active(
+        self, atomic_import_service
+    ):
+        """Given: session with active transaction
+        When: _transaction_context() is requested
+        Then: a nested transaction (savepoint) context is returned
+        """
+        nested_ctx = Mock()
+        atomic_import_service.session.in_transaction = Mock(return_value=True)
+        atomic_import_service.session.begin = Mock()
+        atomic_import_service.session.begin_nested = Mock(return_value=nested_ctx)
+
+        ctx = atomic_import_service._transaction_context()
+
+        assert ctx is nested_ctx
+        atomic_import_service.session.begin_nested.assert_called_once()
+        atomic_import_service.session.begin.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_import_statement_atomic_success(
@@ -441,6 +503,54 @@ class TestProcessUploadJob:
     """Test suite for process_upload_job function."""
 
     @pytest.mark.asyncio
+    async def test_stops_cleanly_when_job_missing(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_extraction_service,
+    ):
+        """Given: job no longer exists
+        When: process_upload_job() starts
+        Then: it retries and exits without raising or extracting
+        """
+        job_id = uuid.uuid4()
+        card_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.get_db_session",
+                return_value=mock_session,
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.provide_repository",
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.UploadJobService",
+                return_value=mock_job_service,
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.provide_extraction",
+                return_value=mock_extraction_service,
+            ),
+        ):
+            mock_session.expire_all = Mock()
+            mock_job_service.update_status.side_effect = UploadJobNotFoundError(
+                f"Upload job with ID {job_id} not found"
+            )
+
+            await process_upload_job(
+                job_id=job_id,
+                pdf_bytes=b"test pdf",
+                card_id=card_id,
+                file_path="statements/test.pdf",
+            )
+
+            # Retries PROCESSING status updates and then exits.
+            assert mock_job_service.update_status.call_count == 5
+            mock_extraction_service.extract_statement.assert_not_called()
+            mock_session.close.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_updates_job_to_processing_at_start(
         self,
         mock_session,
@@ -642,6 +752,82 @@ class TestProcessUploadJob:
                 job_id,
                 UploadJobStatus.COMPLETED,
                 statement_id=statement_id,
+                completed_at=ANY,
+            )
+
+    @pytest.mark.asyncio
+    async def test_job_partial_when_statement_requires_review(
+        self,
+        mock_session,
+        mock_job_service,
+        mock_extraction_service,
+        mock_card,
+    ):
+        """Given: full extraction but balance mismatch pending review
+        When: process_upload_job() completes
+        Then: job is marked PARTIAL with review message
+        """
+        job_id = uuid.uuid4()
+        card_id = uuid.uuid4()
+        statement_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.get_db_session",
+                return_value=mock_session,
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.provide_repository",
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.UploadJobService",
+                return_value=mock_job_service,
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.provide_extraction",
+                return_value=mock_extraction_service,
+            ),
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase.provide_get_card",
+            ) as mock_provide_get_card,
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase._import_with_atomic_service",
+                new_callable=AsyncMock,
+            ) as mock_import,
+            patch(
+                "app.domains.upload_jobs.usecases.process_upload.usecase._apply_rules_to_statement",
+            ),
+        ):
+            mock_get_card = Mock()
+            mock_get_card.execute = Mock(return_value=mock_card)
+            mock_provide_get_card.return_value = mock_get_card
+
+            mock_extraction_service.extract_statement.return_value = Mock(
+                success=True,
+                data=_mock_extracted_statement(),
+                partial_data=None,
+                error=None,
+                model_used="test-model",
+            )
+
+            mock_statement = _mock_statement(
+                statement_id=statement_id,
+                status=StatementStatus.PENDING_REVIEW,
+            )
+            mock_import.return_value = (mock_statement, [_mock_transaction()])
+
+            await process_upload_job(
+                job_id=job_id,
+                pdf_bytes=b"test pdf",
+                card_id=card_id,
+                file_path="statements/test.pdf",
+            )
+
+            mock_job_service.update_status.assert_any_call(
+                job_id,
+                UploadJobStatus.PARTIAL,
+                statement_id=statement_id,
+                error_message=BALANCE_MISMATCH_REVIEW_MESSAGE,
                 completed_at=ANY,
             )
 
