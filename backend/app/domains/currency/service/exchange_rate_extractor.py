@@ -104,13 +104,26 @@ class ExchangeRateExtractor:
             raise ExtractionError(f"Invalid JSON in contentCache: {e}")
 
         # Find markets-general data
+        # The structure is: content_cache["markets-general"][<params_key>]["data"]
+        # where <params_key> is a JSON-encoded parameter string.
         markets_data = None
         for key, value in content_cache.items():
             if "markets-general" in key.lower():
-                data_list = value.get("data", [])
-                if data_list and len(data_list) > 0:
-                    markets_data = data_list[0]
-                    break
+                if isinstance(value, dict):
+                    # Check for data directly (legacy format)
+                    data_list = value.get("data", [])
+                    if data_list:
+                        markets_data = data_list[0]
+                        break
+                    # Drill into nested param-keyed dicts
+                    for inner in value.values():
+                        if isinstance(inner, dict):
+                            data_list = inner.get("data", [])
+                            if data_list:
+                                markets_data = data_list[0]
+                                break
+                    if markets_data:
+                        break
 
         if not markets_data:
             raise ExtractionError(

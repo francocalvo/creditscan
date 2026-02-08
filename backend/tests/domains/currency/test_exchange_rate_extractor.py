@@ -39,6 +39,32 @@ VALID_HTML_FIXTURE = """
 </html>
 """
 
+VALID_NESTED_HTML_FIXTURE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cronista Dólar MEP</title>
+    <script>
+        Fusion.contentCache = {
+            "markets-general": {
+                "{\\"from\\":\\"01/01/2025\\",\\"to\\":\\"01/31/2025\\",\\"tokenList\\":\\"[{\\\\\\"tokenValue\\\\\\":\\\\\\"ARSMEP\\\\\\",\\\\\\"tokenType\\\\\\":\\\\\\"monedas\\\\\\"}]\\"}": {
+                    "data": [{
+                        "Compra": 1446.15,
+                        "Venta": 1447.50,
+                        "UltimaActualizacion": "/Date(1737676800000)/"
+                    }],
+                    "expires": 300,
+                    "lastModified": "2025-01-24T00:00:00Z"
+                }
+            }
+        };
+    Fusion.init();
+    </script>
+</head>
+<body></body>
+</html>
+"""
+
 MISSING_CACHE_HTML_FIXTURE = """
 <!DOCTYPE html>
 <html>
@@ -230,6 +256,17 @@ class TestExchangeRateExtractor:
         assert rate.rate_date == Date(2025, 1, 24)
         # 1737676800000 ms = January 24, 2025 00:00:00 UTC
         assert rate.fetched_at == datetime(2025, 1, 24, 0, 0, 0, tzinfo=UTC)
+        assert rate.source == "cronista_mep"
+
+    def test_parse_current_rate_nested_structure(self) -> None:
+        """Test parsing HTML where markets-general data is nested under a param key."""
+        extractor = ExchangeRateExtractor()
+        rate = extractor._parse_current_rate(VALID_NESTED_HTML_FIXTURE)
+
+        assert isinstance(rate, ExtractedRate)
+        assert rate.buy_rate == Decimal("1446.15")
+        assert rate.sell_rate == Decimal("1447.50")
+        assert rate.rate_date == Date(2025, 1, 24)
         assert rate.source == "cronista_mep"
 
     def test_parse_current_rate_missing_cache_raises(self) -> None:
