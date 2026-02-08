@@ -106,6 +106,19 @@ class Settings(BaseSettings):
 
     # OpenRouter API configuration
     OPENROUTER_API_KEY: str = ""
+    OPENROUTER_OCR_MODELS: str = "google/gemini-flash-1.5,google/gemini-pro-1.5"
+    OPENROUTER_STATEMENT_MODELS: str = "google/gemini-pro-1.5,google/gemini-pro-1.5"
+
+    # ZAI API configuration
+    ZAI_API_KEY: str = ""
+    ZAI_OCR_MODELS: str = "glm-ocr,glm-ocr"
+    ZAI_STATEMENT_MODELS: str = "glm-4.5-air,glm-4.5-air"
+
+    # Extraction provider configuration (openrouter | zai)
+    EXTRACTION_PROVIDER: str = "openrouter"
+    EXTRACTION_OCR_PROVIDER: str = ""
+    EXTRACTION_STATEMENT_PROVIDER: str = ""
+    EXTRACTION_WAIT_LOG_INTERVAL_SECONDS: float = 10.0
 
     # Exchange rate API configuration
     EXCHANGE_RATE_API_KEY: str = ""

@@ -2,6 +2,10 @@
 
 Exports:
     OpenRouterClient: HTTP client for OpenRouter API
+    ExtractionProvider: Provider protocol for pluggable backends
+    CompositeExtractionProvider: Compose OCR and statement backends
+    OpenRouterExtractionProvider: OpenRouter provider implementation
+    ZaiExtractionProvider: ZAI provider implementation
     ExtractionService: High-level extraction orchestration
     ExtractionResult: Result wrapper with success/failure states
     ExtractedStatement: Parsed statement data model
@@ -18,10 +22,22 @@ from app.pkgs.extraction.models import (
     InstallmentInfo,
     Money,
 )
+from app.pkgs.extraction.providers import (
+    CompositeExtractionProvider,
+    ExtractionProvider,
+    OpenRouterExtractionProvider,
+    ZaiExtractionProvider,
+    provide_provider,
+)
 from app.pkgs.extraction.service import ExtractionService, provide
 
 __all__ = [
     "OpenRouterClient",
+    "CompositeExtractionProvider",
+    "ExtractionProvider",
+    "OpenRouterExtractionProvider",
+    "ZaiExtractionProvider",
+    "provide_provider",
     "ExtractionService",
     "ExtractionResult",
     "ExtractedStatement",
