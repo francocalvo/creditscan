@@ -8,8 +8,8 @@
 -- Usage: psql -d <database> -f seed_credit_cards.sql
 -- =============================================================================
 
--- Configuration: Pass user_email via -v flag, e.g.:
---   psql -v user_email="'dev@francocalvo.ar'" -f seed_credit_cards.sql
+-- Configuration: Set the user email here
+\set user_email 'dev@francocalvo.ar'
 
 -- =============================================================================
 -- CLEANUP: Remove existing data for user (optional - comment out to append)
