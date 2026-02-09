@@ -86,8 +86,7 @@ const router = createRouter({
     {
       path: '/auth/signup',
       name: 'signup',
-      component: AuthLayout,
-      meta: { guest: true },
+      redirect: { name: 'login' },
     },
   ],
 })

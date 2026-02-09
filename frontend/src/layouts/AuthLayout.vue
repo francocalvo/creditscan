@@ -246,8 +246,8 @@ watch(
               />
             </div>
 
-            <!-- Toggle link -->
-            <div class="toggle-link">
+            <!-- Toggle link (signup disabled) -->
+            <!-- <div class="toggle-link">
               <p v-if="isSignup">
                 Already have an account?
                 <router-link to="/auth/login" class="link">Log In</router-link>
@@ -256,7 +256,7 @@ watch(
                 Don't have an account?
                 <router-link to="/auth/signup" class="link">Sign Up</router-link>
               </p>
-            </div>
+            </div> -->
           </form>
         </template>
       </Card>
