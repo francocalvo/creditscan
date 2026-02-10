@@ -1226,6 +1226,30 @@ export class TransactionTagsService {
   }
 
   /**
+   * Get Transaction Tags Batch
+   * Get all tags for multiple transactions in a single request.
+   *
+   * Returns all transaction-tag mappings for the given transaction IDs.
+   * Requires authentication (current_user dependency enforces this).
+   * @returns TransactionTagPublic Successful Response
+   * @throws ApiError
+   */
+  public static transactionTagsGetTransactionTagsBatch(
+    data: $OpenApiTs['/api/v1/transaction-tags/batch']['post']['req'],
+  ): CancelablePromise<$OpenApiTs['/api/v1/transaction-tags/batch']['post']['res'][200]> {
+    const { requestBody } = data
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/api/v1/transaction-tags/batch',
+      body: requestBody,
+      mediaType: 'application/json',
+      errors: {
+        422: 'Validation Error',
+      },
+    })
+  }
+
+  /**
    * Remove Tag From Transaction
    * Remove a tag from a transaction.
    *
@@ -1410,6 +1434,23 @@ export class RulesService {
       errors: {
         422: 'Validation Error',
       },
+    })
+  }
+}
+
+export class NotificationsService {
+  /**
+   * Trigger Notification
+   * Manually trigger due date notification check for the current user.
+   * @returns TriggerResponse Successful Response
+   * @throws ApiError
+   */
+  public static notificationsTriggerNotification(): CancelablePromise<
+    $OpenApiTs['/api/v1/notifications/trigger']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/api/v1/notifications/trigger',
     })
   }
 }

@@ -36,6 +36,13 @@ export type BatchCurrencyConversionResponse = {
   results: Array<CurrencyConversionResponse>
 }
 
+/**
+ * Request body for batch fetching transaction tags.
+ */
+export type BatchTransactionTagsRequest = {
+  transaction_ids: Array<string>
+}
+
 export type Body_card_statements_upload_statement = {
   card_id: string
   file: Blob | File
@@ -129,7 +136,16 @@ export type ConditionField = 'payee' | 'description' | 'amount' | 'date'
 /**
  * Operators for condition matching.
  */
-export type ConditionOperator = 'contains' | 'equals' | 'gt' | 'gte' | 'lt' | 'lte' | 'before' | 'after' | 'between'
+export type ConditionOperator =
+  | 'contains'
+  | 'equals'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'before'
+  | 'after'
+  | 'between'
 
 /**
  * Model for creating credit card.
@@ -154,6 +170,10 @@ export type CreditCardPublic = {
   alias?: string | null
   default_currency?: string
   id: string
+  credit_limit?: string | null
+  limit_last_updated_at?: string | null
+  limit_source?: LimitSource | null
+  outstanding_balance?: string
 }
 
 /**
@@ -165,6 +185,7 @@ export type CreditCardUpdate = {
   last4?: string | null
   alias?: string | null
   default_currency?: string | null
+  credit_limit?: number | string | null
 }
 
 /**
@@ -221,6 +242,11 @@ export type ExchangeRatesResponse = {
 export type HTTPValidationError = {
   detail?: Array<ValidationError>
 }
+
+/**
+ * Enumeration for credit card limit sources.
+ */
+export type LimitSource = 'manual' | 'statement'
 
 /**
  * Logical operators for combining conditions.
@@ -508,6 +534,11 @@ export type TransactionsPublic = {
   } | null
 }
 
+export type TriggerResponse = {
+  statements_found: number
+  notification_sent: boolean
+}
+
 export type UpdatePassword = {
   current_password: string
   new_password: string
@@ -545,6 +576,8 @@ export type UserCreate = {
   is_superuser?: boolean
   full_name?: string | null
   preferred_currency?: string | null
+  notifications_enabled?: boolean
+  ntfy_topic?: string | null
   password: string
 }
 
@@ -554,6 +587,8 @@ export type UserPublic = {
   is_superuser?: boolean
   full_name?: string | null
   preferred_currency?: string | null
+  notifications_enabled?: boolean
+  ntfy_topic?: string | null
   id: string
 }
 
@@ -569,6 +604,8 @@ export type UserUpdate = {
   is_superuser?: boolean
   full_name?: string | null
   preferred_currency?: string | null
+  notifications_enabled?: boolean
+  ntfy_topic?: string | null
   password?: string | null
 }
 
@@ -576,6 +613,8 @@ export type UserUpdateMe = {
   full_name?: string | null
   email?: string | null
   preferred_currency?: string | null
+  notifications_enabled?: boolean | null
+  ntfy_topic?: string | null
 }
 
 export type UsersPublic = {
@@ -1219,6 +1258,19 @@ export type $OpenApiTs = {
       }
     }
   }
+  '/api/v1/transaction-tags/batch': {
+    post: {
+      req: {
+        requestBody: BatchTransactionTagsRequest
+      }
+      res: {
+        /**
+         * Successful Response
+         */
+        200: Array<TransactionTagPublic>
+      }
+    }
+  }
   '/api/v1/transaction-tags/transaction/{transaction_id}/tag/{tag_id}': {
     delete: {
       req: {
@@ -1304,6 +1356,16 @@ export type $OpenApiTs = {
          * Successful Response
          */
         204: void
+      }
+    }
+  }
+  '/api/v1/notifications/trigger': {
+    post: {
+      res: {
+        /**
+         * Successful Response
+         */
+        200: TriggerResponse
       }
     }
   }

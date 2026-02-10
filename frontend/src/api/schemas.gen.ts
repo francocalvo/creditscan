@@ -98,6 +98,23 @@ export const $BatchCurrencyConversionResponse = {
   description: 'Response model for batch currency conversion.',
 } as const
 
+export const $BatchTransactionTagsRequest = {
+  properties: {
+    transaction_ids: {
+      items: {
+        type: 'string',
+        format: 'uuid',
+      },
+      type: 'array',
+      title: 'Transaction Ids',
+    },
+  },
+  type: 'object',
+  required: ['transaction_ids'],
+  title: 'BatchTransactionTagsRequest',
+  description: 'Request body for batch fetching transaction tags.',
+} as const
+
 export const $Body_card_statements_upload_statement = {
   properties: {
     card_id: {
@@ -738,6 +755,46 @@ export const $CreditCardPublic = {
       format: 'uuid',
       title: 'Id',
     },
+    credit_limit: {
+      anyOf: [
+        {
+          type: 'string',
+          pattern: '^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$',
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Credit Limit',
+    },
+    limit_last_updated_at: {
+      anyOf: [
+        {
+          type: 'string',
+          format: 'date-time',
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Limit Last Updated At',
+    },
+    limit_source: {
+      anyOf: [
+        {
+          $ref: '#/components/schemas/LimitSource',
+        },
+        {
+          type: 'null',
+        },
+      ],
+    },
+    outstanding_balance: {
+      type: 'string',
+      pattern: '^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$',
+      title: 'Outstanding Balance',
+      default: '0',
+    },
   },
   type: 'object',
   required: ['user_id', 'bank', 'brand', 'last4', 'id'],
@@ -804,6 +861,22 @@ export const $CreditCardUpdate = {
         },
       ],
       title: 'Default Currency',
+    },
+    credit_limit: {
+      anyOf: [
+        {
+          type: 'number',
+          exclusiveMinimum: 0,
+        },
+        {
+          type: 'string',
+          pattern: '^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$',
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Credit Limit',
     },
   },
   type: 'object',
@@ -994,6 +1067,13 @@ export const $HTTPValidationError = {
   },
   type: 'object',
   title: 'HTTPValidationError',
+} as const
+
+export const $LimitSource = {
+  type: 'string',
+  enum: ['manual', 'statement'],
+  title: 'LimitSource',
+  description: 'Enumeration for credit card limit sources.',
 } as const
 
 export const $LogicalOperator = {
@@ -2069,6 +2149,22 @@ export const $TransactionsPublic = {
   description: 'Response model for paginated transactions.',
 } as const
 
+export const $TriggerResponse = {
+  properties: {
+    statements_found: {
+      type: 'integer',
+      title: 'Statements Found',
+    },
+    notification_sent: {
+      type: 'boolean',
+      title: 'Notification Sent',
+    },
+  },
+  type: 'object',
+  required: ['statements_found', 'notification_sent'],
+  title: 'TriggerResponse',
+} as const
+
 export const $UpdatePassword = {
   properties: {
     current_password: {
@@ -2232,6 +2328,23 @@ export const $UserCreate = {
       ],
       title: 'Preferred Currency',
     },
+    notifications_enabled: {
+      type: 'boolean',
+      title: 'Notifications Enabled',
+      default: false,
+    },
+    ntfy_topic: {
+      anyOf: [
+        {
+          type: 'string',
+          maxLength: 100,
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Ntfy Topic',
+    },
     password: {
       type: 'string',
       maxLength: 40,
@@ -2285,6 +2398,23 @@ export const $UserPublic = {
         },
       ],
       title: 'Preferred Currency',
+    },
+    notifications_enabled: {
+      type: 'boolean',
+      title: 'Notifications Enabled',
+      default: false,
+    },
+    ntfy_topic: {
+      anyOf: [
+        {
+          type: 'string',
+          maxLength: 100,
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Ntfy Topic',
     },
     id: {
       type: 'string',
@@ -2378,6 +2508,23 @@ export const $UserUpdate = {
       ],
       title: 'Preferred Currency',
     },
+    notifications_enabled: {
+      type: 'boolean',
+      title: 'Notifications Enabled',
+      default: false,
+    },
+    ntfy_topic: {
+      anyOf: [
+        {
+          type: 'string',
+          maxLength: 100,
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Ntfy Topic',
+    },
     password: {
       anyOf: [
         {
@@ -2434,6 +2581,29 @@ export const $UserUpdateMe = {
         },
       ],
       title: 'Preferred Currency',
+    },
+    notifications_enabled: {
+      anyOf: [
+        {
+          type: 'boolean',
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Notifications Enabled',
+    },
+    ntfy_topic: {
+      anyOf: [
+        {
+          type: 'string',
+          maxLength: 100,
+        },
+        {
+          type: 'null',
+        },
+      ],
+      title: 'Ntfy Topic',
     },
   },
   type: 'object',

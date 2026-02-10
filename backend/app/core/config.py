@@ -127,6 +127,12 @@ class Settings(BaseSettings):
     RATE_EXTRACTION_HOUR: int = 21  # UTC hour
     RATE_EXTRACTION_MINUTE: int = 0  # UTC minute
 
+    # Ntfy notification configuration
+    NTFY_INTERNAL_URL: str = "http://ntfy:80"
+    NTFY_PUBLIC_URL: str = "https://ntfy.localhost"
+    NOTIFICATION_HOUR: int = 22  # UTC hour
+    NOTIFICATION_MINUTE: int = 0  # UTC minute
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (

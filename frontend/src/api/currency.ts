@@ -25,4 +25,3 @@ export function convertCurrencyBatch(params: {
     date: params.date ?? undefined,
   })
 }
-

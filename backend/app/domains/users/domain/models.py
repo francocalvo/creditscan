@@ -13,6 +13,8 @@ class UserBase(SQLModel):
     is_superuser: bool = False
     full_name: str | None = Field(default=None, max_length=255)
     preferred_currency: str | None = Field(default=None, max_length=3)
+    notifications_enabled: bool = Field(default=False)
+    ntfy_topic: str | None = Field(default=None, max_length=100)
 
 
 # Properties to receive via API on creation
@@ -36,6 +38,8 @@ class UserUpdateMe(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = Field(default=None, max_length=255)
     preferred_currency: str | None = Field(default=None, max_length=3)
+    notifications_enabled: bool | None = Field(default=None)
+    ntfy_topic: str | None = Field(default=None, max_length=100)
 
 
 class UpdatePassword(SQLModel):
