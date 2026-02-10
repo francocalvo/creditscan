@@ -63,6 +63,7 @@ class CardStatementPublic(CardStatementBase):
     """Public model for card statements."""
 
     id: uuid.UUID
+    total_paid: Decimal = Field(default=Decimal("0"))
 
 
 # For updates (all fields optional)
