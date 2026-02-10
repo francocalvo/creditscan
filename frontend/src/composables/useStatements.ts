@@ -30,6 +30,7 @@ export interface CardStatement {
   minimum_payment: number | null
   is_fully_paid: boolean
   backend_status?: string
+  total_paid: number
 }
 
 export interface StatementsResponse {
@@ -44,6 +45,7 @@ export interface StatementWithCard extends CardStatement {
   status: StatementStatus
   card?: CreditCard
   needsReview: boolean
+  remainingBalance: number | null
 }
 
 export interface UserBalance {
@@ -105,9 +107,20 @@ export function useStatements() {
     return preferredCurrencyFetchInFlight
   }
 
+  const getRemainingBalance = (statement: CardStatement): number | null => {
+    if (statement.current_balance === null) return null
+    return Math.max(0, statement.current_balance - (statement.total_paid ?? 0))
+  }
+
   const getStatementStatus = (statement: CardStatement): StatementStatus => {
-    // Check if the statement is marked as fully paid in the API
-    if (statement.is_fully_paid || statement.current_balance == 0.0) {
+    if (statement.is_fully_paid) {
+      return 'paid'
+    }
+
+    const remaining = getRemainingBalance(statement)
+
+    // Consider it paid if remaining balance is 0 or negative
+    if (remaining !== null && remaining <= 0) {
       return 'paid'
     }
 
@@ -119,11 +132,6 @@ export function useStatements() {
 
     if (today > dueDate) {
       return 'overdue'
-    }
-
-    // Consider it paid if balance is 0 or negative (fallback check)
-    if (statement.current_balance !== null && statement.current_balance <= 0) {
-      return 'paid'
     }
 
     return 'pending'
@@ -144,6 +152,7 @@ export function useStatements() {
           status: getStatementStatus(statement),
           card,
           needsReview: statement.backend_status === 'pending_review',
+          remainingBalance: getRemainingBalance(statement),
         }
       })
       .sort((a, b) => {

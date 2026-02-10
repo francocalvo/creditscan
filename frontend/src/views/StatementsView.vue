@@ -611,7 +611,7 @@ const getCardLatestBalance = (cardId: string) => {
       return parseDateString(b.period_end).getTime() - parseDateString(a.period_end).getTime()
     })
 
-  return cardStatements.length > 0 ? cardStatements[0]?.current_balance : null
+  return cardStatements.length > 0 ? cardStatements[0]?.remainingBalance : null
 }
 
 // Handle payment button click
@@ -829,7 +829,7 @@ const handleLimitSaved = () => {
             <tr v-for="statement in filteredStatements" :key="statement.id">
               <td class="card-cell">{{ getStatementCardDisplay(statement) }}</td>
               <td>{{ formatPeriod(statement.period_start, statement.period_end) }}</td>
-              <td class="balance-cell">{{ formatCurrency(statement.current_balance) }}</td>
+              <td class="balance-cell">{{ formatCurrency(statement.remainingBalance) }}</td>
               <td class="date-cell">
                 <i class="pi pi-calendar calendar-icon"></i>
                 {{ formatDate(statement.due_date) }}
@@ -1216,9 +1216,9 @@ const handleLimitSaved = () => {
       v-model:visible="showPaymentModal"
       :statement-id="selectedStatement.id"
       :current-balance="
-        typeof selectedStatement.current_balance === 'string'
-          ? parseFloat(selectedStatement.current_balance)
-          : selectedStatement.current_balance
+        typeof selectedStatement.remainingBalance === 'string'
+          ? parseFloat(selectedStatement.remainingBalance)
+          : selectedStatement.remainingBalance
       "
       :statement-card="getStatementCardDisplay(selectedStatement)"
       :is-submitting="isProcessingPayment"
