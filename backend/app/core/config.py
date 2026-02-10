@@ -9,6 +9,7 @@ from pydantic import (
     HttpUrl,
     PostgresDsn,
     computed_field,
+    field_validator,
     model_validator,
 )
 from pydantic_core import MultiHostUrl
@@ -132,6 +133,20 @@ class Settings(BaseSettings):
     NTFY_PUBLIC_URL: str = "https://ntfy.localhost"
     NOTIFICATION_HOUR: int = 22  # UTC hour
     NOTIFICATION_MINUTE: int = 0  # UTC minute
+
+    @field_validator("NOTIFICATION_HOUR")
+    @classmethod
+    def validate_hour(cls, v: int) -> int:
+        if not 0 <= v <= 23:
+            raise ValueError("NOTIFICATION_HOUR must be between 0 and 23")
+        return v
+
+    @field_validator("NOTIFICATION_MINUTE")
+    @classmethod
+    def validate_minute(cls, v: int) -> int:
+        if not 0 <= v <= 59:
+            raise ValueError("NOTIFICATION_MINUTE must be between 0 and 59")
+        return v
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
