@@ -89,10 +89,10 @@ class Settings(BaseSettings):
 
 ## 🟡 High Priority (Fix Soon After Merge)
 
-### [ ] Add integration tests for notification flow
-**Priority:** High  
-**Effort:** 2-3 hours  
-**Files:** `backend/tests/integrations/` (new directory)
+### [x] Add integration tests for notification flow
+**Priority:** High
+**Effort:** 2-3 hours
+**Files:** `backend/tests/api/routes/notifications/test_trigger.py`, `backend/tests/domains/notifications/test_notification_flow_integration.py`
 
 **Task:**
 Create integration tests that verify the complete notification flow works end-to-end.
@@ -180,8 +180,8 @@ async def test_full_notification_flow(db: Session):
 ```
 
 **Acceptance Criteria:**
-- [ ] Full flow test passes with real database
-- [ ] Scheduler lifecycle tests pass
+- [x] Full flow test passes with real database
+- [x] Scheduler lifecycle tests pass
 - [ ] Migration test passes
 - [ ] All integration tests run in CI/CD
 
