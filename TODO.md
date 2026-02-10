@@ -183,7 +183,7 @@ async def test_full_notification_flow(db: Session):
 - [x] Full flow test passes with real database
 - [x] Scheduler lifecycle tests pass
 - [ ] Migration test passes
-- [ ] All integration tests run in CI/CD
+- [x] All integration tests run in CI/CD (covered by existing `backend-tests.yml` workflow)
 
 ---
 
