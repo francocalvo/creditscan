@@ -100,8 +100,7 @@ class NotificationScheduler:
 
     async def _execute(self) -> None:
         """Perform one notification run."""
-        session = self.session_factory()
-        try:
+        with self.session_factory() as session:
             ntfy_client = self.ntfy_client_factory()
             usecase = provide(
                 session=session,
@@ -115,5 +114,3 @@ class NotificationScheduler:
                 len(results),
                 notified,
             )
-        finally:
-            session.close()

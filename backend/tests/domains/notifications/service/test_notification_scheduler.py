@@ -38,6 +38,8 @@ class TestNotificationScheduler:
     @pytest.mark.asyncio
     async def test_execute_calls_use_case(self) -> None:
         mock_session = MagicMock()
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=False)
         mock_session_factory = MagicMock(return_value=mock_session)
         mock_ntfy_client = MagicMock()
         mock_ntfy_factory = MagicMock(return_value=mock_ntfy_client)
@@ -64,4 +66,6 @@ class TestNotificationScheduler:
             ntfy_public_url="",
         )
         mock_usecase.execute_all.assert_called_once()
-        mock_session.close.assert_called_once()
+        # Verify context manager was used (__enter__ and __exit__ called)
+        mock_session.__enter__.assert_called_once()
+        mock_session.__exit__.assert_called_once()
