@@ -1300,6 +1300,19 @@ const handleDelete = () => {
 
     <template #footer>
       <div v-if="statement" class="modal-footer">
+        <!-- Delete button (edit mode only, left side) -->
+        <div v-if="isEditMode" class="footer-left">
+          <Button
+            label="Delete"
+            icon="pi pi-trash"
+            :loading="isDeleting"
+            :disabled="isDeleting || isSaving"
+            @click="handleDelete"
+            severity="danger"
+            outlined
+          />
+        </div>
+
         <div v-if="totalPages > 1" class="pagination">
           <span class="pagination-info">{{ paginationInfo }}</span>
           <div class="pagination-nav">
@@ -1335,17 +1348,8 @@ const handleDelete = () => {
         </div>
 
         <div class="footer-actions">
-          <!-- View mode buttons -->
+          <!-- View mode buttons: Pay, Edit, Close -->
           <template v-if="!isEditMode">
-            <Button
-              label="Delete"
-              icon="pi pi-trash"
-              :loading="isDeleting"
-              :disabled="isDeleting"
-              @click="handleDelete"
-              severity="danger"
-              outlined
-            />
             <Button
               label="Pay"
               icon="pi pi-credit-card"
@@ -1864,9 +1868,14 @@ const handleDelete = () => {
 .modal-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.footer-left {
+  margin-right: auto;
+  flex-shrink: 0;
 }
 
 .footer-actions {
@@ -1897,6 +1906,11 @@ const handleDelete = () => {
   .modal-footer {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .footer-left {
+    margin-right: 0;
+    order: 3;
   }
 
   .pagination {
