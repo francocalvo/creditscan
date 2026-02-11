@@ -5,9 +5,10 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import InputSwitch from 'primevue/inputswitch'
 import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
 
 const toast = useToast()
-const { isEnabled, ntfyTopicUrl, isLoading, fetchSettings, toggleNotifications, testNotification } =
+const { isEnabled, ntfyTopicUrl, isLoading, error, fetchSettings, toggleNotifications, testNotification } =
   useNotifications()
 
 const isTesting = ref(false)
@@ -70,6 +71,10 @@ const handleTest = async () => {
 <template>
   <div class="notifications-tab">
     <div class="notifications-card">
+      <Message v-if="error" severity="error" :closable="true" @close="error = null">
+        {{ error.message }}
+      </Message>
+
       <h3 class="card-title">Push Notifications</h3>
 
       <div class="form-group toggle-group">
