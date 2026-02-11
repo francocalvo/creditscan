@@ -43,7 +43,7 @@ class CreditCardBase(SQLModel):
 class CreditCardCreate(CreditCardBase):
     """Model for creating credit card."""
 
-    pass
+    credit_limit: Decimal | None = Field(default=None, gt=0)
 
 
 # Database table model

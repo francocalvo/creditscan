@@ -26,6 +26,17 @@ class CreditCardService:
     def create_card(self, card_data: CreditCardCreate) -> CreditCardPublic:
         """Create a new credit card."""
         card = self.repository.create(card_data)
+        if card_data.credit_limit is not None:
+            from datetime import UTC, datetime
+
+            from app.domains.credit_cards.domain.models import LimitSource
+
+            card = self.repository.update(
+                card.id,
+                CreditCardUpdate(),
+                limit_source=LimitSource.MANUAL,
+                limit_last_updated_at=datetime.now(UTC),
+            )
         return CreditCardPublic.model_validate(card)
 
     def get_card(self, card_id: uuid.UUID) -> CreditCardPublic:

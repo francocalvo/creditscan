@@ -30,6 +30,7 @@ export interface CreditCardCreate {
   brand: CardBrand
   last4: string
   alias?: string
+  credit_limit?: number
 }
 
 export interface CreditCardsResponse {

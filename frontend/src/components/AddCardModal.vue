@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -27,6 +28,7 @@ const bank = ref<string>('')
 const brand = ref<CardBrand | null>(null)
 const last4 = ref<string>('')
 const alias = ref<string>('')
+const creditLimit = ref<number | null>(null)
 
 // UX state
 const formSubmitted = ref<boolean>(false)
@@ -98,6 +100,14 @@ const last4Error = computed((): string | null => {
   return null
 })
 
+const creditLimitError = computed((): string | null => {
+  if (!formSubmitted.value) return null
+  if (creditLimit.value !== null && creditLimit.value <= 0) {
+    return 'Limit must be greater than 0'
+  }
+  return null
+})
+
 const duplicateError = computed((): string | null => {
   if (!formSubmitted.value) return null
   return duplicateCard.value ? 'A card with this bank, provider, and last 4 digits already exists' : null
@@ -111,6 +121,7 @@ const isFormValid = computed((): boolean => {
     !bankError.value &&
     !brandError.value &&
     !last4Error.value &&
+    !creditLimitError.value &&
     !duplicateError.value
   )
 })
@@ -126,6 +137,7 @@ function setVisible(value: boolean): void {
     brand.value = null
     last4.value = ''
     alias.value = ''
+    creditLimit.value = null
     formSubmitted.value = false
     serverError.value = null
     isSubmitting.value = false
@@ -163,6 +175,7 @@ async function handleSave(): Promise<void> {
       brand: brand.value,
       last4: last4.value,
       alias: alias.value.trim() || undefined,
+      credit_limit: creditLimit.value ?? undefined,
     })
 
     // Emit success and close modal (reset happens in setVisible)
@@ -259,6 +272,24 @@ function handleCancel(): void {
           class="w-full"
         />
         <small class="field-hint">A friendly name for this card</small>
+      </div>
+
+      <!-- Credit Limit Field (Optional) -->
+      <div class="form-field">
+        <label for="credit-limit-input" class="field-label">Credit Limit (Optional)</label>
+        <InputNumber
+          id="credit-limit-input"
+          v-model="creditLimit"
+          mode="currency"
+          currency="ARS"
+          locale="es-AR"
+          :min="0"
+          :disabled="isSubmitting"
+          :class="{ 'p-invalid': !!creditLimitError }"
+          placeholder="e.g., 500000"
+          class="w-full"
+        />
+        <small v-if="creditLimitError" class="p-error">{{ creditLimitError }}</small>
       </div>
 
       <!-- Duplicate Error Message -->
