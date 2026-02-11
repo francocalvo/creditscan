@@ -1,8 +1,9 @@
 """User domain models."""
 
+import re
 import uuid
 
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 from sqlmodel import Field, SQLModel  # type: ignore
 
 
@@ -15,6 +16,15 @@ class UserBase(SQLModel):
     preferred_currency: str | None = Field(default=None, max_length=3)
     notifications_enabled: bool = Field(default=False)
     ntfy_topic: str | None = Field(default=None, max_length=100)
+
+    @field_validator("ntfy_topic")
+    @classmethod
+    def validate_ntfy_topic(cls, v: str | None) -> str | None:
+        if v and not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+            raise ValueError(
+                "ntfy_topic must contain only letters, numbers, dashes, and underscores"
+            )
+        return v
 
 
 # Properties to receive via API on creation
@@ -40,6 +50,15 @@ class UserUpdateMe(SQLModel):
     preferred_currency: str | None = Field(default=None, max_length=3)
     notifications_enabled: bool | None = Field(default=None)
     ntfy_topic: str | None = Field(default=None, max_length=100)
+
+    @field_validator("ntfy_topic")
+    @classmethod
+    def validate_ntfy_topic(cls, v: str | None) -> str | None:
+        if v and not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+            raise ValueError(
+                "ntfy_topic must contain only letters, numbers, dashes, and underscores"
+            )
+        return v
 
 
 class UpdatePassword(SQLModel):
