@@ -361,6 +361,20 @@ def test_register_user(client: TestClient, db: Session) -> None:
     assert verify_password(password, user_db.hashed_password)
 
 
+def test_register_user_signup_disabled(client: TestClient) -> None:
+    with patch("app.api.routes.users.signup.settings") as mock_settings:
+        mock_settings.USERS_OPEN_REGISTRATION = False
+        username = random_email()
+        password = random_lower_string()
+        data = {"email": username, "password": password, "full_name": "Test"}
+        r = client.post(
+            f"{settings.API_V1_STR}/users/signup",
+            json=data,
+        )
+        assert r.status_code == 403
+        assert r.json()["detail"] == "Signups are currently disabled."
+
+
 def test_register_user_already_exists_error(client: TestClient) -> None:
     password = random_lower_string()
     full_name = random_lower_string()

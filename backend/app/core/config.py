@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     EMAIL_TEST_USER: EmailStr = "test@example.com"
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
+    USERS_OPEN_REGISTRATION: bool = False
 
     # S3/Garage storage configuration
     S3_ENDPOINT_URL: str = "http://localhost:3900"

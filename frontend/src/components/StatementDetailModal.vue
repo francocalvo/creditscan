@@ -845,26 +845,13 @@ const handleCancel = () => {
       <section class="summary-section">
         <h3 class="section-title">Statement Summary</h3>
         <div class="summary-grid">
-          <div class="summary-item">
-            <p class="summary-label">Previous Balance</p>
-            <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.previous_balance) }}</p>
-            <InputNumber
-              v-else
-              v-model="editedStatement!.previous_balance"
-              :min="0"
-              mode="currency"
-              currency="USD"
-              locale="en-US"
-              :maxFractionDigits="2"
-              :disabled="isSaving"
-              class="summary-input"
-              :class="{ 'p-invalid': validationErrors.previous_balance }"
-            />
-            <small v-if="isEditMode && validationErrors.previous_balance" class="p-error">{{ validationErrors.previous_balance }}</small>
-          </div>
-
           <div class="summary-item summary-item--highlight">
             <p class="summary-label">Current Balance</p>
+            <p class="summary-value">{{ formatCurrency(statement.remainingBalance) }}</p>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Total Balance</p>
             <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.current_balance) }}</p>
             <InputNumber
               v-else
@@ -897,6 +884,24 @@ const handleCancel = () => {
               :class="{ 'p-invalid': validationErrors.minimum_payment }"
             />
             <small v-if="isEditMode && validationErrors.minimum_payment" class="p-error">{{ validationErrors.minimum_payment }}</small>
+          </div>
+
+          <div class="summary-item">
+            <p class="summary-label">Previous Balance</p>
+            <p v-if="!isEditMode" class="summary-value">{{ formatCurrency(statement.previous_balance) }}</p>
+            <InputNumber
+              v-else
+              v-model="editedStatement!.previous_balance"
+              :min="0"
+              mode="currency"
+              currency="USD"
+              locale="en-US"
+              :maxFractionDigits="2"
+              :disabled="isSaving"
+              class="summary-input"
+              :class="{ 'p-invalid': validationErrors.previous_balance }"
+            />
+            <small v-if="isEditMode && validationErrors.previous_balance" class="p-error">{{ validationErrors.previous_balance }}</small>
           </div>
 
           <div class="summary-item">

@@ -100,6 +100,21 @@ class PaymentRepository:
         total = result.one()
         return total if total is not None else Decimal("0")
 
+    def get_sums_by_statement_ids(
+        self, statement_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Decimal]:
+        """Get the sum of payments for multiple statements in a single query."""
+        if not statement_ids:
+            return {}
+
+        query = (
+            select(Payment.statement_id, func.sum(Payment.amount))
+            .where(Payment.statement_id.in_(statement_ids))  # type: ignore[union-attr]
+            .group_by(Payment.statement_id)
+        )
+        result = self.db_session.exec(query)
+        return {row[0]: row[1] for row in result}
+
 
 def provide(session: Session) -> PaymentRepository:
     """Provide an instance of PaymentRepository.

@@ -1,6 +1,7 @@
 """Card statement service implementation."""
 
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from sqlmodel import Session
@@ -15,14 +16,20 @@ from app.domains.card_statements.repository import provide as provide_repository
 from app.domains.card_statements.repository.card_statement_repository import (
     CardStatementRepository,
 )
+from app.domains.payments.repository.payment_repository import PaymentRepository
 
 
 class CardStatementService:
     """Service for card statements."""
 
-    def __init__(self, repository: CardStatementRepository):
+    def __init__(
+        self,
+        repository: CardStatementRepository,
+        payment_repository: PaymentRepository,
+    ):
         """Initialize the service with a repository."""
         self.repository = repository
+        self.payment_repository = payment_repository
 
     def create_statement(
         self, statement_data: CardStatementCreate
@@ -34,7 +41,9 @@ class CardStatementService:
     def get_statement(self, statement_id: uuid.UUID) -> CardStatementPublic:
         """Get a card statement by ID."""
         statement = self.repository.get_by_id(statement_id)
-        return CardStatementPublic.model_validate(statement)
+        pub = CardStatementPublic.model_validate(statement)
+        pub.total_paid = self.payment_repository.get_sum_by_statement_id(statement_id)
+        return pub
 
     def list_statements(
         self, skip: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
@@ -43,8 +52,15 @@ class CardStatementService:
         statements = self.repository.list(skip=skip, limit=limit, filters=filters)
         count = self.repository.count(filters=filters)
 
+        pub_list = [CardStatementPublic.model_validate(s) for s in statements]
+
+        statement_ids = [s.id for s in pub_list]
+        sums = self.payment_repository.get_sums_by_statement_ids(statement_ids)
+        for pub in pub_list:
+            pub.total_paid = sums.get(pub.id, Decimal("0"))
+
         return CardStatementsPublic(
-            data=[CardStatementPublic.model_validate(s) for s in statements],
+            data=pub_list,
             count=count,
         )
 
@@ -53,7 +69,9 @@ class CardStatementService:
     ) -> CardStatementPublic:
         """Update a card statement."""
         statement = self.repository.update(statement_id, statement_data)
-        return CardStatementPublic.model_validate(statement)
+        pub = CardStatementPublic.model_validate(statement)
+        pub.total_paid = self.payment_repository.get_sum_by_statement_id(statement_id)
+        return pub
 
     def delete_statement(self, statement_id: uuid.UUID) -> None:
         """Delete a card statement."""
@@ -66,4 +84,7 @@ def provide(session: Session) -> CardStatementService:
     Args:
         session: The database session to use.
     """
-    return CardStatementService(provide_repository(session))
+    return CardStatementService(
+        provide_repository(session),
+        PaymentRepository(session),
+    )

@@ -130,7 +130,7 @@ const formatCurrency = (amount: number | null): string => {
       </div>
 
       <div class="balance-info">
-        <p class="info-label">Current Balance:</p>
+        <p class="info-label">Remaining Balance:</p>
         <p class="info-value balance-amount">{{ formatCurrency(currentBalance) }}</p>
       </div>
 

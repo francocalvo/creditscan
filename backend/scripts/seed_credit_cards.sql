@@ -18,16 +18,16 @@
 -- Delete transaction tags for this user's tags
 DELETE FROM transaction_tags
 WHERE tag_id IN (
-    SELECT tag_id FROM tags 
+    SELECT tag_id FROM tags
     WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email')
 );
 
 -- Delete tags for this user
-DELETE FROM tags 
+DELETE FROM tags
 WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email');
 
 -- Delete payments for this user
-DELETE FROM payment 
+DELETE FROM payment
 WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email');
 
 -- Delete transactions for this user's statements
@@ -38,15 +38,27 @@ WHERE statement_id IN (
     WHERE cc.user_id = (SELECT id FROM "user" WHERE email = :'user_email')
 );
 
+-- Delete upload jobs referencing this user's statements or cards
+DELETE FROM upload_job
+WHERE statement_id IN (
+    SELECT cs.id FROM card_statement cs
+    JOIN credit_card cc ON cs.card_id = cc.id
+    WHERE cc.user_id = (SELECT id FROM "user" WHERE email = :'user_email')
+)
+OR card_id IN (
+    SELECT id FROM credit_card
+    WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email')
+);
+
 -- Delete statements for this user's cards
 DELETE FROM card_statement
 WHERE card_id IN (
-    SELECT id FROM credit_card 
+    SELECT id FROM credit_card
     WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email')
 );
 
 -- Delete credit cards for this user
-DELETE FROM credit_card 
+DELETE FROM credit_card
 WHERE user_id = (SELECT id FROM "user" WHERE email = :'user_email');
 
 -- =============================================================================
