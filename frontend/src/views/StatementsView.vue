@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useStatements } from '@/composables/useStatements'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
@@ -369,6 +370,8 @@ onMounted(() => {
 })
 
 const toast = useToast()
+const route = useRoute()
+const router = useRouter()
 
 const activeTab = ref('statements')
 const searchQuery = ref('')
@@ -582,6 +585,25 @@ onMounted(() => {
   fetchBalance()
   fetchTags()
 })
+
+// Handle query parameter to open statement detail modal after upload
+watch(
+  [() => route.query.statementId, statementsWithCard],
+  ([statementId, statements]) => {
+    if (!statementId || route.query.showDetail !== 'true') return
+    if (statements.length === 0) return
+
+    const statement = statements.find((s) => s.id === statementId)
+    if (statement) {
+      selectedStatement.value = statement
+      detailStartInEditMode.value = false
+      showDetailModal.value = true
+      // Clear query params to prevent reopening on navigation
+      router.replace({ path: '/', query: {} })
+    }
+  },
+  { immediate: true },
+)
 
 // Lazy-load transactions only when the tab is opened
 watch(

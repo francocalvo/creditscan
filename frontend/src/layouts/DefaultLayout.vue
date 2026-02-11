@@ -73,15 +73,15 @@ const handleUploadStatement = (event?: MouseEvent) => {
   showUploadModal.value = true
 }
 
-// Handle successful upload - navigate to statement detail
+// Handle successful upload - navigate to home and open statement detail modal
 const handleUploadComplete = (statementId: string) => {
   showUploadModal.value = false
-  router.push(`/statements/${statementId}`)
+  router.push({ path: '/', query: { statementId, showDetail: 'true' } })
 }
 
 // Navigate to statement from toast
 const navigateToStatement = (statementId: string) => {
-  router.push(`/statements/${statementId}`)
+  router.push({ path: '/', query: { statementId, showDetail: 'true' } })
 }
 
 </script>
