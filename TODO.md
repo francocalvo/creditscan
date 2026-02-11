@@ -187,7 +187,7 @@ async def test_full_notification_flow(db: Session):
 
 ---
 
-### [ ] Create documentation for ntfy setup
+### [x] Create documentation for ntfy setup
 **Priority:** High  
 **Effort:** 1 hour  
 **Files:** `docs/notifications.md` (new file)
@@ -286,15 +286,15 @@ Your unique topic is generated when you enable notifications. If you need a new 
 ```
 
 **Acceptance Criteria:**
-- [ ] Documentation is clear and beginner-friendly
-- [ ] Includes platform-specific instructions (iOS, Android)
-- [ ] Has troubleshooting section
+- [x] Documentation is clear and beginner-friendly
+- [x] Includes platform-specific instructions (iOS, Android)
+- [x] Has troubleshooting section
 - [ ] Link is added to the Settings UI
 - [ ] Screenshots or diagrams included (optional but recommended)
 
 ---
 
-### [ ] Add ntfy topic validation
+### [x] Add ntfy topic validation
 **Priority:** High  
 **Effort:** 20 minutes  
 **Files:** `backend/app/domains/users/domain/models.py`
@@ -363,14 +363,14 @@ def test_ntfy_topic_invalid_special_chars():
 ```
 
 **Acceptance Criteria:**
-- [ ] Validator rejects invalid topics (spaces, special chars)
-- [ ] Validator accepts valid topics
-- [ ] Error message is clear
-- [ ] Tests cover valid and invalid cases
+- [x] Validator rejects invalid topics (spaces, special chars)
+- [x] Validator accepts valid topics
+- [x] Error message is clear
+- [x] Tests cover valid and invalid cases
 
 ---
 
-### [ ] Decide on `ntfy_public_url` parameter
+### [x] Decide on `ntfy_public_url` parameter
 **Priority:** High  
 **Effort:** 15 minutes (decision) + 30 minutes (implementation if used)
 
@@ -399,14 +399,14 @@ Files to update:
 4. `backend/app/domains/notifications/service/notification_scheduler.py`
 
 **Acceptance Criteria:**
-- [ ] Decision documented in code or issue
-- [ ] Either parameter is used for links OR removed cleanly
-- [ ] All call sites updated
-- [ ] Tests pass
+- [x] Decision documented in code or issue
+- [x] Either parameter is used for links OR removed cleanly
+- [x] All call sites updated
+- [x] Tests pass
 
 ---
 
-### [ ] Fix hardcoded timezone in docker-compose
+### [x] Fix hardcoded timezone in docker-compose
 **Priority:** High  
 **Effort:** 5 minutes  
 **Files:** `docker-compose.yml`
@@ -439,13 +439,13 @@ NTFY_TIMEZONE=UTC
 ```
 
 **Acceptance Criteria:**
-- [ ] Timezone is set to UTC or configurable
-- [ ] Documentation explains timezone behavior
-- [ ] Users understand notifications are scheduled in UTC
+- [x] Timezone is set to UTC or configurable
+- [x] Documentation explains timezone behavior
+- [x] Users understand notifications are scheduled in UTC
 
 ---
 
-### [ ] Add error display in frontend
+### [x] Add error display in frontend
 **Priority:** High  
 **Effort:** 30 minutes  
 **Files:** `frontend/src/components/settings/NotificationsTab.vue`, `frontend/src/composables/useNotifications.ts`
@@ -511,8 +511,8 @@ const { isEnabled, ntfyTopicUrl, isLoading, error, fetchSettings, toggleNotifica
 ```
 
 **Acceptance Criteria:**
-- [ ] Errors from API calls are displayed to users
-- [ ] Error messages are dismissible
+- [x] Errors from API calls are displayed to users
+- [x] Error messages are dismissible
 - [ ] No console errors on fetch/update/test failures
 
 ---
