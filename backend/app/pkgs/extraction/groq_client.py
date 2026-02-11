@@ -1,6 +1,7 @@
 """Groq API client for LLM completions with multimodal support."""
 
 import base64
+import io
 import logging
 from typing import Any
 
@@ -102,41 +103,55 @@ class GroqClient:
         each page to a PNG and send it as an image_url item.
         """
         try:
-            import fitz  # PyMuPDF
+            from pdf2image import convert_from_bytes, pdfinfo_from_bytes
         except ImportError as exc:  # pragma: no cover - dependency guard
             raise RuntimeError(
-                "PyMuPDF is required for Groq OCR PDF conversion. "
-                "Install dependency 'pymupdf'."
+                "pdf2image is required for Groq OCR PDF conversion. "
+                "Install dependency 'pdf2image'."
             ) from exc
 
-        document = fitz.open(stream=pdf_bytes, filetype="pdf")
         try:
-            if document.page_count == 0:
-                raise ValueError("PDF has no pages")
+            pdf_info = pdfinfo_from_bytes(pdf_bytes)
+            total_pages = int(pdf_info.get("Pages", 0))
+        except Exception:
+            total_pages = 0
 
-            page_count = min(document.page_count, max_pages)
-            if document.page_count > max_pages:
-                logger.warning(
-                    "Groq OCR PDF has %s pages; truncating to first %s pages",
-                    document.page_count,
-                    max_pages,
-                )
+        if total_pages == 0:
+            raise ValueError("PDF has no pages")
 
-            zoom = dpi / 72.0
-            matrix = fitz.Matrix(zoom, zoom)
-            images: list[str] = []
-            for page_index in range(page_count):
-                page = document.load_page(page_index)
-                pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-                image_bytes = pixmap.tobytes("png")
-                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        page_count = min(total_pages, max_pages)
+        if total_pages > max_pages:
+            logger.warning(
+                "Groq OCR PDF has %s pages; truncating to first %s pages",
+                total_pages,
+                max_pages,
+            )
+
+        try:
+            page_images = convert_from_bytes(
+                pdf_bytes,
+                dpi=dpi,
+                fmt="png",
+                first_page=1,
+                last_page=page_count,
+                thread_count=1,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to convert PDF pages to PNG for Groq OCR. "
+                "Ensure poppler is installed (e.g., poppler-utils)."
+            ) from exc
+
+        images: list[str] = []
+        for image in page_images:
+            with io.BytesIO() as output:
+                image.save(output, format="PNG")
+                image_base64 = base64.b64encode(output.getvalue()).decode("utf-8")
                 images.append(f"data:image/png;base64,{image_base64}")
 
-            if not images:
-                raise ValueError("PDF conversion produced no images")
-            return images
-        finally:
-            document.close()
+        if not images:
+            raise ValueError("PDF conversion produced no images")
+        return images
 
     async def complete_with_text(
         self,
