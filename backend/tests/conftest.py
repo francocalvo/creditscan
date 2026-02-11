@@ -17,6 +17,8 @@ from app.pkgs.database import get_db, set_engine
 from .utils.user import authentication_token_from_email
 from .utils.utils import get_superuser_token_headers
 
+settings.USERS_OPEN_REGISTRATION = True
+
 
 # Enable SQLite foreign key support for referential integrity
 @event.listens_for(Engine, "connect")
