@@ -595,6 +595,8 @@ watch(
 
     const statement = statements.find((s) => s.id === statementId)
     if (statement) {
+      // Switch to statements tab if not already there
+      activeTab.value = 'statements'
       selectedStatement.value = statement
       detailStartInEditMode.value = false
       showDetailModal.value = true
