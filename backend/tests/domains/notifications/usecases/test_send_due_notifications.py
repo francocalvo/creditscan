@@ -88,7 +88,6 @@ def usecase(db: Session, mock_ntfy: NtfyClient) -> SendDueNotificationsUseCase:
     return SendDueNotificationsUseCase(
         session=db,
         ntfy_client=mock_ntfy,
-        ntfy_public_url="https://ntfy.example.com",
     )
 
 

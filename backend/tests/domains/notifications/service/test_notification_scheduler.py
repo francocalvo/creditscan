@@ -63,7 +63,6 @@ class TestNotificationScheduler:
         mock_provide.assert_called_once_with(
             session=mock_session,
             ntfy_client=mock_ntfy_client,
-            ntfy_public_url="",
         )
         mock_usecase.execute_all.assert_called_once()
         # Verify context manager was used (__enter__ and __exit__ called)

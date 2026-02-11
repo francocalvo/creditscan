@@ -130,7 +130,6 @@ class Settings(BaseSettings):
 
     # Ntfy notification configuration
     NTFY_INTERNAL_URL: str = "http://ntfy:80"
-    NTFY_PUBLIC_URL: str = "https://ntfy.localhost"
     NOTIFICATION_HOUR: int = 22  # UTC hour
     NOTIFICATION_MINUTE: int = 0  # UTC minute
 

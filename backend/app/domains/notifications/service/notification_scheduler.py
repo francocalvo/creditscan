@@ -105,7 +105,6 @@ class NotificationScheduler:
             usecase = provide(
                 session=session,
                 ntfy_client=ntfy_client,
-                ntfy_public_url="",
             )
             results = await usecase.execute_all()
             notified = sum(1 for r in results if r.notification_sent)

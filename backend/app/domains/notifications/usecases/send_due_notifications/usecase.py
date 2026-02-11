@@ -25,11 +25,9 @@ class SendDueNotificationsUseCase:
         self,
         session: Session,
         ntfy_client: NtfyClient,
-        ntfy_public_url: str,
     ) -> None:
         self.session = session
         self.ntfy_client = ntfy_client
-        self.ntfy_public_url = ntfy_public_url
 
     def _card_name(self, card: CreditCard) -> str:
         if card.alias:
@@ -120,10 +118,8 @@ class SendDueNotificationsUseCase:
 def provide(
     session: Session,
     ntfy_client: NtfyClient,
-    ntfy_public_url: str,
 ) -> SendDueNotificationsUseCase:
     return SendDueNotificationsUseCase(
         session=session,
         ntfy_client=ntfy_client,
-        ntfy_public_url=ntfy_public_url,
     )

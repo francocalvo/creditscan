@@ -24,7 +24,6 @@ async def trigger_notification(
     usecase = provide(
         session=session,
         ntfy_client=ntfy_client,
-        ntfy_public_url=settings.NTFY_PUBLIC_URL,
     )
     result = await usecase.execute_for_user(current_user.id)
     return TriggerResponse(
