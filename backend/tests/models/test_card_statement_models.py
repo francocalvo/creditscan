@@ -7,6 +7,7 @@ from app.domains.card_statements.domain.models import (
     CardStatementBase,
     CardStatementCreate,
     CardStatementUpdate,
+    StatementReviewTrigger,
     StatementStatus,
 )
 
@@ -59,6 +60,31 @@ class TestCardStatementStatus:
         assert statement.status == StatementStatus.PENDING_REVIEW
 
 
+class TestCardStatementReviewDiagnostics:
+    """Tests for review_trigger and review_details fields."""
+
+    def test_review_fields_default_to_none(self):
+        """CardStatement should default review metadata fields to None."""
+        statement = CardStatementBase(card_id=uuid.uuid4())
+        assert statement.review_trigger is None
+        assert statement.review_details is None
+
+    def test_review_fields_can_be_set(self):
+        """CardStatement should accept structured review diagnostics."""
+        statement = CardStatementBase(
+            card_id=uuid.uuid4(),
+            review_trigger=StatementReviewTrigger.BALANCE_MISMATCH,
+            review_details={
+                "current_balance": "100.00",
+                "transactions_total": "98.00",
+                "difference": "2.00",
+            },
+        )
+        assert statement.review_trigger == StatementReviewTrigger.BALANCE_MISMATCH
+        assert statement.review_details is not None
+        assert statement.review_details["difference"] == "2.00"
+
+
 class TestCardStatementSourceFilePath:
     """Tests for the source_file_path field on CardStatement."""
 
@@ -84,6 +110,8 @@ class TestCardStatementCreate:
         statement = CardStatementCreate(card_id=uuid.uuid4())
         assert statement.currency == "ARS"
         assert statement.status == StatementStatus.COMPLETE
+        assert statement.review_trigger is None
+        assert statement.review_details is None
         assert statement.source_file_path is None
 
 
@@ -123,4 +151,6 @@ class TestCardStatementTableModel:
         statement = CardStatement(card_id=uuid.uuid4())
         assert statement.currency == "ARS"
         assert statement.status == StatementStatus.COMPLETE
+        assert statement.review_trigger is None
+        assert statement.review_details is None
         assert statement.source_file_path is None

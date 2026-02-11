@@ -15,6 +15,7 @@ from sqlmodel import Session
 from app.domains.card_statements.domain.models import (
     CardStatement,
     CardStatementPublic,
+    StatementReviewTrigger,
     StatementStatus,
 )
 from app.domains.credit_cards.domain.models import (
@@ -32,6 +33,7 @@ from app.pkgs.currency import provide as provide_currency
 from app.pkgs.extraction.models import ExtractedStatement, Money
 
 logger = logging.getLogger(__name__)
+BALANCE_MISMATCH_TOLERANCE = Decimal("0.01")
 
 
 class AtomicImportService:
@@ -64,7 +66,7 @@ class AtomicImportService:
     def _has_balance_mismatch(
         current_balance: Decimal | None,
         transactions_total: Decimal,
-        tolerance: Decimal = Decimal("0.01"),
+        tolerance: Decimal = BALANCE_MISMATCH_TOLERANCE,
     ) -> bool:
         """Return True when current balance differs from transactions total."""
         if current_balance is None:
@@ -114,8 +116,18 @@ class AtomicImportService:
                 else Decimal("0")
             )
             statement_status = StatementStatus.COMPLETE
+            review_trigger: StatementReviewTrigger | None = None
+            review_details: dict[str, object] | None = None
             if self._has_balance_mismatch(current_balance, transactions_total):
                 statement_status = StatementStatus.PENDING_REVIEW
+                review_trigger = StatementReviewTrigger.BALANCE_MISMATCH
+                balance_difference = current_balance - transactions_total
+                review_details = {
+                    "current_balance": str(current_balance),
+                    "transactions_total": str(transactions_total),
+                    "difference": str(balance_difference),
+                    "tolerance": str(BALANCE_MISMATCH_TOLERANCE),
+                }
                 logger.warning(
                     "Statement balance mismatch detected: "
                     "card_id=%s current_balance=%s transactions_total=%s currency=%s",
@@ -144,6 +156,8 @@ class AtomicImportService:
                 minimum_payment=minimum_payment,
                 currency=target_currency,
                 status=statement_status,
+                review_trigger=review_trigger,
+                review_details=review_details,
                 source_file_path=source_file_path,
             )
             self.session.add(statement)
@@ -193,6 +207,7 @@ class AtomicImportService:
         card_id: uuid.UUID,
         target_currency: str,
         source_file_path: str,
+        extraction_error: str | None = None,
     ) -> tuple[CardStatementPublic, list[TransactionPublic]]:
         """Atomically import partial statement data.
 
@@ -233,6 +248,10 @@ class AtomicImportService:
                     partial_data.get("minimum_payment"), target_currency
                 )
 
+            raw_transactions = partial_data.get("transactions", [])
+            imported_transactions = 0
+            skipped_transactions = 0
+
             # Create statement with PENDING_REVIEW status
             statement = CardStatement(
                 card_id=card_id,
@@ -245,6 +264,8 @@ class AtomicImportService:
                 minimum_payment=minimum_payment_amount,
                 currency=target_currency,
                 status=StatementStatus.PENDING_REVIEW,
+                review_trigger=StatementReviewTrigger.PARTIAL_EXTRACTION,
+                review_details=None,
                 source_file_path=source_file_path,
             )
             self.session.add(statement)
@@ -252,7 +273,6 @@ class AtomicImportService:
 
             # Create transactions from partial data
             transactions: list[Transaction] = []
-            raw_transactions = partial_data.get("transactions", [])
             if isinstance(raw_transactions, list):
                 for i, raw_txn in enumerate(raw_transactions):
                     try:
@@ -282,12 +302,29 @@ class AtomicImportService:
                                 )
                                 self.session.add(transaction)
                                 transactions.append(transaction)
+                                imported_transactions += 1
                             else:
+                                skipped_transactions += 1
                                 logger.warning(
                                     f"Skipping transaction {i}: missing required fields"
                                 )
+                        else:
+                            skipped_transactions += 1
                     except Exception as e:
+                        skipped_transactions += 1
                         logger.warning(f"Skipping transaction {i}: {e}")
+
+            statement.review_details = self._build_partial_review_details(
+                partial_data=partial_data,
+                period_start=period_start,
+                period_end=period_end,
+                due_date=due_date,
+                current_balance=current_balance_amount,
+                raw_transactions=raw_transactions,
+                imported_transactions=imported_transactions,
+                skipped_transactions=skipped_transactions,
+                extraction_error=extraction_error,
+            )
 
             self.session.flush()
 
@@ -300,6 +337,49 @@ class AtomicImportService:
                 CardStatementPublic.model_validate(statement),
                 [TransactionPublic.model_validate(t) for t in transactions],
             )
+
+    @staticmethod
+    def _build_partial_review_details(
+        partial_data: dict[str, object],
+        period_start: date | None,
+        period_end: date | None,
+        due_date: date | None,
+        current_balance: Decimal | None,
+        raw_transactions: object,
+        imported_transactions: int,
+        skipped_transactions: int,
+        extraction_error: str | None,
+    ) -> dict[str, object]:
+        """Build partial extraction diagnostics for statement review."""
+        missing_fields: list[str] = []
+
+        if period_start is None:
+            missing_fields.append("period.start")
+        if period_end is None:
+            missing_fields.append("period.end")
+        if due_date is None:
+            missing_fields.append("period.due_date")
+
+        if "current_balance" not in partial_data or current_balance is None:
+            missing_fields.append("current_balance")
+
+        if not isinstance(raw_transactions, list):
+            missing_fields.append("transactions")
+            transaction_count = 0
+        else:
+            transaction_count = len(raw_transactions)
+            if transaction_count == 0:
+                missing_fields.append("transactions")
+
+        details: dict[str, object] = {
+            "missing_fields": missing_fields,
+            "transaction_count": transaction_count,
+            "imported_transactions": imported_transactions,
+            "skipped_transactions": skipped_transactions,
+        }
+        if extraction_error:
+            details["extraction_error"] = extraction_error
+        return details
 
     def _extract_date(self, value: object) -> date | None:
         """Safely extract date from various formats."""

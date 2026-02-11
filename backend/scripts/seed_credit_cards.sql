@@ -304,8 +304,80 @@ CROSS JOIN LATERAL (
             ELSE NULL
         END AS installment_tot
     -- Adding te.txn_num to the subquery to ensure it's re-evaluated for each row
-    FROM (SELECT random() AS r, floor(3 + random() * 10)::int AS tot, te.txn_num) AS rand_vals
+FROM (SELECT random() AS r, floor(3 + random() * 10)::int AS tot, te.txn_num) AS rand_vals
 ) inst;
+
+-- =============================================================================
+-- NORMALIZE TRANSACTION TOTALS TO STAY BELOW CARD LIMIT
+-- =============================================================================
+-- Scale transaction amounts when a statement total exceeds 90% of card limit.
+-- Then apply a final one-row correction to absorb rounding overflow.
+WITH user_data AS (
+    SELECT id AS user_id FROM "user" WHERE email = :'user_email'
+),
+statement_totals AS (
+    SELECT
+        cs.id AS statement_id,
+        round((cc.credit_limit * 0.90)::numeric, 2) AS max_statement_total,
+        COALESCE(SUM(t.amount), 0)::numeric(32,2) AS total_amount
+    FROM card_statement cs
+    JOIN credit_card cc ON cs.card_id = cc.id
+    JOIN user_data u ON cc.user_id = u.user_id
+    LEFT JOIN transaction t ON t.statement_id = cs.id
+    GROUP BY cs.id, cc.credit_limit
+),
+limits_to_scale AS (
+    SELECT
+        statement_id,
+        max_statement_total,
+        total_amount,
+        max_statement_total / NULLIF(total_amount, 0) AS scale_factor
+    FROM statement_totals
+    WHERE total_amount > max_statement_total
+)
+UPDATE "transaction" t
+SET amount = GREATEST(round((t.amount * lts.scale_factor)::numeric, 2), 0.01)::numeric(32,2)
+FROM limits_to_scale lts
+WHERE t.statement_id = lts.statement_id;
+
+WITH user_data AS (
+    SELECT id AS user_id FROM "user" WHERE email = :'user_email'
+),
+statement_totals AS (
+    SELECT
+        cs.id AS statement_id,
+        round((cc.credit_limit * 0.90)::numeric, 2) AS max_statement_total,
+        COALESCE(SUM(t.amount), 0)::numeric(32,2) AS total_amount
+    FROM card_statement cs
+    JOIN credit_card cc ON cs.card_id = cc.id
+    JOIN user_data u ON cc.user_id = u.user_id
+    LEFT JOIN transaction t ON t.statement_id = cs.id
+    GROUP BY cs.id, cc.credit_limit
+),
+statement_overflow AS (
+    SELECT
+        statement_id,
+        round((total_amount - max_statement_total)::numeric, 2) AS overflow_amount
+    FROM statement_totals
+    WHERE total_amount > max_statement_total
+),
+largest_txn AS (
+    SELECT
+        t.id AS transaction_id,
+        t.statement_id,
+        row_number() OVER (
+            PARTITION BY t.statement_id
+            ORDER BY t.amount DESC, t.id
+        ) AS txn_rank
+    FROM "transaction" t
+    JOIN statement_overflow so ON so.statement_id = t.statement_id
+)
+UPDATE "transaction" t
+SET amount = GREATEST(round((t.amount - so.overflow_amount)::numeric, 2), 0.01)::numeric(32,2)
+FROM largest_txn lt
+JOIN statement_overflow so ON so.statement_id = lt.statement_id
+WHERE t.id = lt.transaction_id
+  AND lt.txn_rank = 1;
 
 -- =============================================================================
 -- INSERT TRANSACTION TAGS

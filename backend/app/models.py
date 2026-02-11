@@ -18,6 +18,7 @@ from app.domains.card_statements.domain.models import (  # noqa
     CardStatementPublic,
     CardStatementsPublic,
     CardStatementUpdate,
+    StatementReviewTrigger,
 )
 
 # Credit card models (table=True: CreditCard)
@@ -144,6 +145,7 @@ __all__ = [
     "CardStatementPublic",
     "CardStatementsPublic",
     "CardStatementUpdate",
+    "StatementReviewTrigger",
     "CreditCard",
     "CreditCardBase",
     "CreditCardCreate",

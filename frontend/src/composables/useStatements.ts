@@ -30,6 +30,8 @@ export interface CardStatement {
   minimum_payment: number | null
   is_fully_paid: boolean
   backend_status?: string
+  review_trigger?: StatementReviewTrigger | null
+  review_details?: Record<string, unknown> | null
   total_paid: number
 }
 
@@ -40,11 +42,15 @@ export interface StatementsResponse {
 }
 
 export type StatementStatus = 'paid' | 'pending' | 'overdue'
+export type StatementReviewTrigger = 'balance_mismatch' | 'partial_extraction'
 
 export interface StatementWithCard extends CardStatement {
   status: StatementStatus
   card?: CreditCard
   needsReview: boolean
+  reviewTrigger: StatementReviewTrigger | null
+  reviewReason: string | null
+  reviewDetails: Record<string, unknown> | null
   remainingBalance: number | null
 }
 
@@ -112,6 +118,36 @@ export function useStatements() {
     return Math.max(0, statement.current_balance - (statement.total_paid ?? 0))
   }
 
+  const parseReviewTrigger = (
+    trigger: string | null | undefined,
+  ): StatementReviewTrigger | null => {
+    if (trigger === 'balance_mismatch' || trigger === 'partial_extraction') {
+      return trigger
+    }
+    return null
+  }
+
+  const parseReviewDetails = (
+    details: unknown,
+  ): Record<string, unknown> | null => {
+    if (details && typeof details === 'object' && !Array.isArray(details)) {
+      return details as Record<string, unknown>
+    }
+    return null
+  }
+
+  const getReviewReason = (
+    trigger: StatementReviewTrigger | null,
+  ): string | null => {
+    if (trigger === 'balance_mismatch') {
+      return 'Balance mismatch'
+    }
+    if (trigger === 'partial_extraction') {
+      return 'Partial extraction'
+    }
+    return null
+  }
+
   const getStatementStatus = (statement: CardStatement): StatementStatus => {
     if (statement.is_fully_paid) {
       return 'paid'
@@ -147,11 +183,16 @@ export function useStatements() {
     return statements.value
       .map((statement) => {
         const card = cards.value.find((c) => c.id === statement.card_id)
+        const reviewTrigger = parseReviewTrigger(statement.review_trigger)
+        const reviewDetails = parseReviewDetails(statement.review_details)
         return {
           ...statement,
           status: getStatementStatus(statement),
           card,
           needsReview: statement.backend_status === 'pending_review',
+          reviewTrigger,
+          reviewReason: getReviewReason(reviewTrigger),
+          reviewDetails,
           remainingBalance: getRemainingBalance(statement),
         }
       })

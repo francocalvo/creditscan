@@ -1,12 +1,15 @@
 """Groq API client for LLM completions with multimodal support."""
 
 import base64
+import io
 import logging
 from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
+MAX_GROQ_OCR_PAGES = 8
+GROQ_OCR_DPI = 150
 
 
 class GroqClient:
@@ -50,22 +53,19 @@ class GroqClient:
             httpx.TimeoutException: If request exceeds timeout
             httpx.HTTPStatusError: If API returns error status
         """
-        pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        image_data_urls = self._pdf_to_png_data_urls(pdf_bytes)
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        content.extend(
+            {"type": "image_url", "image_url": {"url": image_data_url}}
+            for image_data_url in image_data_urls
+        )
 
         payload: dict[str, Any] = {
             "model": model,
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:application/pdf;base64,{pdf_base64}"
-                            },
-                        },
-                    ],
+                    "content": content,
                 }
             ],
         }
@@ -89,6 +89,69 @@ class GroqClient:
             result: dict[str, object] = response.json()
             logger.info(f"Received response from Groq for model: {model}")
             return result
+
+    def _pdf_to_png_data_urls(
+        self,
+        pdf_bytes: bytes,
+        *,
+        max_pages: int = MAX_GROQ_OCR_PAGES,
+        dpi: int = GROQ_OCR_DPI,
+    ) -> list[str]:
+        """Render PDF pages into PNG data URLs for Groq Vision.
+
+        Groq vision accepts image inputs but not raw PDF data URLs, so we convert
+        each page to a PNG and send it as an image_url item.
+        """
+        try:
+            from pdf2image import convert_from_bytes, pdfinfo_from_bytes
+        except ImportError as exc:  # pragma: no cover - dependency guard
+            raise RuntimeError(
+                "pdf2image is required for Groq OCR PDF conversion. "
+                "Install dependency 'pdf2image'."
+            ) from exc
+
+        try:
+            pdf_info = pdfinfo_from_bytes(pdf_bytes)
+            total_pages = int(pdf_info.get("Pages", 0))
+        except Exception:
+            total_pages = 0
+
+        if total_pages == 0:
+            raise ValueError("PDF has no pages")
+
+        page_count = min(total_pages, max_pages)
+        if total_pages > max_pages:
+            logger.warning(
+                "Groq OCR PDF has %s pages; truncating to first %s pages",
+                total_pages,
+                max_pages,
+            )
+
+        try:
+            page_images = convert_from_bytes(
+                pdf_bytes,
+                dpi=dpi,
+                fmt="png",
+                first_page=1,
+                last_page=page_count,
+                thread_count=1,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to convert PDF pages to PNG for Groq OCR. "
+                "Ensure poppler is installed (e.g., poppler-utils)."
+            ) from exc
+
+        images: list[str] = []
+        for image in page_images:
+            with io.BytesIO() as output:
+                image.save(output, format="PNG")
+                image_base64 = base64.b64encode(output.getvalue()).decode("utf-8")
+                images.append(f"data:image/png;base64,{image_base64}")
+
+        if not images:
+            raise ValueError("PDF conversion produced no images")
+        return images
 
     async def complete_with_text(
         self,

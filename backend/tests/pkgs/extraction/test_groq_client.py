@@ -31,17 +31,26 @@ class TestGroqClient:
         assert client.base_url == "https://custom.api.com/v1"
 
     def test_complete_with_pdf_encodes_pdf_correctly(self):
-        """Test that complete_with_pdf() encodes PDF as base64."""
+        """Test that complete_with_pdf() forwards rendered PNG data URLs."""
         client = GroqClient(api_key="test-key")
         pdf_bytes = b"test pdf content"
-        expected_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        png_bytes = b"fake-png-content"
+        expected_base64 = base64.b64encode(png_bytes).decode("utf-8")
+        expected_data_url = f"data:image/png;base64,{expected_base64}"
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
         mock_response.raise_for_status = MagicMock()
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=[expected_data_url],
+                ) as mock_convert,
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -59,7 +68,8 @@ class TestGroqClient:
                 content = payload["messages"][0]["content"]
                 image_url = content[1]["image_url"]["url"]
 
-                assert f"data:application/pdf;base64,{expected_base64}" == image_url
+                assert expected_data_url == image_url
+                mock_convert.assert_called_once_with(pdf_bytes)
 
         asyncio.run(run_test())
 
@@ -73,7 +83,14 @@ class TestGroqClient:
         mock_response.raise_for_status = MagicMock()
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -109,7 +126,14 @@ class TestGroqClient:
         mock_response.raise_for_status = MagicMock()
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -151,7 +175,14 @@ class TestGroqClient:
         mock_response.json.return_value = expected_response
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -178,7 +209,14 @@ class TestGroqClient:
         pdf_bytes = b"test pdf"
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -212,7 +250,14 @@ class TestGroqClient:
         )
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -236,7 +281,14 @@ class TestGroqClient:
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None
@@ -268,7 +320,14 @@ class TestGroqClient:
         mock_response.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
 
         async def run_test():
-            with patch("httpx.AsyncClient") as mock_client_class:
+            with (
+                patch("httpx.AsyncClient") as mock_client_class,
+                patch.object(
+                    client,
+                    "_pdf_to_png_data_urls",
+                    return_value=["data:image/png;base64,abc"],
+                ),
+            ):
                 mock_client = AsyncMock()
                 mock_client.__aenter__.return_value = mock_client
                 mock_client.__aexit__.return_value = None

@@ -257,6 +257,32 @@ class TestAtomicImport:
             is False
         )
 
+    def test_build_partial_review_details_includes_missing_fields_and_counts(
+        self, atomic_import_service
+    ):
+        """Partial diagnostics should expose what is missing and skipped."""
+        details = atomic_import_service._build_partial_review_details(
+            partial_data={"period": {"start": "2024-01-01"}},
+            period_start=date(2024, 1, 1),
+            period_end=None,
+            due_date=None,
+            current_balance=None,
+            raw_transactions=[{"bad": "txn"}, "invalid-entry"],
+            imported_transactions=0,
+            skipped_transactions=2,
+            extraction_error="Validation failed",
+        )
+
+        assert details["missing_fields"] == [
+            "period.end",
+            "period.due_date",
+            "current_balance",
+        ]
+        assert details["transaction_count"] == 2
+        assert details["imported_transactions"] == 0
+        assert details["skipped_transactions"] == 2
+        assert details["extraction_error"] == "Validation failed"
+
     def test_transaction_context_uses_begin_when_no_active_transaction(
         self, atomic_import_service
     ):
@@ -361,6 +387,10 @@ class TestAtomicImport:
 
             assert result[0] is not None
             mock_atomic_service.import_partial_statement_atomic.assert_called_once()
+            call_kwargs = (
+                mock_atomic_service.import_partial_statement_atomic.call_args.kwargs
+            )
+            assert call_kwargs["extraction_error"] == "Validation failed"
 
 
 class TestCreditLimitUpdate:

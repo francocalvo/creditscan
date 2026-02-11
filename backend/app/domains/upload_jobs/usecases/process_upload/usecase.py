@@ -81,6 +81,7 @@ async def _import_with_atomic_service(
             card_id=card_id,
             target_currency=target_currency,
             source_file_path=file_path,
+            extraction_error=extraction_result.error,
         )
     else:
         raise ExtractionError(
