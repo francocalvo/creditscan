@@ -304,8 +304,91 @@ CROSS JOIN LATERAL (
             ELSE NULL
         END AS installment_tot
     -- Adding te.txn_num to the subquery to ensure it's re-evaluated for each row
-    FROM (SELECT random() AS r, floor(3 + random() * 10)::int AS tot, te.txn_num) AS rand_vals
+FROM (SELECT random() AS r, floor(3 + random() * 10)::int AS tot, te.txn_num) AS rand_vals
 ) inst;
+
+-- =============================================================================
+-- NORMALIZE TRANSACTION TOTALS TO STAY BELOW CARD LIMIT
+-- =============================================================================
+-- Scale down transactions when a statement total exceeds 90% of card limit.
+-- Keeps seeded data realistic while preserving per-statement transaction mix.
+WITH user_data AS (
+    SELECT id AS user_id FROM "user" WHERE email = :'user_email'
+),
+statement_totals AS (
+    SELECT
+        cs.id AS statement_id,
+        cc.credit_limit::numeric(32,2) AS credit_limit,
+        round((cc.credit_limit * 0.90)::numeric, 2) AS max_statement_total,
+        COALESCE(SUM(t.amount), 0)::numeric(32,2) AS total_amount
+    FROM card_statement cs
+    JOIN credit_card cc ON cs.card_id = cc.id
+    JOIN user_data u ON cc.user_id = u.user_id
+    LEFT JOIN transaction t ON t.statement_id = cs.id
+    GROUP BY cs.id, cc.credit_limit
+),
+limits_to_scale AS (
+    SELECT
+        statement_id,
+        credit_limit,
+        max_statement_total,
+        total_amount,
+        max_statement_total / NULLIF(total_amount, 0) AS scale_factor
+    FROM statement_totals
+    WHERE total_amount > max_statement_total
+),
+ranked_txns AS (
+    SELECT
+        t.id AS transaction_id,
+        t.statement_id,
+        t.amount,
+        lts.max_statement_total,
+        lts.scale_factor,
+        row_number() OVER (
+            PARTITION BY t.statement_id
+            ORDER BY t.amount DESC, t.id
+        ) AS txn_rank
+    FROM transaction t
+    JOIN limits_to_scale lts ON lts.statement_id = t.statement_id
+),
+scaled_txns AS (
+    SELECT
+        rt.transaction_id,
+        rt.statement_id,
+        rt.txn_rank,
+        CASE
+            WHEN rt.txn_rank = 1 THEN NULL
+            ELSE round((rt.amount * rt.scale_factor)::numeric, 2)
+        END AS scaled_amount
+    FROM ranked_txns rt
+),
+scaled_other_totals AS (
+    SELECT
+        statement_id,
+        COALESCE(SUM(scaled_amount), 0)::numeric(32,2) AS scaled_other_sum
+    FROM scaled_txns
+    WHERE txn_rank > 1
+    GROUP BY statement_id
+),
+final_amounts AS (
+    SELECT
+        st.transaction_id,
+        CASE
+            WHEN st.txn_rank = 1
+                THEN round(
+                    (lts.max_statement_total - COALESCE(sot.scaled_other_sum, 0))::numeric,
+                    2
+                )
+            ELSE st.scaled_amount
+        END AS final_amount
+    FROM scaled_txns st
+    JOIN limits_to_scale lts ON lts.statement_id = st.statement_id
+    LEFT JOIN scaled_other_totals sot ON sot.statement_id = st.statement_id
+)
+UPDATE transaction t
+SET amount = GREATEST(fa.final_amount, 0.01)::numeric(32,2)
+FROM final_amounts fa
+WHERE t.id = fa.transaction_id;
 
 -- =============================================================================
 -- INSERT TRANSACTION TAGS
