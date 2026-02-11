@@ -55,6 +55,14 @@ vi.mock('@/composables/useStatementUpload', () => ({
   })
 }))
 
+// Mock useRules composable
+const mockApplyRules = vi.fn()
+vi.mock('@/composables/useRules', () => ({
+  useRules: () => ({
+    applyRules: mockApplyRules,
+  })
+}))
+
 // Mock useToast
 vi.mock('primevue/usetoast', () => ({
   useToast: () => ({
@@ -151,6 +159,11 @@ describe('UploadStatementModal', () => {
       created_at: '2024-01-01',
       updated_at: '2024-01-01',
       completed_at: '2024-01-01',
+    })
+    mockApplyRules.mockResolvedValue({
+      transactions_processed: 0,
+      tags_applied: 0,
+      details: [],
     })
   })
 
