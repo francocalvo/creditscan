@@ -4,8 +4,9 @@ import uuid
 from datetime import date
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 
-from sqlalchemy import DECIMAL, Column
+from sqlalchemy import DECIMAL, JSON, Column
 from sqlmodel import Field, SQLModel
 
 
@@ -14,6 +15,13 @@ class StatementStatus(str, Enum):
 
     COMPLETE = "complete"
     PENDING_REVIEW = "pending_review"
+
+
+class StatementReviewTrigger(str, Enum):
+    """Reason why a statement requires manual review."""
+
+    BALANCE_MISMATCH = "balance_mismatch"
+    PARTIAL_EXTRACTION = "partial_extraction"
 
 
 # Base model with shared properties
@@ -37,6 +45,11 @@ class CardStatementBase(SQLModel):
     is_fully_paid: bool = Field(default=False)
     currency: str = Field(default="ARS", max_length=3)
     status: StatementStatus = Field(default=StatementStatus.COMPLETE)
+    review_trigger: StatementReviewTrigger | None = Field(default=None, max_length=64)
+    review_details: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
     source_file_path: str | None = Field(default=None, max_length=500)
 
 

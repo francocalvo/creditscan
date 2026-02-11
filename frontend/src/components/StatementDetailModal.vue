@@ -593,6 +593,116 @@ const formattedPeriod = computed(() => {
   return `${start.toLocaleDateString('en-US', { month: 'short' })} - ${end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
 })
 
+const formatReviewFieldLabel = (fieldKey: string): string => {
+  const labels: Record<string, string> = {
+    'period.start': 'Period start date',
+    'period.end': 'Period end date',
+    'period.due_date': 'Payment due date',
+    current_balance: 'Current balance',
+    transactions: 'Transactions',
+  }
+  return labels[fieldKey] ?? fieldKey
+}
+
+const formatReviewValue = (value: unknown): string | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value.toFixed(2)
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value
+  }
+  return null
+}
+
+const toSafeNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+  return null
+}
+
+const reviewBannerTitle = computed(() => {
+  if (!props.statement?.needsReview) return ''
+  if (props.statement.reviewTrigger === 'balance_mismatch') {
+    return 'This statement needs manual review due to a balance mismatch.'
+  }
+  if (props.statement.reviewTrigger === 'partial_extraction') {
+    return 'This statement needs manual review due to partial PDF extraction.'
+  }
+  return 'This statement needs manual review.'
+})
+
+const reviewBannerText = computed(() => {
+  if (!props.statement?.needsReview) return ''
+  if (props.statement.reviewTrigger === 'balance_mismatch') {
+    return 'The imported transaction total does not reconcile with the statement balance.'
+  }
+  if (props.statement.reviewTrigger === 'partial_extraction') {
+    return 'Some fields or transactions could not be extracted and need verification.'
+  }
+  return 'Please verify the details and mark as reviewed when done.'
+})
+
+const reviewDiagnosticLines = computed<string[]>(() => {
+  if (!props.statement?.needsReview) return []
+  const details = props.statement.reviewDetails
+  if (!details) return []
+
+  if (props.statement.reviewTrigger === 'balance_mismatch') {
+    const lines: string[] = []
+    const currentBalance = formatReviewValue(details['current_balance'])
+    const transactionsTotal = formatReviewValue(details['transactions_total'])
+    const difference = formatReviewValue(details['difference'])
+
+    if (currentBalance && transactionsTotal) {
+      lines.push(
+        `Current balance: ${currentBalance}; Sum of imported transactions: ${transactionsTotal}`,
+      )
+    }
+    if (difference) {
+      lines.push(`Difference: ${difference}`)
+    }
+    return lines
+  }
+
+  if (props.statement.reviewTrigger === 'partial_extraction') {
+    const lines: string[] = []
+    const missingRaw = details['missing_fields']
+    if (Array.isArray(missingRaw) && missingRaw.length > 0) {
+      const missingFields = missingRaw
+        .filter((field): field is string => typeof field === 'string' && field.length > 0)
+        .map(formatReviewFieldLabel)
+      if (missingFields.length > 0) {
+        lines.push(`Missing fields: ${missingFields.join(', ')}`)
+      }
+    }
+
+    const skippedTransactions = toSafeNumber(details['skipped_transactions'])
+    if (skippedTransactions !== null && skippedTransactions > 0) {
+      lines.push(`Skipped transactions: ${Math.trunc(skippedTransactions)}`)
+    }
+
+    const importedTransactions = toSafeNumber(details['imported_transactions'])
+    if (importedTransactions !== null) {
+      lines.push(`Imported transactions: ${Math.trunc(importedTransactions)}`)
+    }
+
+    const extractionError = details['extraction_error']
+    if (typeof extractionError === 'string' && extractionError.length > 0) {
+      lines.push(`Extractor note: ${extractionError}`)
+    }
+    return lines
+  }
+
+  return []
+})
+
 // Helper functions
 const formatCurrency = (amount: number | null): string => {
   if (amount === null) return '$0.00'
@@ -856,10 +966,13 @@ const handleDelete = () => {
       >
         <div class="review-banner-content">
           <div>
-            <strong>This statement needs manual review.</strong>
-            <p class="review-banner-text">
-              It may contain errors or incomplete data from the PDF import. Please verify the details and mark as reviewed when done.
-            </p>
+            <strong>{{ reviewBannerTitle }}</strong>
+            <p class="review-banner-text">{{ reviewBannerText }}</p>
+            <ul v-if="reviewDiagnosticLines.length > 0" class="review-diagnostic-list">
+              <li v-for="line in reviewDiagnosticLines" :key="line" class="review-diagnostic-item">
+                {{ line }}
+              </li>
+            </ul>
           </div>
           <Button
             label="Mark as Reviewed"
@@ -1461,6 +1574,16 @@ const handleDelete = () => {
   margin: 0.25rem 0 0 0;
   font-size: 0.813rem;
   font-weight: 400;
+}
+
+.review-diagnostic-list {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1rem;
+}
+
+.review-diagnostic-item {
+  margin: 0.125rem 0;
+  font-size: 0.813rem;
 }
 
 .header-badges {
