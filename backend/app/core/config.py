@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     RATE_EXTRACTION_MINUTE: int = 0  # UTC minute
 
     # Ntfy notification configuration
-    NTFY_INTERNAL_URL: str = "http://ntfy:80"
+    NTFY_INTERNAL_URL: str = "https://ntfy.sh"
     NOTIFICATION_HOUR: int = 22  # UTC hour
     NOTIFICATION_MINUTE: int = 0  # UTC minute
 

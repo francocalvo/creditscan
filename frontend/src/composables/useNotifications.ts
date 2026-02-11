@@ -1,7 +1,11 @@
 import { ref } from 'vue'
 import { UsersService, NotificationsService } from '@/api'
 
-const ntfyPublicUrl = import.meta.env.VITE_NTFY_URL || 'https://ntfy.localhost'
+function getNtfyBaseUrl(): string {
+  return import.meta.env.VITE_NTFY_URL || 'https://ntfy.sh'
+}
+
+const ntfyPublicUrl = getNtfyBaseUrl()
 
 export function useNotifications() {
   const isEnabled = ref(false)

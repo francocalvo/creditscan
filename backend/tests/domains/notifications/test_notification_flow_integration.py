@@ -108,7 +108,7 @@ async def test_execute_sends_notifications_for_enabled_users(
     card = _create_card(db, user, alias="My Visa")
     _create_statement(db, card, current_balance=Decimal("800.00"))
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     mock_ntfy.send = AsyncMock(return_value=True)
 
     scheduler = NotificationScheduler(
@@ -136,7 +136,7 @@ async def test_execute_skips_disabled_users(db: Session) -> None:
     _create_statement(db, card_enabled)
     _create_statement(db, card_disabled)
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     mock_ntfy.send = AsyncMock(return_value=True)
 
     scheduler = NotificationScheduler(
@@ -161,7 +161,7 @@ async def test_execute_handles_multiple_users(db: Session) -> None:
     _create_statement(db, card_a, current_balance=Decimal("100.00"))
     _create_statement(db, card_b, current_balance=Decimal("200.00"))
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     mock_ntfy.send = AsyncMock(return_value=True)
 
     scheduler = NotificationScheduler(
@@ -181,7 +181,7 @@ async def test_execute_with_no_enabled_users(db: Session) -> None:
     """Scheduler completes gracefully when no users have notifications on."""
     _create_user(db, notifications_enabled=False)
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     mock_ntfy.send = AsyncMock(return_value=True)
 
     scheduler = NotificationScheduler(
@@ -209,7 +209,7 @@ async def test_execute_with_mixed_paid_and_unpaid(db: Session) -> None:
         due_date=date.today() + timedelta(days=5),
     )
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     mock_ntfy.send = AsyncMock(return_value=True)
 
     scheduler = NotificationScheduler(
@@ -235,7 +235,7 @@ async def test_execute_continues_after_ntfy_failure(db: Session) -> None:
     _create_statement(db, card_a)
     _create_statement(db, card_b)
 
-    mock_ntfy = NtfyClient(server_url="http://ntfy:80")
+    mock_ntfy = NtfyClient(server_url="https://ntfy.sh")
     # First call fails, second succeeds
     mock_ntfy.send = AsyncMock(side_effect=[False, True])
 

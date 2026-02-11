@@ -78,7 +78,7 @@ def _create_statement(
 
 @pytest.fixture
 def mock_ntfy() -> NtfyClient:
-    client = NtfyClient(server_url="http://ntfy:80")
+    client = NtfyClient(server_url="https://ntfy.sh")
     client.send = AsyncMock(return_value=True)
     return client
 

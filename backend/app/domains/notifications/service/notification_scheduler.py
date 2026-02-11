@@ -28,7 +28,7 @@ class NotificationScheduler:
         self.scheduled_time = time(hour=hour, minute=minute)
         self.session_factory = session_factory
         self.ntfy_client_factory = ntfy_client_factory or (
-            lambda: NtfyClient("http://ntfy:80")
+            lambda: NtfyClient("https://ntfy.sh")
         )
         self._task: asyncio.Task[Any] | None = None
         self._running = False

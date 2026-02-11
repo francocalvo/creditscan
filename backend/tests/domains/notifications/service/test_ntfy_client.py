@@ -8,13 +8,13 @@ from app.domains.notifications.service.ntfy_client import NtfyClient
 
 @pytest.fixture
 def client() -> NtfyClient:
-    return NtfyClient(server_url="http://ntfy:80")
+    return NtfyClient(server_url="https://ntfy.sh")
 
 
 @pytest.mark.asyncio
 async def test_send_success(client: NtfyClient) -> None:
     mock_response = httpx.Response(
-        200, json={"id": "abc"}, request=httpx.Request("POST", "http://ntfy:80")
+        200, json={"id": "abc"}, request=httpx.Request("POST", "https://ntfy.sh")
     )
     with patch(
         "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response
@@ -32,7 +32,7 @@ async def test_send_success(client: NtfyClient) -> None:
 @pytest.mark.asyncio
 async def test_send_correct_payload(client: NtfyClient) -> None:
     mock_response = httpx.Response(
-        200, json={"id": "abc"}, request=httpx.Request("POST", "http://ntfy:80")
+        200, json={"id": "abc"}, request=httpx.Request("POST", "https://ntfy.sh")
     )
     with patch(
         "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response
@@ -45,7 +45,7 @@ async def test_send_correct_payload(client: NtfyClient) -> None:
             tags=["credit_card"],
         )
     mock_post.assert_called_once_with(
-        "http://ntfy:80",
+        "https://ntfy.sh",
         json={
             "topic": "pf-app-test",
             "title": "Test Title",
@@ -59,7 +59,7 @@ async def test_send_correct_payload(client: NtfyClient) -> None:
 @pytest.mark.asyncio
 async def test_send_omits_tags_when_none(client: NtfyClient) -> None:
     mock_response = httpx.Response(
-        200, json={"id": "abc"}, request=httpx.Request("POST", "http://ntfy:80")
+        200, json={"id": "abc"}, request=httpx.Request("POST", "https://ntfy.sh")
     )
     with patch(
         "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response
@@ -91,7 +91,9 @@ async def test_send_failure_returns_false(client: NtfyClient) -> None:
 
 @pytest.mark.asyncio
 async def test_send_http_error_returns_false(client: NtfyClient) -> None:
-    mock_response = httpx.Response(500, request=httpx.Request("POST", "http://ntfy:80"))
+    mock_response = httpx.Response(
+        500, request=httpx.Request("POST", "https://ntfy.sh")
+    )
     with patch(
         "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response
     ):
