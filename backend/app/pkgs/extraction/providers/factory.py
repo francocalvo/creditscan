@@ -2,8 +2,10 @@
 
 from app.core.config import settings
 from app.pkgs.extraction.client import OpenRouterClient
+from app.pkgs.extraction.groq_client import GroqClient
 from app.pkgs.extraction.providers.base import ExtractionProvider
 from app.pkgs.extraction.providers.composite_provider import CompositeExtractionProvider
+from app.pkgs.extraction.providers.groq_provider import GroqExtractionProvider
 from app.pkgs.extraction.providers.openrouter_provider import (
     OpenRouterExtractionProvider,
 )
@@ -50,9 +52,25 @@ def _build_provider(provider_name: str) -> ExtractionProvider:
             statement_models=statement_models,
         )
 
+    if normalized == "groq":
+        client = GroqClient(api_key=settings.GROQ_API_KEY)
+        ocr_models = _parse_models(
+            settings.GROQ_OCR_MODELS,
+            GroqExtractionProvider.DEFAULT_OCR_MODELS,
+        )
+        statement_models = _parse_models(
+            settings.GROQ_STATEMENT_MODELS,
+            GroqExtractionProvider.DEFAULT_STATEMENT_MODELS,
+        )
+        return GroqExtractionProvider(
+            client=client,
+            ocr_models=ocr_models,
+            statement_models=statement_models,
+        )
+
     raise ValueError(
         f"Unsupported extraction provider '{provider_name}'. "
-        "Supported providers: openrouter, zai"
+        "Supported providers: openrouter, zai, groq"
     )
 
 
