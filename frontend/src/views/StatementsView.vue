@@ -643,6 +643,17 @@ const handleStatementUpdated = async () => {
   await Promise.all([fetchStatements(), fetchBalance()])
 }
 
+const handleStatementDeleted = async () => {
+  selectedStatement.value = null
+  await Promise.all([fetchStatements(), fetchBalance()])
+  toast.add({
+    severity: 'success',
+    summary: 'Statement Deleted',
+    detail: 'The statement has been successfully deleted.',
+    life: 3000,
+  })
+}
+
 const handleEditStatementFromPayment = () => {
   if (!selectedStatement.value) return
   if (isTransitioningModals.value) return
@@ -1231,6 +1242,7 @@ const handleLimitSaved = () => {
       :start-in-edit-mode="detailStartInEditMode"
       @pay="handlePayFromDetail"
       @statement-updated="handleStatementUpdated"
+      @statement-deleted="handleStatementDeleted"
     />
 
     <!-- Add Card Modal -->

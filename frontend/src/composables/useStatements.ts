@@ -541,6 +541,41 @@ export function useStatements() {
     }
   }
 
+  const deleteStatement = async (statementId: string) => {
+    error.value = null
+
+    try {
+      const token =
+        typeof OpenAPI.TOKEN === 'function'
+          ? await OpenAPI.TOKEN({
+              method: 'DELETE',
+              url: `/api/v1/card-statements/${statementId}`,
+            } as ApiRequestOptions<string>)
+          : OpenAPI.TOKEN || ''
+
+      const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to delete statement: ${response.statusText}`)
+      }
+
+      // Remove statement from local array
+      statements.value = statements.value.filter((s) => s.id !== statementId)
+    } catch (e) {
+      error.value = e instanceof Error ? e : new Error('Failed to delete statement')
+      console.error('Error deleting statement:', e)
+      throw error.value
+    }
+  }
+
   return {
     statements,
     statementsWithCard,
@@ -554,6 +589,7 @@ export function useStatements() {
     createPayment,
     updateStatement,
     updateCardLimit,
+    deleteStatement,
     deleteCard,
     formatCurrency,
     formatDate,
