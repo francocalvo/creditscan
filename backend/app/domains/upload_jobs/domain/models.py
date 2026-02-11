@@ -4,7 +4,8 @@ import uuid
 from datetime import UTC, datetime
 from enum import Enum
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Column, ForeignKey, UniqueConstraint
+from sqlalchemy import Uuid as SAUuid
 from sqlmodel import Field, SQLModel
 
 
@@ -37,7 +38,12 @@ class UploadJob(SQLModel, table=True):
     file_path: str = Field(max_length=500)
     file_size: int
     statement_id: uuid.UUID | None = Field(
-        default=None, foreign_key="card_statement.id"
+        default=None,
+        sa_column=Column(
+            SAUuid(),
+            ForeignKey("card_statement.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     error_message: str | None = Field(default=None, max_length=2000)
     retry_count: int = Field(default=0)

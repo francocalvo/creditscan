@@ -6,7 +6,8 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import DECIMAL, Column
+from sqlalchemy import DECIMAL, Column, ForeignKey
+from sqlalchemy import Uuid as SAUuid
 from sqlmodel import Field, SQLModel
 
 
@@ -36,6 +37,14 @@ class Payment(PaymentBase, table=True):
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4, primary_key=True, alias="payment_id"
+    )
+    statement_id: uuid.UUID = Field(
+        sa_column=Column(
+            SAUuid(),
+            ForeignKey("card_statement.id", ondelete="CASCADE"),
+            index=True,
+            nullable=False,
+        )
     )
 
 

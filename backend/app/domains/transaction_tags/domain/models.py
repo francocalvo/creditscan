@@ -2,6 +2,8 @@
 
 import uuid
 
+from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Uuid as SAUuid
 from sqlmodel import Field, SQLModel
 
 
@@ -12,12 +14,18 @@ class TransactionTag(SQLModel, table=True):
     __tablename__ = "transaction_tags"
 
     transaction_id: uuid.UUID = Field(
-        foreign_key="transaction.id",
-        primary_key=True,
+        sa_column=Column(
+            SAUuid(),
+            ForeignKey("transaction.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
     )
     tag_id: uuid.UUID = Field(
-        foreign_key="tags.tag_id",
-        primary_key=True,
+        sa_column=Column(
+            SAUuid(),
+            ForeignKey("tags.tag_id", ondelete="CASCADE"),
+            primary_key=True,
+        )
     )
 
 
