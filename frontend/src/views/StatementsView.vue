@@ -794,9 +794,6 @@ const handleLimitSaved = () => {
         </div>
 
         <div class="filter-controls">
-          <button class="filter-button">
-            <i class="pi pi-cog"></i>
-          </button>
           <select v-model="filterStatus" class="filter-select">
             <option value="all">All</option>
             <option value="needs_review">Needs Review</option>
@@ -1333,21 +1330,6 @@ const handleLimitSaved = () => {
 .filter-controls {
   display: flex;
   gap: 12px;
-}
-
-.filter-button {
-  padding: 12px 16px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--text-body);
-  transition: all 0.2s;
-}
-
-.filter-button:hover {
-  background: var(--surface-muted);
 }
 
 .filter-select {

@@ -115,7 +115,12 @@ class Settings(BaseSettings):
     ZAI_OCR_MODELS: str = "glm-ocr,glm-ocr"
     ZAI_STATEMENT_MODELS: str = "glm-4.5-air,glm-4.5-air"
 
-    # Extraction provider configuration (openrouter | zai)
+    # Groq API configuration
+    GROQ_API_KEY: str = ""
+    GROQ_OCR_MODELS: str = "meta-llama/llama-4-maverick-17b-128e-instruct,meta-llama/llama-4-maverick-17b-128e-instruct"
+    GROQ_STATEMENT_MODELS: str = "openai/gpt-oss-120b,openai/gpt-oss-120b"
+
+    # Extraction provider configuration (openrouter | zai | groq)
     EXTRACTION_PROVIDER: str = "openrouter"
     EXTRACTION_OCR_PROVIDER: str = ""
     EXTRACTION_STATEMENT_PROVIDER: str = ""
