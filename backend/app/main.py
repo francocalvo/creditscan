@@ -9,6 +9,10 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api.main import api_router
 from app.core.config import settings
 from app.domains.currency.service.rate_scheduler import RateExtractionScheduler
+from app.domains.notifications.service.notification_scheduler import (
+    NotificationScheduler,
+)
+from app.domains.notifications.service.ntfy_client import NtfyClient
 from app.domains.upload_jobs.service.job_resumption import resume_pending_jobs
 
 
@@ -24,10 +28,18 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     )
     scheduler.start()
 
+    notification_scheduler = NotificationScheduler(
+        hour=settings.NOTIFICATION_HOUR,
+        minute=settings.NOTIFICATION_MINUTE,
+        ntfy_client_factory=lambda: NtfyClient(settings.NTFY_INTERNAL_URL),
+    )
+    notification_scheduler.start()
+
     yield
 
     # Shutdown tasks
     await scheduler.stop()
+    await notification_scheduler.stop()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

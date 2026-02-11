@@ -22,5 +22,8 @@ backend/.coverage
 backend/coverage.xml
 frontend/coverage/
 
+# Environment (secrets)
+.env
+
 # Local dev data volumes
 .data/

@@ -82,6 +82,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
       - LEDGER_PATH=${LEDGER_PATH}
+      - NTFY_INTERNAL_URL=${NTFY_INTERNAL_URL}
+      - NOTIFICATION_HOUR=${NOTIFICATION_HOUR}
+      - NOTIFICATION_MINUTE=${NOTIFICATION_MINUTE}
 
   backend:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
@@ -118,6 +121,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
       - LEDGER_PATH=${LEDGER_PATH}
+      - NTFY_INTERNAL_URL=${NTFY_INTERNAL_URL}
+      - NOTIFICATION_HOUR=${NOTIFICATION_HOUR}
+      - NOTIFICATION_MINUTE=${NOTIFICATION_MINUTE}
 
     healthcheck:
       test:
@@ -169,6 +175,7 @@ services:
       context: ./frontend
       args:
         - VITE_API_URL=https://api.${DOMAIN?Variable not set}
+        - VITE_NTFY_URL=https://ntfy.sh
         - NODE_ENV=production
     labels:
       - traefik.enable=true

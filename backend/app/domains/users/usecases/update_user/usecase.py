@@ -46,10 +46,16 @@ class UpdateUserUseCase:
             if existing_user and existing_user.id != user_id:
                 raise DuplicateUserError("User with this email already exists")
 
-        # Convert UserUpdateMe to UserUpdate if needed, preserving only set fields
+        # Auto-generate ntfy_topic when enabling notifications without one
         if isinstance(user_data, UserUpdateMe):
-            # Use model_dump(exclude_unset=True) to only include explicitly provided fields
             update_dict = user_data.model_dump(exclude_unset=True)
+            current_user = self.user_service.get_user(user_id)
+            if (
+                update_dict.get("notifications_enabled")
+                and not current_user.ntfy_topic
+                and "ntfy_topic" not in update_dict
+            ):
+                update_dict["ntfy_topic"] = f"pf-app-{uuid.uuid4()}"
             update_data = UserUpdate.model_validate(update_dict)
         else:
             update_data = user_data

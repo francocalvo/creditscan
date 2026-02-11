@@ -5,4 +5,3 @@ export type {
   TransactionsPublic,
   TransactionUpdate,
 } from './types.gen'
-

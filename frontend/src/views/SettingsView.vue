@@ -4,13 +4,15 @@ import TabNavigation from '@/components/dashboard/TabNavigation.vue'
 import ProfileTab from '@/components/settings/ProfileTab.vue'
 import TagsTab from '@/components/settings/TagsTab.vue'
 import RulesTab from '@/components/settings/RulesTab.vue'
+import NotificationsTab from '@/components/settings/NotificationsTab.vue'
 
-const activeTab = ref<'profile' | 'tags' | 'rules'>('profile')
+const activeTab = ref<'profile' | 'tags' | 'rules' | 'notifications'>('profile')
 
 const tabs = [
   { id: 'profile', label: 'Profile' },
   { id: 'tags', label: 'Tags' },
   { id: 'rules', label: 'Rules' },
+  { id: 'notifications', label: 'Notifications' },
 ]
 </script>
 
@@ -20,12 +22,12 @@ const tabs = [
     <div class="section-header">
       <div class="header-left">
         <h1 class="section-title">Settings</h1>
-        <p class="section-subtitle">Manage your profile, tags, and automation rules</p>
+        <p class="section-subtitle">Manage your profile, tags, automation rules, and notifications</p>
       </div>
     </div>
 
     <!-- Tab Navigation -->
-    <TabNavigation :tabs="tabs" :activeTab="activeTab" @update:activeTab="activeTab = $event as 'profile' | 'tags' | 'rules'" />
+    <TabNavigation :tabs="tabs" :activeTab="activeTab" @update:activeTab="activeTab = $event as 'profile' | 'tags' | 'rules' | 'notifications'" />
 
     <!-- Profile Tab -->
     <ProfileTab v-if="activeTab === 'profile'" />
@@ -35,6 +37,9 @@ const tabs = [
 
     <!-- Rules Tab -->
     <RulesTab v-else-if="activeTab === 'rules'" />
+
+    <!-- Notifications Tab -->
+    <NotificationsTab v-else-if="activeTab === 'notifications'" />
   </div>
 </template>
 
