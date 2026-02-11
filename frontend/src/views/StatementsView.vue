@@ -849,9 +849,6 @@ const handleLimitSaved = () => {
                     <i class="pi pi-exclamation-circle"></i>
                     Needs Review
                   </span>
-                  <span v-if="statement.needsReview && statement.reviewReason" class="review-reason">
-                    {{ statement.reviewReason }}
-                  </span>
                 </div>
               </td>
               <td>
@@ -1450,13 +1447,6 @@ const handleLimitSaved = () => {
 
 .review-tag i {
   font-size: 11px;
-}
-
-.review-reason {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  color: var(--text-color-secondary);
 }
 
 .action-buttons {

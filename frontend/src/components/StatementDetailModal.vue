@@ -975,6 +975,7 @@ const handleDelete = () => {
             </ul>
           </div>
           <Button
+            class="review-banner-action"
             label="Mark as Reviewed"
             icon="pi pi-check"
             size="small"
@@ -1564,10 +1565,14 @@ const handleDelete = () => {
 
 .review-banner-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   width: 100%;
+}
+
+.review-banner-action {
+  align-self: flex-start;
 }
 
 .review-banner-text {
