@@ -8,6 +8,8 @@ import InputText from 'primevue/inputtext'
 import DatePicker from 'primevue/datepicker'
 import Checkbox from 'primevue/checkbox'
 import Dropdown from 'primevue/dropdown'
+import ConfirmDialog from 'primevue/confirmdialog'
+import { useConfirm } from 'primevue/useconfirm'
 import StatusBadge from '@/components/dashboard/StatusBadge.vue'
 import { type StatementWithCard } from '@/composables/useStatements'
 import { type CardStatement } from '@/composables/useStatements'
@@ -29,6 +31,7 @@ interface Emits {
   (e: 'update:visible', value: boolean): void
   (e: 'pay', statement: StatementWithCard): void
   (e: 'statement-updated', statement: CardStatement): void
+  (e: 'statement-deleted', statementId: string): void
 }
 
 type SortField = 'txn_date' | 'amount' | 'payee'
@@ -65,7 +68,10 @@ const currencyOptions = [
 const { transactions, totalCount, isLoading, error, fetchTransactions, reset, updateTransaction, createTransaction, deleteTransaction } = useStatementTransactions()
 
 // Statements composable
-const { updateStatement: updateStatementApi } = useStatements()
+const { updateStatement: updateStatementApi, deleteStatement: deleteStatementApi } = useStatements()
+
+// Confirm dialog
+const confirm = useConfirm()
 
 // Tags composables
 const { fetchTags, getTagById } = useTags()
@@ -76,6 +82,7 @@ const isEditMode = ref(false)
 const isSaving = ref(false)
 const saveError = ref<Error | null>(null)
 const isMarkingReviewed = ref(false)
+const isDeleting = ref(false)
 
 const handleMarkAsReviewed = async () => {
   if (!props.statement) return
@@ -775,9 +782,39 @@ const handleSave = async () => {
 const handleCancel = () => {
   exitEditMode()
 }
+
+const handleDelete = () => {
+  if (!props.statement) return
+
+  confirm.require({
+    message: 'Are you sure you want to delete this statement? This action cannot be undone and will also delete all associated transactions.',
+    header: 'Delete Statement',
+    icon: 'pi pi-exclamation-triangle',
+    rejectLabel: 'Cancel',
+    acceptLabel: 'Delete',
+    rejectClass: 'p-button-secondary p-button-outlined',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      if (!props.statement) return
+
+      isDeleting.value = true
+      try {
+        await deleteStatementApi(props.statement.id)
+        emit('statement-deleted', props.statement.id)
+        internalVisible.value = false
+      } catch (e) {
+        saveError.value = e instanceof Error ? e : new Error('Failed to delete statement')
+        console.error('Error deleting statement:', e)
+      } finally {
+        isDeleting.value = false
+      }
+    },
+  })
+}
 </script>
 
 <template>
+  <ConfirmDialog />
   <Dialog
     v-model:visible="internalVisible"
     modal
@@ -1300,6 +1337,15 @@ const handleCancel = () => {
         <div class="footer-actions">
           <!-- View mode buttons -->
           <template v-if="!isEditMode">
+            <Button
+              label="Delete"
+              icon="pi pi-trash"
+              :loading="isDeleting"
+              :disabled="isDeleting"
+              @click="handleDelete"
+              severity="danger"
+              outlined
+            />
             <Button
               label="Pay"
               icon="pi pi-credit-card"
