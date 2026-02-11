@@ -29,6 +29,7 @@ dependencies = [
     "cryptography>=46.0.3",
     "boto3>=1.28.0",
     "zai-sdk>=0.2.2",
+    "pymupdf>=1.26.4",
 ]
     #"psycopg[binary]<4.0.0,>=3.1.13",
 

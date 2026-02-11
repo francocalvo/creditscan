@@ -7,6 +7,8 @@ from typing import Any
 import httpx
 
 logger = logging.getLogger(__name__)
+MAX_GROQ_OCR_PAGES = 8
+GROQ_OCR_DPI = 150
 
 
 class GroqClient:
@@ -50,22 +52,19 @@ class GroqClient:
             httpx.TimeoutException: If request exceeds timeout
             httpx.HTTPStatusError: If API returns error status
         """
-        pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        image_data_urls = self._pdf_to_png_data_urls(pdf_bytes)
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        content.extend(
+            {"type": "image_url", "image_url": {"url": image_data_url}}
+            for image_data_url in image_data_urls
+        )
 
         payload: dict[str, Any] = {
             "model": model,
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:application/pdf;base64,{pdf_base64}"
-                            },
-                        },
-                    ],
+                    "content": content,
                 }
             ],
         }
@@ -89,6 +88,55 @@ class GroqClient:
             result: dict[str, object] = response.json()
             logger.info(f"Received response from Groq for model: {model}")
             return result
+
+    def _pdf_to_png_data_urls(
+        self,
+        pdf_bytes: bytes,
+        *,
+        max_pages: int = MAX_GROQ_OCR_PAGES,
+        dpi: int = GROQ_OCR_DPI,
+    ) -> list[str]:
+        """Render PDF pages into PNG data URLs for Groq Vision.
+
+        Groq vision accepts image inputs but not raw PDF data URLs, so we convert
+        each page to a PNG and send it as an image_url item.
+        """
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:  # pragma: no cover - dependency guard
+            raise RuntimeError(
+                "PyMuPDF is required for Groq OCR PDF conversion. "
+                "Install dependency 'pymupdf'."
+            ) from exc
+
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        try:
+            if document.page_count == 0:
+                raise ValueError("PDF has no pages")
+
+            page_count = min(document.page_count, max_pages)
+            if document.page_count > max_pages:
+                logger.warning(
+                    "Groq OCR PDF has %s pages; truncating to first %s pages",
+                    document.page_count,
+                    max_pages,
+                )
+
+            zoom = dpi / 72.0
+            matrix = fitz.Matrix(zoom, zoom)
+            images: list[str] = []
+            for page_index in range(page_count):
+                page = document.load_page(page_index)
+                pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+                image_bytes = pixmap.tobytes("png")
+                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+                images.append(f"data:image/png;base64,{image_base64}")
+
+            if not images:
+                raise ValueError("PDF conversion produced no images")
+            return images
+        finally:
+            document.close()
 
     async def complete_with_text(
         self,
