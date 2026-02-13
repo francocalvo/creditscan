@@ -58,7 +58,7 @@ export function useTags() {
           ? await OpenAPI.TOKEN({
               method: 'GET',
               url: '/api/v1/tags/',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
       const url = `${OpenAPI.BASE}/api/v1/tags/`
 
@@ -115,7 +115,7 @@ export function useTags() {
         ? await OpenAPI.TOKEN({
             method: 'POST',
             url: '/api/v1/tags/',
-          } as ApiRequestOptions<string>)
+          } as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
 
     if (!token) {
@@ -194,7 +194,7 @@ export function useTags() {
         ? await OpenAPI.TOKEN({
             method: 'PATCH',
             url: `/api/v1/tags/${tagId}`,
-          } as ApiRequestOptions<string>)
+          } as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
 
     if (!token) {
@@ -271,7 +271,7 @@ export function useTags() {
         ? await OpenAPI.TOKEN({
             method: 'DELETE',
             url: `/api/v1/tags/${tagId}`,
-          } as ApiRequestOptions<string>)
+          } as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
 
     if (!token) {

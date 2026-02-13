@@ -89,7 +89,7 @@ export function useCreditCards() {
           ? await OpenAPI.TOKEN({
               method: 'GET',
               url: '/api/v1/credit-cards',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
       const queryParams = new URLSearchParams()
 
@@ -143,7 +143,7 @@ export function useCreditCards() {
         ? await OpenAPI.TOKEN({
             method: 'POST',
             url: '/api/v1/credit-cards/',
-          } as ApiRequestOptions<string>)
+          } as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
 
     if (!token) {
@@ -218,7 +218,7 @@ export function useCreditCards() {
         ? await OpenAPI.TOKEN({
             method: 'DELETE',
             url: `/api/v1/credit-cards/${cardId}`,
-          } as ApiRequestOptions<string>)
+          } as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
 
     if (!token) {

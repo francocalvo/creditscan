@@ -36,7 +36,7 @@ export function useTransactionTags() {
           ? await OpenAPI.TOKEN({
               method: 'POST',
               url: '/api/v1/transaction-tags/batch',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transaction-tags/batch`

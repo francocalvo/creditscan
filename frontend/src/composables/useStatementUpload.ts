@@ -47,7 +47,7 @@ export function useStatementUpload() {
   async function getAuthToken(): Promise<string> {
     const token =
       typeof OpenAPI.TOKEN === 'function'
-        ? await OpenAPI.TOKEN({} as ApiRequestOptions<string>)
+        ? await OpenAPI.TOKEN({} as ApiRequestOptions)
         : OpenAPI.TOKEN || ''
     return token
   }

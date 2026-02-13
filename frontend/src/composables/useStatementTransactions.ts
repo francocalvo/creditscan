@@ -74,7 +74,7 @@ export function useStatementTransactions() {
           ? await OpenAPI.TOKEN({
               method: 'GET',
               url: '/api/v1/transactions',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const queryParams = new URLSearchParams()
@@ -137,7 +137,7 @@ export function useStatementTransactions() {
           ? await OpenAPI.TOKEN({
               method: 'PATCH',
               url: `/api/v1/transactions/${transactionId}`,
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/${transactionId}`
@@ -187,7 +187,7 @@ export function useStatementTransactions() {
           ? await OpenAPI.TOKEN({
               method: 'POST',
               url: '/api/v1/transactions/',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/`
@@ -234,7 +234,7 @@ export function useStatementTransactions() {
           ? await OpenAPI.TOKEN({
               method: 'DELETE',
               url: `/api/v1/transactions/${transactionId}`,
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/transactions/${transactionId}`

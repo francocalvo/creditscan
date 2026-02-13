@@ -232,7 +232,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'GET',
               url: '/api/v1/card-statements',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
       const queryParams = new URLSearchParams()
 
@@ -377,7 +377,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'GET',
               url: '/api/v1/users/me/balance',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
       const url = `${OpenAPI.BASE}/api/v1/users/me/balance`
 
@@ -416,7 +416,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'POST',
               url: '/api/v1/payments/',
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
       const { useAuthStore } = await import('@/stores/auth')
       const authStore = useAuthStore()
@@ -482,7 +482,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'PATCH',
               url: `/api/v1/card-statements/${statementId}`,
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
@@ -507,10 +507,14 @@ export function useStatements() {
       const index = statements.value.findIndex((s) => s.id === statementId)
       if (index !== -1) {
         const { status: apiStatus, ...rest } = updatedStatement
+        const currentStatement = statements.value[index]
+        if (!currentStatement) {
+          return updatedStatement
+        }
         statements.value[index] = {
-          ...statements.value[index],
+          ...currentStatement,
           ...rest,
-          backend_status: apiStatus ?? statements.value[index].backend_status,
+          backend_status: apiStatus ?? currentStatement.backend_status,
         }
       }
 
@@ -539,7 +543,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'PATCH',
               url: `/api/v1/credit-cards/${cardId}`,
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/credit-cards/${cardId}`
@@ -591,7 +595,7 @@ export function useStatements() {
           ? await OpenAPI.TOKEN({
               method: 'DELETE',
               url: `/api/v1/card-statements/${statementId}`,
-            } as ApiRequestOptions<string>)
+            } as ApiRequestOptions)
           : OpenAPI.TOKEN || ''
 
       const url = `${OpenAPI.BASE}/api/v1/card-statements/${statementId}`
